@@ -1,0 +1,53 @@
+# 🔹 Ignore Python cache and compiled files
+__pycache__/
+*.py[cod]
+*.so
+*.DS_Store
+
+# 🔹 Ignore Virtual Environment
+venv/
+.env/
+*.venv
+
+# 🔹 Ignore API Keys & Credentials
+config.py
+.env
+openai_api_key.txt
+pinecone_api_key.txt
+
+# 🔹 Ignore Model Checkpoints & Hugging Face Cache
+*.bin
+*.ckpt
+*.h5
+*.tflite
+model/
+models/
+huggingface/
+transformers_cache/
+~/.cache/huggingface/
+~/.cache/torch/
+
+# 🔹 Ignore Log Files
+logs/
+*.log
+
+# 🔹 Ignore Jupyter Notebook Checkpoints (if used)
+.ipynb_checkpoints/
+
+# 🔹 Ignore Docker & Deployment Files (if using Docker)
+docker-compose.yml
+.Dockerfile
+*.tar
+*.whl
+
+# 🔹 Ignore IDE & Editor Files
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*.bak
+
+# 🔹 Ignore Database Files (if applicable)
+*.db
+*.sqlite3
