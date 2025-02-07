@@ -21,7 +21,6 @@ pinecone_api_key.txt
 *.h5
 *.tflite
 model/
-models/
 huggingface/
 transformers_cache/
 ~/.cache/huggingface/

@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from models.query_classifier import classify_query
+from models.query_classifier import classify_fiqh_query, classify_non_islamic_query
 from models.query_enhancer import enhance_query
 from models.embedding import generate_embedding
 from models.retriever import retrieve_documents
@@ -27,21 +27,27 @@ async def chat_pipeline(request: ChatRequest):
     
     try:
         # # Step 1: Classify query (fiqh or non-fiqh)
-        is_fiqh = classify_query(user_query)
+        is_non_islamic = classify_non_islamic_query(user_query)
+        if is_non_islamic:
+            return {"response": "This question is not related to the domain of Islamic education. Please ask relevant questions."}
+        
+
+        # # Step 2: Classify query (fiqh or non-fiqh)
+        is_fiqh = classify_fiqh_query(user_query)
         
         if is_fiqh:
             return {"response": "This is a fiqh-related question. Please consult a qualified scholar."}
         
-        # Step 2: Enhance query
+        # Step 3: Enhance query
         enhanced_query = enhance_query(user_query)
 
-        # Step 3: Generate embedding
+        # Step 4: Generate embedding
         query_embedding = generate_embedding(enhanced_query)
 
-        # Step 4: Retrieve relevant documents from Pinecone
+        # Step 5: Retrieve relevant documents from Pinecone
         relevant_docs = retrieve_documents(query_embedding)
 
-        # Step 5: Generate AI response using OpenAI
+        # Step 6: Generate AI response using OpenAI
         ai_response = generate_response(enhanced_query, relevant_docs)
 
         return {"response": ai_response}
