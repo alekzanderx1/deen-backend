@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from models.query_classifier import classify_fiqh_query, classify_non_islamic_query
 from models.query_enhancer import enhance_query
@@ -7,6 +8,15 @@ from models.retriever import retrieve_documents
 from models.response_generator import generate_response
 
 app = FastAPI()
+
+# 🔹 CORS Configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow requests from any origin (change for production)
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allow all headers
+)
 
 # Define request model
 class ChatRequest(BaseModel):
