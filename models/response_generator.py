@@ -49,8 +49,19 @@ def format_references(retrieved_docs: list) -> str:
         chapter = retrieved_docs[i].get("chapter", "Unknown Chapter")
         hadith_number = retrieved_docs[i].get("hadith_number", "N/A")
         text = retrieved_docs[i].get("text", "No text available.")
+        # formatted_references += (
+        #     f"\n**Hadith Reference {i+1}**\n"
+        #     f"- **Source:** {source}\n"
+        #     f"- **Author:** {author}\n"
+        #     f"- **Volume:** {volume}\n"
+        #     f"- **Book:** {book}\n"
+        #     f"- **Chapter:** {chapter}\n"
+        #     f"- **Hadith Number:** {hadith_number}\n"
+        #     f"- **Text:** \"{text}\"\n"
+        #     "---------------------------------------------"
+        # )
         formatted_references += (
-            f"\n**Hadith Reference {i+1}**\n"
+            f"\n--------------------------------------\n"
             f"- **Source:** {source}\n"
             f"- **Author:** {author}\n"
             f"- **Volume:** {volume}\n"
@@ -111,3 +122,38 @@ def generate_response(query: str, retrieved_docs: list):
 
     
     return completion.choices[0].message.content
+
+
+
+def generate_response_stream(query: str, retrieved_docs: list):
+    """
+    Generates a streaming response using OpenAI's API.
+    Yields chunks of text as they are generated.
+    """
+    # Format the retrieved references for better readability
+    references = format_references(retrieved_docs)  # assuming this function is imported
+    user_prompt = (
+        f"User Query: {query}\n\n{references}\n\n"
+        "Based on these references, please provide an answer from the Twelver Shia perspective."
+    )
+    print("user_prompt:", user_prompt)
+
+    # Call OpenAI API with streaming enabled.
+    # Adjust parameters (like model and system prompt) as needed.
+    response = client.chat.completions.create(
+        model="gpt-4o",  # or your chosen model
+        messages=[
+            {"role": "developer", "content": systemPrompt},  # ensure systemPrompt is defined/imported
+            {"role": "user", "content": user_prompt}
+        ],
+        stream=True  # Enable streaming
+    )
+
+    # Iterate over the streamed response and yield text chunks.
+    for chunk in response:
+      # Use attribute access instead of subscripting.
+      delta = chunk.choices[0].delta  # This should give you the delta dictionary.
+      if delta:
+          content = delta.content
+          if content:
+              yield content
