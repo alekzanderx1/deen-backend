@@ -111,3 +111,39 @@ async def chat_pipeline_stream(request: ChatRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+    
+
+@app.post("/references")
+async def references_pipeline(request: ChatRequest):
+    user_query = request.user_query.strip()
+
+    if not user_query:
+        raise HTTPException(status_code=400, detail="Please provide an appropriate query.")
+    
+    try:
+        # # Step 1: Classify query (fiqh or non-fiqh)
+        is_non_islamic = classify_non_islamic_query(user_query)
+        if is_non_islamic:
+            return {"response": "This question is not related to the domain of Islamic education. Please ask relevant questions."}
+        
+
+        # # Step 2: Classify query (fiqh or non-fiqh)
+        is_fiqh = classify_fiqh_query(user_query)
+        
+        if is_fiqh:
+            return {"response": "This is a fiqh-related question. Please consult a qualified scholar."}
+        
+        # Step 3: Enhance query
+        enhanced_query = enhance_query(user_query)
+
+        # Step 4: Generate embedding
+        query_embedding = generate_embedding(enhanced_query)
+
+        # Step 5: Retrieve relevant documents from Pinecone
+        relevant_docs = retrieve_documents(query_embedding)
+
+        # Step 6: Return the retrieved documents
+        return {"response": relevant_docs}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
