@@ -53,17 +53,7 @@ def format_references(retrieved_docs: list) -> str:
         chapter = retrieved_docs[i].get("chapter", "Unknown Chapter")
         hadith_number = retrieved_docs[i].get("hadith_number", "N/A")
         text = retrieved_docs[i].get("text", "No text available.")
-        # formatted_references += (
-        #     f"\n**Hadith Reference {i+1}**\n"
-        #     f"- **Source:** {source}\n"
-        #     f"- **Author:** {author}\n"
-        #     f"- **Volume:** {volume}\n"
-        #     f"- **Book:** {book}\n"
-        #     f"- **Chapter:** {chapter}\n"
-        #     f"- **Hadith Number:** {hadith_number}\n"
-        #     f"- **Text:** \"{text}\"\n"
-        #     "---------------------------------------------"
-        # )
+
         formatted_references += (
             f"\n--------------------------------------\n"
             f"- **Source:** {source}\n"
@@ -77,27 +67,6 @@ def format_references(retrieved_docs: list) -> str:
         )
         if i == 0:
             print(formatted_references)
-    # for idx, doc in enumerate(retrieved_docs, 1):
-    #     metadata = doc.get("metadata", {})
-    #     source = metadata.get("source", "Unknown Source")
-    #     author = metadata.get("author", "Unknown Author")
-    #     volume = metadata.get("volume", "Unknown Volume")
-    #     book = metadata.get("book", "Unknown Book")
-    #     chapter = metadata.get("chapter", "Unknown Chapter")
-    #     hadith_number = metadata.get("hadith_number", "N/A")
-    #     text = metadata.get("text", "No text available.")
-    #     print(metadata)
-    #     formatted_references += (
-    #         f"\n📖 **Hadith Reference {idx}**\n"
-    #         f"- **Source:** {source}\n"
-    #         f"- **Author:** {author}\n"
-    #         f"- **Volume:** {volume}\n"
-    #         f"- **Book:** {book}\n"
-    #         f"- **Chapter:** {chapter}\n"
-    #         f"- **Hadith Number:** {hadith_number}\n"
-    #         f"- **Text:** \"{text}\"\n"
-    #         "---------------------------------------------"
-    #     )
 
     return formatted_references
 

@@ -10,7 +10,6 @@ venv/
 *.venv
 
 # 🔹 Ignore API Keys & Credentials
-config.py
 .env
 openai_api_key.txt
 pinecone_api_key.txt

@@ -1,11 +1,11 @@
 from pinecone import Pinecone, ServerlessSpec
-from config import PINECONE_API_KEY
+from config import PINECONE_API_KEY, DEEN_INDEX_LINK
 
 # Initialize a client
 pc = Pinecone(api_key=PINECONE_API_KEY)
 
 # Connect to your index
-index = pc.Index(host="https://deen-index-1-lscg4rr.svc.aped-4627-b74a.pinecone.io")
+index = pc.Index(host=DEEN_INDEX_LINK)
 
 def retrieve_documents(query_embedding):
     print("INSIDE retrieve_documents")

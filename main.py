@@ -11,6 +11,8 @@ from models.response_generator import generate_response_stream  # import the gen
 
 app = FastAPI()
 
+# RUN USING: uvicorn main:app --reload
+
 # 🔹 CORS Configuration
 app.add_middleware(
     CORSMiddleware,
@@ -146,4 +148,5 @@ async def references_pipeline(request: ChatRequest):
         return {"response": relevant_docs}
         
     except Exception as e:
+        print(f"{str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
