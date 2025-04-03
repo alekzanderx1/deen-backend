@@ -1,11 +1,11 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from models.query_classifier import classify_fiqh_query, classify_non_islamic_query
 from models.query_enhancer import enhance_query
 from models.embedding import generate_embedding
-from models.retriever import retrieve_documents
+from models.retriever import retrieve_documents, retrieve_shia_documents, retrieve_sunni_documents
 from models.response_generator import generate_response
 from models.response_generator import generate_response_stream  # import the generator function
 
@@ -116,7 +116,7 @@ async def chat_pipeline_stream(request: ChatRequest):
     
 
 @app.post("/references")
-async def references_pipeline(request: ChatRequest):
+async def references_pipeline(request: ChatRequest, sect: str = Query("both", enum=["sunni", "shia", "both"])):
     user_query = request.user_query.strip()
 
     if not user_query:
@@ -142,10 +142,13 @@ async def references_pipeline(request: ChatRequest):
         query_embedding = generate_embedding(enhanced_query)
 
         # Step 5: Retrieve relevant documents from Pinecone
-        relevant_docs = retrieve_documents(query_embedding)
+        results = {}
+        if sect in ["shia", "both"]:
+            results["shia"] = retrieve_shia_documents(query_embedding)
+        if sect in ["sunni", "both"]:
+            results["sunni"] = retrieve_sunni_documents(query_embedding)
 
-        # Step 6: Return the retrieved documents
-        return {"response": relevant_docs}
+        return {"response": results}
         
     except Exception as e:
         print(f"{str(e)}")
