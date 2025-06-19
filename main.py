@@ -76,6 +76,8 @@ def stream_message(message: str):
     """
     yield message
 
+
+# Example json body input: {"user_query": "What does Islam say about justice?"}
 @app.post("/chat/stream")
 async def chat_pipeline_stream(request: ChatRequest):
     user_query = request.user_query.strip()
@@ -114,6 +116,11 @@ async def chat_pipeline_stream(request: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
     
+
+
+# Takes query parameter called 'sect', which can equal to sunni, shia, or both.
+# Example usage: http://localhost:8000/references?sect=both
+# Example json body input:: {"user_query": "What does Islam say about justice?"}
 
 @app.post("/references")
 async def references_pipeline(request: ChatRequest, sect: str = Query("both", enum=["sunni", "shia", "both"])):
