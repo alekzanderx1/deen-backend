@@ -1,5 +1,6 @@
 from openai import OpenAI
-from config import OPENAI_API_KEY
+from core.config import OPENAI_API_KEY
+from core import utils
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
@@ -34,77 +35,13 @@ Imam Ja’far as-Sadiq (AS) has said: “There are three qualities with which Al
 """
 
 
-
-def format_references(retrieved_docs: list) -> str:
-    """
-    Formats retrieved hadiths and Quranic references for better readability.
-    """
-    print("INSIDE format_references")
-    formatted_references = "\n\n**Retrieved References:**\n"
-
-    if not retrieved_docs:
-        return formatted_references + "\n(No relevant references were found in the database.)"
-    # print(retrieved_docs)
-    for i in range(len(retrieved_docs)):
-        source = retrieved_docs[i].get("source", "Unknown Source")
-        author = retrieved_docs[i].get("author", "Unknown Author")
-        volume = retrieved_docs[i].get("volume", "Unknown Volume")
-        book = retrieved_docs[i].get("book", "Unknown Book")
-        chapter = retrieved_docs[i].get("chapter", "Unknown Chapter")
-        hadith_number = retrieved_docs[i].get("hadith_number", "N/A")
-        text = retrieved_docs[i].get("text", "No text available.")
-
-        formatted_references += (
-            f"\n--------------------------------------\n"
-            f"- **Source:** {source}\n"
-            f"- **Author:** {author}\n"
-            f"- **Volume:** {volume}\n"
-            f"- **Book:** {book}\n"
-            f"- **Chapter:** {chapter}\n"
-            f"- **Hadith Number:** {hadith_number}\n"
-            f"- **Text:** \"{text}\"\n"
-            "---------------------------------------------"
-        )
-        if i == 0:
-            print(formatted_references)
-
-    return formatted_references
-
-
-
-def generate_response(query: str, retrieved_docs: list):
-    """
-    Generates AI response using OpenAI API.
-    """
-    print("INSIDE generate_response")
-
-    # Format retrieved references
-    references = format_references(retrieved_docs)
-
-    user_prompt = f"User Query: {query}\n\n{references}\n\nBased on these references, please provide an answer from the Twelver Shia perspective."
-    #return "Sample response"
-    print("user_prompt:", user_prompt)
-
-    completion = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "developer", "content": systemPrompt},
-            {"role": "user", "content": user_prompt}
-        ]
-    )
-
-    
-    return completion.choices[0].message.content
-
-
-
 def generate_response_stream(query: str, retrieved_docs: list):
     """
     Generates a streaming response using OpenAI's API.
     Yields chunks of text as they are generated.
     """
     # Format the retrieved references for better readability
-    references = format_references(retrieved_docs)  # assuming this function is imported
+    references = utils.format_references(retrieved_docs)  # assuming this function is imported
     user_prompt = (
         f"User Query: {query}\n\n{references}\n\n"
         "Based on these references, please provide an answer from the Twelver Shia perspective."
