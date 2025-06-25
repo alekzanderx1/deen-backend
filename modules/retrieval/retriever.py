@@ -1,5 +1,5 @@
 from pinecone import Pinecone, ServerlessSpec
-from config import PINECONE_API_KEY, DEEN_INDEX_LINK, DEEN_SUNNI_INDEX_LINK
+from core.config import PINECONE_API_KEY, DEEN_INDEX_LINK, DEEN_SUNNI_INDEX_LINK
 
 # Initialize a client
 pc = Pinecone(api_key=PINECONE_API_KEY)

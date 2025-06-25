@@ -6,8 +6,10 @@ __pycache__/
 
 # 🔹 Ignore Virtual Environment
 venv/
+venv1/
 .env/
 *.venv
+*.venv1
 
 # 🔹 Ignore API Keys & Credentials
 .env
