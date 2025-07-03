@@ -1,53 +1,39 @@
-from pinecone import Pinecone, ServerlessSpec
-from core.config import PINECONE_API_KEY, DEEN_INDEX_LINK, DEEN_SUNNI_INDEX_LINK
-
-# Initialize a client
-pc = Pinecone(api_key=PINECONE_API_KEY)
-
-# Connect to your index
-index = pc.Index(host=DEEN_INDEX_LINK)
+from core.config import  DEEN_INDEX_NAME, DEEN_SUNNI_INDEX_NAME
+import core.vectorstore as vectorstore_module
+import traceback
 
 def retrieve_documents(query_embedding):
-    # Connect to your index
-    index = pc.Index(host=DEEN_INDEX_LINK)
-    print("INSIDE retrieve_documents")
-    results = index.query(
-        namespace="ns1",
-        vector=query_embedding,
-        top_k=7,
-        include_values=False,
-        include_metadata=True
-    )
-    print("Documents retrieved. Example:", results["matches"][0]["metadata"])
-    return [match["metadata"] for match in results["matches"]]
+    print("INSIDE retrive_documents")
+    try:
+        vectorstore = vectorstore_module._get_vectorstore(DEEN_INDEX_NAME)
+        docs = vectorstore.search(query_embedding,'similarity',k=7)
+        return docs
+    except Exception as e:
+        print(f"Error retrieving documents: {e}")
+        traceback.print_exc()
+        return []
 
 def retrieve_shia_documents(query_embedding):
-    # Connect to your index
-    index = pc.Index(host=DEEN_INDEX_LINK)
-    print("INSIDE retrieve_documents")
-    results = index.query(
-        namespace="ns1",
-        vector=query_embedding,
-        top_k=7,
-        include_values=False,
-        include_metadata=True
-    )
-    print("Documents retrieved. Example:", results["matches"][0]["metadata"])
-    return [match["metadata"] for match in results["matches"]]
+    print("INSIDE shia retrive_documents")
+    try:
+        vectorstore = vectorstore_module._get_vectorstore(DEEN_INDEX_NAME)
+        docs = vectorstore.search(query_embedding,'similarity',k=7)
+        return docs
+    except Exception as e:
+        print(f"Error retrieving documents: {e}")
+        traceback.print_exc()
+        return []
 
 def retrieve_sunni_documents(query_embedding):
-    # Connect to your index
-    index = pc.Index(host=DEEN_SUNNI_INDEX_LINK)
-    print("INSIDE retrieve_documents")
-    results = index.query(
-        namespace="ns1",
-        vector=query_embedding,
-        top_k=7,
-        include_values=False,
-        include_metadata=True
-    )
-    print("Documents retrieved. Example:", results["matches"][0]["metadata"])
-    return [match["metadata"] for match in results["matches"]]
+    print("INSIDE sunni retrive_documents")
+    try:
+        vectorstore = vectorstore_module._get_vectorstore(DEEN_SUNNI_INDEX_NAME)
+        docs = vectorstore.search(query_embedding,'similarity',k=7)
+        return docs
+    except Exception as e:
+        print(f"Error retrieving documents: {e}")
+        traceback.print_exc()
+        return []
 
 """
 Returns a list of the following:
