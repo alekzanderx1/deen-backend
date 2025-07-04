@@ -25,13 +25,10 @@ def chat_pipeline(user_query: str):
     # Step 3: Enhance query
     enhanced_query = enhancer.enhance_query(user_query)
 
-    # Step 4: Generate embedding
-    query_embedding = embedder.generate_embedding(enhanced_query)
+    # Step 4: Retrieve relevant documents from Pinecone
+    relevant_docs = retriever.retrieve_documents(enhanced_query)
 
-    # Step 5: Retrieve relevant documents from Pinecone
-    relevant_docs = retriever.retrieve_documents(query_embedding)
-
-    # Step 6: Generate AI response using OpenAI
+    # Step 5: Generate AI response using OpenAI
     ai_response = generator.generate_response(enhanced_query, relevant_docs)
 
     return ai_response
@@ -53,13 +50,10 @@ def chat_pipeline_streaming(user_query: str):
     # Step 2: Enhance the query
     enhanced_query = enhancer.enhance_query(user_query)
 
-    # Step 3: Generate embedding
-    query_embedding = embedder.generate_embedding(enhanced_query)
+    # Step 3: Retrieve relevant documents from Pinecone
+    relevant_docs = retriever.retrieve_documents(enhanced_query)
 
-    # Step 4: Retrieve relevant documents from Pinecone
-    relevant_docs = retriever.retrieve_documents(query_embedding)
-
-    # Step 5: Stream the AI response from OpenAI
+    # Step 4: Stream the AI response from OpenAI
     response_generator = stream_generator.generate_response_stream(enhanced_query, relevant_docs)
 
     # Return a StreamingResponse with appropriate media type.
@@ -83,14 +77,11 @@ def references_pipeline(user_query: str, sect: str):
     # Step 3: Enhance query
     enhanced_query = enhancer.enhance_query(user_query)
 
-    # Step 4: Generate embedding
-    query_embedding = embedder.generate_embedding(enhanced_query)
-
-    # Step 5: Retrieve relevant documents from Pinecone
+    # Step 4: Retrieve relevant documents from Pinecone
     results = {}
     if sect in ["shia", "both"]:
-        results["shia"] = retriever.retrieve_shia_documents(query_embedding)
+        results["shia"] = retriever.retrieve_shia_documents(enhanced_query)
     if sect in ["sunni", "both"]:
-        results["sunni"] = retriever.retrieve_sunni_documents(query_embedding)
+        results["sunni"] = retriever.retrieve_sunni_documents(enhanced_query)
 
     return results
