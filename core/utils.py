@@ -1,5 +1,7 @@
 from langchain_core.documents import Document
 import traceback
+import json
+
 def format_references(retrieved_docs: list[Document]) -> str:
     """
     Formats retrieved hadiths and Quranic references for better readability.
@@ -42,6 +44,37 @@ def format_references(retrieved_docs: list[Document]) -> str:
         formatted_references += "\n\n**Error formatting references. Please check the data structure.**"
 
     return formatted_references
+
+def format_references_as_json(retrieved_docs: list[Document]):
+    """
+    Formats retrieved hadiths and Quranic references into JSON format
+    """
+    print("INSIDE format_references_as_json")
+    result = {"references": []}
+    formatted_references = []
+    try:
+        if not retrieved_docs:
+            return result
+
+        for doc in retrieved_docs:
+            reference = {
+                "source": doc.metadata.get("source", "Unknown Source"),
+                "author": doc.metadata.get("author", "Unknown Author"),
+                "volume": doc.metadata.get("volume", "Unknown Volume"),
+                "book": doc.metadata.get("book", "Unknown Book"),
+                "chapter": doc.metadata.get("chapter", "Unknown Chapter"),
+                "hadith_number": doc.metadata.get("hadith_number", "N/A"),
+                "text": doc.page_content.strip() if doc.page_content else "No text available"
+            }
+            formatted_references.append(reference)
+    except Exception as e:
+        print(f"Error formatting references: {e}")
+        traceback.print_exc()
+        return result
+    
+    result["references"] = formatted_references
+    
+    return '\n\n\n' + json.dumps(result)
 
 def stream_message(message: str):
     """

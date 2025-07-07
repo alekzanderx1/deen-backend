@@ -6,7 +6,7 @@ from modules.generation import generator, stream_generator
 from modules.retrieval import retriever
 from fastapi.responses import StreamingResponse
 from core import utils
-
+from itertools import chain
 
 
 def chat_pipeline(user_query: str):
@@ -56,8 +56,11 @@ def chat_pipeline_streaming(user_query: str):
     # Step 4: Stream the AI response from OpenAI
     response_generator = stream_generator.generate_response_stream(enhanced_query, relevant_docs)
 
+    #Step 5: Stream the formatted references in JSON format
+    references = utils.stream_message(utils.format_references_as_json(relevant_docs))
+
     # Return a StreamingResponse with appropriate media type.
-    return StreamingResponse(response_generator, media_type="text/event-stream")
+    return StreamingResponse(chain(response_generator,references), media_type="text/event-stream")
 
 
 
