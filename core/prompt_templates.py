@@ -1,9 +1,9 @@
-from openai import OpenAI
-from config import OPENAI_API_KEY
+from langchain.prompts import ChatPromptTemplate
 
-client = OpenAI(api_key=OPENAI_API_KEY)
 
-systemPrompt = """
+# Promt templates for genrator
+
+generatorSystemTemplate = """
 You are an AI assistant specializing in answering religious questions from the perspective of Twelver Shia Islam. Your responses should be well-researched, respectful, and based on authoritative Islamic sources, with proper references where applicable. You have access to relevant hadiths, Quranic ayahs, and scholarly references retrieved from a vector database.
 
 Your primary objectives are:
@@ -33,100 +33,43 @@ Correct:
 Imam Ja’far as-Sadiq (AS) has said: “There are three qualities with which Allah increases the respect of a Muslim: To be lenient to those who do injustice to him, to give to those who deprive him and to establish relations with those who neglect him.” (Al-Kafi, Volume 2, Book 1, Chapter 53, Hadith 10)
 """
 
+generatorUserTemplate = "User Query: {query}\n\n{references}\n\nBased on these references, please provide an answer from the Twelver Shia perspective."
+
+generator_prompt_template = ChatPromptTemplate.from_messages(
+                [("system", generatorSystemTemplate), ("user", generatorUserTemplate)]
+)
 
 
-def format_references(retrieved_docs: list) -> str:
-    """
-    Formats retrieved hadiths and Quranic references for better readability.
-    """
-    print("INSIDE format_references")
-    formatted_references = "\n\n**Retrieved References:**\n"
+# Promt templates for enhancer
 
-    if not retrieved_docs:
-        return formatted_references + "\n(No relevant references were found in the database.)"
-    # print(retrieved_docs)
-    for i in range(len(retrieved_docs)):
-        source = retrieved_docs[i].get("source", "Unknown Source")
-        author = retrieved_docs[i].get("author", "Unknown Author")
-        volume = retrieved_docs[i].get("volume", "Unknown Volume")
-        book = retrieved_docs[i].get("book", "Unknown Book")
-        chapter = retrieved_docs[i].get("chapter", "Unknown Chapter")
-        hadith_number = retrieved_docs[i].get("hadith_number", "N/A")
-        text = retrieved_docs[i].get("text", "No text available.")
+enhancerSystemTemplate = """
+You are an AI assistant for a Twelver Shia Islam application, enhancing user queries to improve their clarity and context while keeping them within the original intent. Your task is to refine the given user question so that it remains faithful to its original meaning but adds slight elaboration or necessary context to make it clearer for retrieval in a knowledge database.
 
-        formatted_references += (
-            f"\n--------------------------------------\n"
-            f"- **Source:** {source}\n"
-            f"- **Author:** {author}\n"
-            f"- **Volume:** {volume}\n"
-            f"- **Book:** {book}\n"
-            f"- **Chapter:** {chapter}\n"
-            f"- **Hadith Number:** {hadith_number}\n"
-            f"- **Text:** \"{text}\"\n"
-            "---------------------------------------------"
-        )
-        if i == 0:
-            print(formatted_references)
+Enhance the following user query while ensuring that:
+It retains the same intent and meaning.
+It includes relevant clarifications or disambiguations if the query is vague.
+It improves completeness by making implicit details more explicit.
+It remains concise and does not add unnecessary complexity.
 
-    return formatted_references
+Example Enhancements:
+
+Example 1:
+
+User Query: “Who was the first Imam?”
+Enhanced Query: “Who was the first Imam in Twelver Shia Islam, and what was his significance?”
+
+Example 2:
+
+User Query: “Why do Shias commemorate Ashura?”
+Enhanced Query: “What is the significance of Ashura in Shia Islam, and why do Shia Muslims commemorate this event?”
+
+Example 3:
+
+User Query: “What is Taqiyya?”
+Enhanced Query: “What does the concept of Taqiyya mean in Shia Islam, and in what circumstances is it applied?”
+"""
 
 
-
-def generate_response(query: str, retrieved_docs: list):
-    """
-    Generates AI response using OpenAI API.
-    """
-    print("INSIDE generate_response")
-
-    # Format retrieved references
-    references = format_references(retrieved_docs)
-
-    user_prompt = f"User Query: {query}\n\n{references}\n\nBased on these references, please provide an answer from the Twelver Shia perspective."
-    #return "Sample response"
-    print("user_prompt:", user_prompt)
-
-    completion = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "developer", "content": systemPrompt},
-            {"role": "user", "content": user_prompt}
-        ]
-    )
-
-    
-    return completion.choices[0].message.content
-
-
-
-def generate_response_stream(query: str, retrieved_docs: list):
-    """
-    Generates a streaming response using OpenAI's API.
-    Yields chunks of text as they are generated.
-    """
-    # Format the retrieved references for better readability
-    references = format_references(retrieved_docs)  # assuming this function is imported
-    user_prompt = (
-        f"User Query: {query}\n\n{references}\n\n"
-        "Based on these references, please provide an answer from the Twelver Shia perspective."
-    )
-    print("user_prompt:", user_prompt)
-
-    # Call OpenAI API with streaming enabled.
-    # Adjust parameters (like model and system prompt) as needed.
-    response = client.chat.completions.create(
-        model="gpt-4o",  # or your chosen model
-        messages=[
-            {"role": "developer", "content": systemPrompt},  # ensure systemPrompt is defined/imported
-            {"role": "user", "content": user_prompt}
-        ],
-        stream=True  # Enable streaming
-    )
-
-    # Iterate over the streamed response and yield text chunks.
-    for chunk in response:
-      # Use attribute access instead of subscripting.
-      delta = chunk.choices[0].delta  # This should give you the delta dictionary.
-      if delta:
-          content = delta.content
-          if content:
-              yield content
+enhancer_prompt_template = ChatPromptTemplate.from_messages(
+                [("system", enhancerSystemTemplate), ("user", "{text}")]
+)
