@@ -74,7 +74,7 @@ def format_references_as_json(retrieved_docs: list[Document]):
     
     result["references"] = formatted_references
     
-    return '\n\n\n' + json.dumps(result)
+    return '\n\n\n[REFERENCES]\n\n\n' + json.dumps(result)
 
 def stream_message(message: str):
     """
