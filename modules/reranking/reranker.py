@@ -8,6 +8,10 @@ def rerank_documents(dense_results, sparse_results, no_of_docs):
     """
     print("INSIDE rerank_documents")
 
+    # Normalize dense and sparse scores in-place
+    normalize_inplace(dense_results, 1)
+    normalize_inplace(sparse_results.get("matches", []), "score")
+
     combined_with_weighted_scores = defaultdict(lambda: {"dense_score": float(0.0), "sparse_score": float(0.0), "metadata": {}, "page_content_en": "","page_content_ar":""})
 
     # Add dense docs
@@ -50,3 +54,23 @@ def rerank_documents(dense_results, sparse_results, no_of_docs):
         }
         for hadith_id, data in sorted_combined_docs[:no_of_docs]
     ]
+
+def normalize_inplace(items, score_key):
+    """Normalize the scores in-place for a list of items (dicts or tuples)."""
+    print(type(items[1]))
+    scores = [item[1] if isinstance(item, tuple) else item[score_key] for item in items]
+    if not scores:
+        return
+    min_score = min(scores)
+    max_score = max(scores)
+    if max_score == min_score:
+        norm = lambda _: 1.0
+    else:
+        norm = lambda s: (s - min_score) / (max_score - min_score)
+    for i, item in enumerate(items):
+        if isinstance(item, tuple):
+            # For tuple (dense results) (doc, score), replace with (doc, normalized_score)
+            items[i] = (item[0], norm(item[1]))
+        else:
+            # For dict (sparse results), normalize the score in-place
+            item[score_key] = norm(item[score_key])
