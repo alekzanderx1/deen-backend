@@ -5,45 +5,81 @@ import gzip
 
 def format_references(retrieved_docs: list) -> str:
     """
-    Formats retrieved hadiths and Quranic references for better readability.
+    Formats retrieved hadiths and Quranic references for LLM-friendly Markdown output,
+    aligned with the updated JSON structure used in `format_references_as_json`.
     """
     print("INSIDE format_references")
-    formatted_references = "\n\n**Retrieved References:**\n"
+    header = "\n\n**Retrieved References:**\n"
+    if not retrieved_docs:
+        return header + "\n(No relevant references were found in the database.)"
 
-    try:
-        if not retrieved_docs:
-            return formatted_references + "\n(No relevant references were found in the database.)"
+    lines = [header]
 
-        for doc in retrieved_docs:
-            author = doc['metadata'].get("author", "N/A")
-            volume = doc['metadata'].get("volume", "N/A")
-            book_number = doc['metadata'].get("book_number", "N/A")
-            book_title = doc['metadata'].get("book_title", "N/A")
-            chapter_number =  doc['metadata'].get("chapter_number", "N/A")
-            chapter_title = doc['metadata'].get("chapter_title", "N/A")
-            collection = doc['metadata'].get("collection", "N/A")             
-            hadith_no = doc['metadata'].get("hadith_no", "N/A")
-            text = doc['page_content_en'].strip() if doc['page_content_en'] else "No text available"
+    for idx, doc in enumerate(retrieved_docs, start=1):
+        try:
+            # Accept either plain dicts or LangChain Documents
+            if isinstance(doc, dict):
+                metadata = doc.get("metadata", {}) or {}
+                page_content_en = doc.get("page_content_en", "") or ""
+                page_content_ar = doc.get("page_content_ar", "") or ""
+            else:
+                # Fallback for LangChain Document objects
+                metadata = getattr(doc, "metadata", {}) or {}
+                # Your pipeline seems to store bilingual content separately; keep that behavior
+                page_content_en = getattr(doc, "page_content_en", "") or getattr(doc, "page_content", "") or ""
+                page_content_ar = getattr(doc, "page_content_ar", "") or ""
 
-            formatted_references += (
-                f"\n--------------------------------------\n"
-                f"- **Book Title:** {book_title}\n"
-                f"- **Author:** {author}\n"
-                f"- **Volume:** {volume}\n"
-                f"- **Book Number:** {book_number}\n"
-                f"- **Chapter Title:** {chapter_title}\n"
-                f"- **Collection:** {collection}\n"
-                f"- **Hadith Number:** {hadith_no}\n"
-                f"- **Chapter Number:** {chapter_number}\n"
-                f"- **Text:** \"{text}\"\n"
-                "---------------------------------------------"
-            )
-    except Exception as e:
-        print(f"Error formatting references: {e}")
-        traceback.print_exc()
-        formatted_references += "\n\n**Error formatting references. Please check the data structure.**"
+            author         = metadata.get("author", "N/A")
+            volume         = metadata.get("volume", "N/A")
+            book_number    = metadata.get("book_number", "N/A")
+            book_title     = metadata.get("book_title", "N/A")
+            chapter_number = metadata.get("chapter_number", "N/A")
+            chapter_title  = metadata.get("chapter_title", "N/A")
+            collection     = metadata.get("collection", "N/A")
+            grade_ar       = metadata.get("grade_ar", "N/A")
+            grade_en       = metadata.get("grade_en", "N/A")
+            hadith_id      = metadata.get("hadith_id", "N/A")
+            hadith_no      = metadata.get("hadith_no", "N/A")
+            hadith_url     = metadata.get("hadith_url", "N/A")
+            lang           = metadata.get("lang", "N/A")
+            sect           = metadata.get("sect", "N/A")
+            reference      = metadata.get("reference", "N/A")
 
-    return formatted_references
+            text_en = page_content_en.strip() if page_content_en else "No text available"
+            text_ar = page_content_ar.strip() if page_content_ar else "No Arabic text available"
+
+            block = [
+                "--------------------------------------",
+                f"**Reference {idx}:**",
+                f"- **Book Title:** {book_title}",
+                f"- **Author:** {author}",
+                f"- **Volume:** {volume}",
+                f"- **Book Number:** {book_number}",
+                f"- **Chapter Number:** {chapter_number}",
+                f"- **Chapter Title:** {chapter_title}",
+                f"- **Collection:** {collection}",
+                f"- **Hadith Number:** {hadith_no}",
+                f"- **Hadith ID:** {hadith_id}",
+                f"- **Reference:** {reference}",
+                f"- **Grade (EN):** {grade_en}",
+                f"- **Grade (AR):** {grade_ar}",
+                f"- **Language:** {lang}",
+                f"- **Sect:** {sect}",
+                f"- **URL:** {hadith_url}" if hadith_url and hadith_url != "N/A" else None,
+                f"- **Text (EN):** \"{text_en}\"",
+                f"- **Text (AR):** \"{text_ar}\"",
+                "---------------------------------------------",
+            ]
+            # Filter out Nones (e.g., URL line when missing)
+            lines.append("\n".join([ln for ln in block if ln is not None]))
+
+        except Exception as e:
+            print(f"Error formatting a reference: {e}")
+            traceback.print_exc()
+            lines.append("**Error formatting a reference. Skipping this item.**")
+
+    return "\n".join(lines)
+
 
 def format_references_as_json(retrieved_docs: list):
     """
@@ -82,7 +118,7 @@ def format_references_as_json(retrieved_docs: list):
         traceback.print_exc()
         return result
     
-    result["references"] = formatted_references
+    result = formatted_references
     
     return result
 

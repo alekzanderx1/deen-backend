@@ -72,11 +72,11 @@ def references_pipeline(user_query: str, sect: str):
         return "This question is not related to the domain of Islamic education. Please ask relevant questions."
     
 
-    # # Step 2: Classify query (fiqh or non-fiqh)
-    is_fiqh = classifier.classify_fiqh_query(user_query)
+    # # # Step 2: Classify query (fiqh or non-fiqh)
+    # is_fiqh = classifier.classify_fiqh_query(user_query)
     
-    if is_fiqh:
-        return "This is a fiqh-related question. Please consult a qualified scholar."
+    # if is_fiqh:
+    #     return "This is a fiqh-related question. Please consult a qualified scholar."
     
     # Step 3: Enhance query
     enhanced_query = enhancer.enhance_query(user_query)
