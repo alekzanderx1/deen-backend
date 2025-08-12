@@ -13,7 +13,7 @@ def generate_response_stream(query: str, retrieved_docs: list):
     """
     print("INSIDE generate_response_stream")
     # Format retrieved references
-    references = utils.format_references(retrieved_docs)
+    references = utils.format_references_as_json(retrieved_docs)
 
     chat_model = chat_models.get_generator_model()
 
