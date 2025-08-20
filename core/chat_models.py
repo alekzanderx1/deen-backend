@@ -1,6 +1,10 @@
 from core.config import OPENAI_API_KEY
 from langchain.chat_models import init_chat_model
 
+# Models
+# gpt-4o
+# gpt-5-mini-2025-08-07
+
 def get_generator_model():
     """
     Initializes and returns the chat model.
@@ -9,7 +13,7 @@ def get_generator_model():
     
     try:
         chat_model = init_chat_model(
-            model="gpt-4o",
+            model="openai:gpt-4o",
             openai_api_key=OPENAI_API_KEY
         )
         return chat_model

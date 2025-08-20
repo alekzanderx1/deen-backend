@@ -3,6 +3,81 @@ import traceback
 import base64
 import gzip
 
+def compact_format_references(retrieved_docs: list, max_chars: int = 1500) -> str:
+    """
+    Formats retrieved hadiths and Quranic references for LLM-friendly Markdown output,
+    aligned with the updated JSON structure used in `format_references_as_json`, 
+    in a short compact form to reduce LLM token usage.
+    """
+    print("INSIDE format_references")
+    header = "\n\n**Retrieved References:**\n"
+    if not retrieved_docs:
+        return header + "\n(No relevant references were found in the database.)"
+
+    lines = [header]
+
+    for idx, doc in enumerate(retrieved_docs, start=1):
+        try:
+            # Accept either plain dicts or LangChain Documents
+            if isinstance(doc, dict):
+                metadata = doc.get("metadata", {}) or {}
+                page_content_en = doc.get("page_content_en", "") or ""
+            else:
+                # Fallback for LangChain Document objects
+                metadata = getattr(doc, "metadata", {}) or {}
+                page_content_en = getattr(doc, "page_content_en", "") or getattr(doc, "page_content", "") or ""
+
+            author         = metadata.get("author", "N/A")
+            volume         = metadata.get("volume", "N/A")
+            book_number    = metadata.get("book_number", "N/A")
+            book_title     = metadata.get("book_title", "N/A")
+            chapter_number = metadata.get("chapter_number", "N/A")
+            chapter_title  = metadata.get("chapter_title", "N/A")
+            collection     = metadata.get("collection", "N/A")
+            grade_ar       = metadata.get("grade_ar", "N/A")
+            grade_en       = metadata.get("grade_en", "N/A")
+            hadith_id      = metadata.get("hadith_id", "N/A")
+            hadith_no      = metadata.get("hadith_no", "N/A")
+            hadith_url     = metadata.get("hadith_url", "N/A")
+            lang           = metadata.get("lang", "N/A")
+            sect           = metadata.get("sect", "N/A")
+            reference      = metadata.get("reference", "N/A")
+
+            text_en = page_content_en.strip() if page_content_en else "No text available"
+
+            elipses = "...." if len(text_en) > max_chars else ""
+
+            block = [
+                "--------------------------------------",
+                f"**Reference {idx}:**",
+                f"- **Book Title:** {book_title}",
+                f"- **Author:** {author}",
+                f"- **Volume:** {volume}",
+                f"- **Book Number:** {book_number}",
+                f"- **Chapter Number:** {chapter_number}",
+                f"- **Chapter Title:** {chapter_title}",
+                f"- **Collection:** {collection}",
+                f"- **Hadith Number:** {hadith_no}",
+                f"- **Hadith ID:** {hadith_id}",
+                f"- **Reference:** {reference}",
+                f"- **Grade (EN):** {grade_en}",
+                f"- **Grade (AR):** {grade_ar}",
+                f"- **Language:** {lang}",
+                f"- **Sect:** {sect}",
+                f"- **URL:** {hadith_url}" if hadith_url and hadith_url != "N/A" else None,
+                f"- **Text (EN):** \"{text_en[:max_chars] + elipses}\"",
+                "---------------------------------------------",
+            ]
+            # Filter out Nones (e.g., URL line when missing)
+            lines.append("\n".join([ln for ln in block if ln is not None]))
+
+        except Exception as e:
+            print(f"Error formatting a reference: {e}")
+            traceback.print_exc()
+            lines.append("**Error formatting a reference. Skipping this item.**")
+
+    return "\n".join(lines)
+
 def format_references(retrieved_docs: list) -> str:
     """
     Formats retrieved hadiths and Quranic references for LLM-friendly Markdown output,

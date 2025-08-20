@@ -66,7 +66,7 @@ def retrieve_sunni_documents(query,no_of_docs=10):
                 filter={'sect':'sunni'}
         )
 
-        result = reranker.rerank_documents(dense_docs_and_score, sparse_docs,no_of_docs)
+        result = reranker.rerank_documents(dense_docs_and_score, sparse_docs, no_of_docs)
         return result
     except Exception as e:
         print(f"Error retrieving documents: {e}")
