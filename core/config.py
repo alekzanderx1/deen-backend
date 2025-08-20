@@ -13,6 +13,11 @@ DENSE_RESULT_WEIGHT = os.getenv("DENSE_RESULT_WEIGHT",0.8)
 SPARSE_RESULT_WEIGHT = os.getenv("SPARSE_RESULT_WEIGHT",0.2)
 REFERENCE_FETCH_COUNT = int(os.getenv("REFERENCE_FETCH_COUNT", 10))
 
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+KEY_PREFIX = os.getenv("REDIS_KEY_PREFIX", "dev:chat")
+TTL_SECONDS = int(os.getenv("REDIS_TTL_SECONDS", "12000"))  # default 30d
+MAX_MESSAGES = int(os.getenv("REDIS_MAX_MESSAGES", "30"))
+
 # Check if keys are loaded (optional)
 if not OPENAI_API_KEY or not PINECONE_API_KEY:
     raise ValueError("Missing API keys! Ensure they are set in the .env file.")

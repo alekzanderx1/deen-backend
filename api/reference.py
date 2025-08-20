@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query
-from models.schemas import ChatRequest
+from models.schemas import ReferenceRequest
 from core import pipeline
 
 ref_router = APIRouter(
@@ -11,7 +11,7 @@ ref_router = APIRouter(
 # Example usage: http://localhost:8000/references?sect=both
 # Example json body input:: {"user_query": "What does Islam say about justice?"}
 @ref_router.post("/")
-async def references_pipeline(request: ChatRequest, sect: str = Query("both", enum=["sunni", "shia", "both"])):
+async def references_pipeline(request: ReferenceRequest, sect: str = Query("both", enum=["sunni", "shia", "both"])):
     user_query = request.user_query.strip()
 
     if not user_query:

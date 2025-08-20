@@ -1,40 +1,75 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from models.schemas import ChatRequest
-from core import utils, pipeline
+from core import pipeline
+from core.memory import make_history
+import traceback
 
 chat_router = APIRouter(
-    prefix='/chat',
-    tags=['chat']
+    prefix="/chat",
+    tags=["chat"]
 )
 
 @chat_router.post("/")
-async def chat_pipeline(request: ChatRequest):
-    user_query = request.user_query  # Extract the query from JSON request
-    print(f"user_query: {user_query}")
+async def chat_pipeline_ep(request: ChatRequest):
+    """
+    Non-streaming chat endpoint with Redis-backed memory.
+    Expects:
+      {
+        "user_query": "What does Islam say about justice?",
+        "session_id": "user42:thread-7"
+      }
+    """
+    user_query = (request.user_query or "").strip()
+    session_id = (getattr(request, "session_id", "") or "").strip()
 
-    if not user_query or user_query.strip() == "":
+    if not user_query:
         return {"response": "Please provide an appropriate query."}
-    
+    if not session_id:
+        raise HTTPException(status_code=400, detail="Missing session_id")
+
     try:
-        ai_response = pipeline.chat_pipeline(user_query)
+        ai_response = pipeline.chat_pipeline(user_query, session_id)
         return {"response": ai_response}
-
-    except Exception as e:
-        # TODO: Move the exception message to log files, don't show the error to user or in API response
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
-    
+    except Exception:
+        # Log the exception elsewhere; don't leak details to client
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
-# Example json body input: {"user_query": "What does Islam say about justice?"}
 @chat_router.post("/stream")
-async def chat_pipeline_stream(request: ChatRequest):
-    user_query = request.user_query.strip()
+async def chat_pipeline_stream_ep(request: ChatRequest):
+    """
+    Streaming chat endpoint with Redis-backed memory.
+    Expects:
+      {
+        "user_query": "What does Islam say about justice?",
+        "session_id": "user42:thread-7"
+      }
+    """
+    user_query = (request.user_query or "").strip()
+    session_id = (getattr(request, "session_id", "") or "").strip()
+
     if not user_query:
         raise HTTPException(status_code=400, detail="Please provide an appropriate query.")
+    if not session_id:
+        raise HTTPException(status_code=400, detail="Missing session_id")
 
     try:
-        return pipeline.chat_pipeline_streaming(user_query)
+        # Returns a StreamingResponse from the pipeline
+        return pipeline.chat_pipeline_streaming(user_query, session_id)
     except Exception as e:
-        # TODO: Move the exception message to log files, don't show the error to user or in API response
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+        # Log internally; keep response generic
+        print("UNHANDLED ERROR in /chat/stream:", e)
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+# OPTIONAL: Clear a conversation's memory (useful for a "Reset chat" button)
+@chat_router.delete("/session/{session_id}")
+async def clear_session(session_id: str):
+    try:
+        history = make_history(session_id)
+        history.clear()
+        return {"status": "ok"}
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to clear session")
