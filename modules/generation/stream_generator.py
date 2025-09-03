@@ -7,7 +7,7 @@ from core.memory import with_redis_history, trim_history, make_history
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-def generate_response_stream(query: str, retrieved_docs: list, session_id: str):
+def generate_response_stream(query: str, retrieved_docs: list, session_id: str, target_language: str = "english"):
     """
     Generates a streaming response using the chat model.
     Yields chunks of text as they are generated.
@@ -26,7 +26,7 @@ def generate_response_stream(query: str, retrieved_docs: list, session_id: str):
 
     # Stream chunks to caller
     for chunk in chain_with_history.stream(
-        {"query": query, "references": references},
+        {"target_language": target_language, "query": query, "references": references},
         config={"configurable": {"session_id": session_id}},
     ):
         # `chunk` is typically an AIMessageChunk or string

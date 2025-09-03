@@ -37,3 +37,16 @@ def get_enhancer_model():
     except Exception as e:
         print(f"Error initializing LLM: {e}")
         raise e
+    
+
+def get_translator_model():
+    print("INSIDE get_translator_model")
+    try:
+        base = init_chat_model(
+            model="gpt-4o-mini",
+            openai_api_key=OPENAI_API_KEY,
+        )
+        return base.bind(temperature=0)
+    except Exception as e:
+        print(f"Error initializing translator LLM: {e}")
+        raise e

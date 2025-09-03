@@ -48,6 +48,7 @@ async def chat_pipeline_stream_ep(request: ChatRequest):
     """
     user_query = (request.user_query or "").strip()
     session_id = (getattr(request, "session_id", "") or "").strip()
+    target_language = (getattr(request, "language", "") or "english").strip()
 
     if not user_query:
         raise HTTPException(status_code=400, detail="Please provide an appropriate query.")
@@ -56,7 +57,7 @@ async def chat_pipeline_stream_ep(request: ChatRequest):
 
     try:
         # Returns a StreamingResponse from the pipeline
-        return pipeline.chat_pipeline_streaming(user_query, session_id)
+        return pipeline.chat_pipeline_streaming(user_query, session_id, target_language)
     except Exception as e:
         # Log internally; keep response generic
         print("UNHANDLED ERROR in /chat/stream:", e)
