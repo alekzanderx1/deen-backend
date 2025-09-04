@@ -51,14 +51,14 @@ def chat_pipeline_streaming(user_query: str, session_id: str, target_language: s
             # Fallback: keep the original user_query
 
     # Step 2: Classify the query
-    is_non_islamic = classifier.classify_non_islamic_query(user_query)
+    is_non_islamic = classifier.classify_non_islamic_query(user_query, session_id=session_id)
     if is_non_islamic:
-        message = "This question is not related to the domain of Islamic education. Please ask relevant questions."
+        message = "I am not allowed to answer that question. I specialize in questions related to Twelver Shia Islam, anything from history, to theology, to interpretations, and more... Please try another one."
         return StreamingResponse(utils.stream_message(message), media_type="text/event-stream")
 
-    is_fiqh = classifier.classify_fiqh_query(user_query)
+    is_fiqh = classifier.classify_fiqh_query(user_query, session_id=session_id)
     if is_fiqh:
-        message = "This is a fiqh-related question. Please consult a qualified scholar."
+        message = "This is a fiqh-related question. My capabilities are not ready yet to answer such queries. Please consult a qualified scholar."
         return StreamingResponse(utils.stream_message(message), media_type="text/event-stream")
 
     # Step 3: Enhance the query

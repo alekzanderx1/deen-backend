@@ -10,6 +10,7 @@
 # model = AutoModelForCausalLM.from_pretrained(MODEL_NAME).to(device)
 
 from openai import OpenAI
+from modules.context import context
 from core.config import OPENAI_API_KEY
 
 client = OpenAI(api_key=OPENAI_API_KEY)
@@ -53,10 +54,11 @@ Non-Fiqh Queries (Respond with “false”)
 """
 
 systemPromptForNonIslamicFilter = """
-Your task is to determine whether the given user query is irrelevant or inappropriate for an Islamic educational chatbot focused on Twelver Shia Islam.
-• If the query is irrelevant (e.g., unrelated to Islam, asking about random topics, celebrities, general trivia, math problems, politics, technology, science, or anything outside Islamic studies), respond with “true”.
-• If the query is appropriate (i.e., related to Islam, Quran, Hadith, Islamic history, Shia beliefs, jurisprudence, spirituality, theology, ethics, philosophy, or Islamic scholars), respond with “false”.
-• Only respond with “true” or “false”. Do not provide any explanation or additional text.
+Your task is to determine whether the given user query is irrelevant or inappropriate for an Islamic educational chatbot focused on Twelver Shia Islam.\n
+• If the query is irrelevant (e.g., unrelated to Islam, asking about random topics, celebrities, general trivia, math problems, politics, technology, science, or anything outside Islamic studies), respond with “true”.\n
+• If the query is appropriate (i.e., related to Islam, Quran, Hadith, Islamic history, Shia beliefs, jurisprudence, spirituality, theology, ethics, philosophy, or Islamic scholars), respond with “false”.\n
+• Only respond with “true” or “false”. Do not provide any explanation or additional text.\n
+• Sometimes users might be asking a fiqh related question, like "Can I eat pork". Don't mark that as true.
 
 Irrelevant/Inappropriate Queries (Respond with “true”)
 1. Who is Mark Zuckerberg? → true
@@ -75,17 +77,30 @@ Relevant Queries (Respond with “false”)
 """
 
 
-def classify_fiqh_query(query: str) -> bool:
+def classify_fiqh_query(query: str, session_id: str = None) -> bool:
     """
-    Uses Qwen to determine if a query is fiqh-related or not.
+    Uses 4o-mini to determine if a query is fiqh-related or not.
     Returns True if fiqh-related, False otherwise.
+    Uses recent conversation context if session_id is provided.
     """
+
+    chatContext = ""
+    if session_id:
+        chatContext = context.get_recent_context(session_id, 2)
+
+    user_payload = f"""Conversation so far:
+                    {chatContext}
+
+                    Current query: {query}
+
+                    Decide relevance *in context*.
+                    """
 
     completion = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {"role": "developer", "content": systemPromptForFiqh},
-            {"role": "user", "content": query}
+            {"role": "user", "content": user_payload}
         ]
     )
 
@@ -95,16 +110,28 @@ def classify_fiqh_query(query: str) -> bool:
 
 
 
-def classify_non_islamic_query(query: str) -> bool:
+def classify_non_islamic_query(query: str, session_id: str = None) -> bool:
     """
-    Uses 4o mini to classify whether the user query is relevant to shia islam or not
+    Uses 4o mini to classify whether the user query is relevant to shia islam or not.
+    Uses recent conversation context if session_id is provided.
     """
+    chatContext = ""
+    if session_id:
+        chatContext = context.get_recent_context(session_id)
 
+    user_payload = f"""Conversation so far:
+                    {chatContext}
+
+                    Current query: {query}
+
+                    Decide relevance *in context*.
+                    """
+    
     completion = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {"role": "developer", "content": systemPromptForNonIslamicFilter},
-            {"role": "user", "content": query}
+            {"role": "user", "content": user_payload}
         ]
     )
 
