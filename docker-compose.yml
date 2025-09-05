@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    container_name: deen-backend
+    env_file:
+      - .env
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    container_name: deen-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  caddy_data:
+  caddy_config:
