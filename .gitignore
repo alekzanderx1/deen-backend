@@ -34,9 +34,6 @@ logs/
 # 🔹 Ignore Jupyter Notebook Checkpoints (if used)
 .ipynb_checkpoints/
 
-# 🔹 Ignore Docker & Deployment Files (if using Docker)
-docker-compose.yml
-.Dockerfile
 *.tar
 *.whl
 
