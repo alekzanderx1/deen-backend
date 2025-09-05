@@ -26,5 +26,7 @@ def home():
     return {"message": "Welcome to the Shia Islam Chat API"}
 
 
-    
+@app.get("/health", tags=["Health"])
+def health():
+    return {"status": "ok"}
 

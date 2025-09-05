@@ -1,4 +1,22 @@
-venv/
+# Python
 __pycache__/
-.git
+*.pyc
+*.pyo
+*.pyd
+
+# Venv / build
+venv/
+.env            # don't bake secrets into images
+*.log
+dist/
+build/
+
+# Git & IDE
+.git/
 .gitignore
+.vscode/
+.idea/
+
+# Data
+*.sqlite
+data/
