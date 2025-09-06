@@ -1,19 +1,5 @@
 deen-fastapi.duckdns.org {
 	encode gzip
-
-	# Handle CORS preflight (OPTIONS requests)
-	@options method OPTIONS
-	handle @options {
-		header Access-Control-Allow-Origin "*"
-		header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-		header Access-Control-Allow-Headers "Origin, Content-Type, Accept, Authorization"
-		header Access-Control-Max-Age "86400"
-		respond "" 204
-	}
-
-	# Always include CORS on real responses
-	header Access-Control-Allow-Origin "*"
-
 	# Proxy to FastAPI container (named 'api' in docker-compose.yml)
 	reverse_proxy api:8000
 }
