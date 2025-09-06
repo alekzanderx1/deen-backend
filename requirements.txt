@@ -54,7 +54,6 @@ pillow==11.1.0
 pinecone==7.3.0
 pinecone-client==5.0.1
 pinecone-plugin-assistant==1.7.0
-pinecone-plugin-interface==0.0.7
 pluggy==1.6.0
 propcache==0.3.2
 psutil==6.1.1
