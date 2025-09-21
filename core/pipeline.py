@@ -99,3 +99,23 @@ def references_pipeline(user_query: str, sect: str):
         results["sunni"] = utils.format_references_as_json(retriever.retrieve_sunni_documents(enhanced_query,REFERENCE_FETCH_COUNT))
 
     return results
+
+def hikmah_elaboration_pipeline_streaming(selected_text: str, context_text: str, hikmah_tree_name: str, lesson_name: str, lesson_summary: str):
+
+    # Step 1: Enhance the query
+    enhanced_query = enhancer.enhance_elaboration_query(selected_text, context_text, hikmah_tree_name, lesson_name, lesson_summary)
+
+    # Step 2: Retrieve relevant documents from Pinecone
+    relevant_shia_docs = retriever.retrieve_shia_documents(enhanced_query, 4)
+    relevant_sunni_docs = retriever.retrieve_sunni_documents(enhanced_query, 2)
+
+    all_relevant_docs = relevant_shia_docs + relevant_sunni_docs
+
+    # Step 3: Stream the AI response from OpenAI
+    response_generator = stream_generator.generate_elaboration_response_stream(selected_text, context_text, hikmah_tree_name, lesson_name, lesson_summary, all_relevant_docs)
+
+    #Step 4: Stream the formatted references in JSON format
+    references_tail = utils.stream_message('\n\n\n[REFERENCES]\n\n\n' + json.dumps(utils.format_references_as_json(all_relevant_docs)))
+
+    # Return a StreamingResponse with appropriate media type.
+    return StreamingResponse(chain(response_generator, references_tail), media_type="text/event-stream")

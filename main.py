@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api import chat
 from api import reference
+from api import hikmah
 import os
 
 # RUN USING: uvicorn main:app --reload
@@ -25,6 +26,7 @@ app.add_middleware(
 # API routers
 app.include_router(reference.ref_router)
 app.include_router(chat.chat_router)
+app.include_router(hikmah.hikmah_router)
 
 
 @app.get("/")
