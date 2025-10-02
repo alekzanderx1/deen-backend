@@ -14,8 +14,14 @@ ASYNC_DATABASE_URL = FINAL_ASYNC_DATABASE_URL
 if not DATABASE_URL:
     raise ValueError("Database configuration is missing. Please check your .env file and ensure either DATABASE_URL or individual DB components (DB_HOST, DB_NAME, DB_USER, DB_PASSWORD) are set.")
 
-# Create engines
-engine = create_engine(DATABASE_URL)
+# Create engines with connection pooling optimized for threading
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,  # Verify connections before using them
+    pool_recycle=3600,   # Recycle connections after 1 hour
+    pool_size=10,        # Connection pool size
+    max_overflow=20      # Max connections beyond pool_size
+)
 async_engine = create_async_engine(ASYNC_DATABASE_URL or DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://"))
 
 # Create session makers

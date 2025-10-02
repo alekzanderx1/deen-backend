@@ -31,7 +31,7 @@ WHAT TO LOOK FOR IN CHAT INTERACTIONS:
 2. **Knowledge Level**: How advanced is their understanding of Islamic concepts?
 3. **Interests**: What topics engage them most? What do they ask about frequently?
 4. **Learning Style**: Do they prefer detailed explanations, examples, historical context?
-5. **Background**: Are they new to Islam, converting, born Muslim, beginner in Shia studies?
+5. **Background**: Are they new to Islam, converting, born Muslim, beginner in Shia studies, or a more knowledgeable personw?
 6. **Preferences**: Language preference, depth of content, sectarian focus
 7. **Misconceptions**: Any incorrect beliefs that need gentle correction
 8. **Engagement Patterns**: What type of questions do they ask? How do they respond to answers?

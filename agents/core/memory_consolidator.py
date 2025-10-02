@@ -4,10 +4,16 @@ from sqlalchemy.orm import Session
 import json
 import uuid
 import numpy as np
+import os
+import sys
+import threading
+
+# Set tokenizers parallelism before importing sentence_transformers
+# This prevents fork warnings when running in multi-threaded/multi-process environments
+os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+
 from sentence_transformers import SentenceTransformer
 
-import sys
-import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from agents.models.user_memory_models import UserMemoryProfile, MemoryConsolidation
@@ -19,15 +25,22 @@ class MemoryConsolidator:
     Handles smart consolidation of user memory notes to prevent duplicates,
     merge similar observations, and create higher-level insights.
     """
+    # Shared, thread-safe singleton embedder per process
+    _shared_embedder = None
+    _embedder_lock = threading.Lock()
     
     def __init__(self, db: Session):
         self.db = db
         self.llm = get_generator_model()
         # Use a lightweight sentence transformer for semantic similarity
-        self.embedder = SentenceTransformer('all-MiniLM-L6-v2')
+        if MemoryConsolidator._shared_embedder is None:
+            with MemoryConsolidator._embedder_lock:
+                if MemoryConsolidator._shared_embedder is None:
+                    MemoryConsolidator._shared_embedder = SentenceTransformer('all-MiniLM-L6-v2')
+        self.embedder = MemoryConsolidator._shared_embedder
         
         # Consolidation thresholds
-        self.SIMILARITY_THRESHOLD = 0.85  # How similar notes need to be to merge
+        self.SIMILARITY_THRESHOLD = 0.75  # How similar notes need to be to merge (lowered to catch more duplicates)
         self.MAX_NOTES_PER_CATEGORY = 15  # When to trigger consolidation
         self.MIN_CONFIDENCE_TO_KEEP = 0.3  # Remove notes below this confidence
     
@@ -64,14 +77,14 @@ class MemoryConsolidator:
             return False
         
         # Get embeddings for the new note
-        new_embedding = self.embedder.encode([new_note_content])
+        new_embedding = self.embedder.encode([new_note_content], show_progress_bar=False)
         
         # Get embeddings for existing notes
         existing_contents = [note.get("content", "") for note in existing_notes]
         if not existing_contents:
             return False
         
-        existing_embeddings = self.embedder.encode(existing_contents)
+        existing_embeddings = self.embedder.encode(existing_contents, show_progress_bar=False)
         
         # Calculate cosine similarities
         similarities = np.dot(existing_embeddings, new_embedding.T).flatten()
