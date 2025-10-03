@@ -18,7 +18,8 @@ async def chat_pipeline_stream_ep(request: ElaborationRequest):
         "context_text": "The full lesson text...", 
         "hikmah_tree_name": "Hikam of Imam Ali",
         "lesson_name": "Justice and Fairness",
-        "lesson_summary": "A brief summary of the lesson"
+        "lesson_summary": "A brief summary of the lesson",
+        "user_id": "user123"  // Optional: For memory agent to take notes
       }
     """
 
@@ -29,7 +30,8 @@ async def chat_pipeline_stream_ep(request: ElaborationRequest):
             context_text=request.context_text,
             hikmah_tree_name=request.hikmah_tree_name,
             lesson_name=request.lesson_name,
-            lesson_summary=request.lesson_summary
+            lesson_summary=request.lesson_summary,
+            user_id=request.user_id  # Pass user_id to pipeline for memory integration
         )
     except Exception as e:
         # Log internally; keep response generic
