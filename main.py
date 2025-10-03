@@ -1,13 +1,17 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from api import chat
 from api import reference
 from api import hikmah
+from models.JWTBearer import JWTBearer
+from core.auth import jwks
 import os
 
 # RUN USING: uvicorn main:app --reload
 
 app = FastAPI()
+
+auth = JWTBearer(jwks)
 
 # Comma-separated list from env, e.g.:
 # CORS_ALLOW_ORIGINS="https://deen-frontend.vercel.app,https://staging.example.com"
@@ -24,12 +28,12 @@ app.add_middleware(
 )
 
 # API routers
-app.include_router(reference.ref_router)
-app.include_router(chat.chat_router)
-app.include_router(hikmah.hikmah_router)
+app.include_router(reference.ref_router,dependencies=[Depends(auth)])
+app.include_router(chat.chat_router,dependencies=[Depends(auth)])
+app.include_router(hikmah.hikmah_router,dependencies=[Depends(auth)])
 
 
-@app.get("/")
+@app.get("/",dependencies=[Depends(auth)])
 def home():
     return {"message": "Welcome to the Shia Islam Chat API"}
 
