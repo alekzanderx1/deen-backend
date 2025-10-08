@@ -26,6 +26,16 @@ auth = JWTBearer(jwks)
 # CORS_ALLOW_ORIGINS="https://deen-frontend.vercel.app,https://staging.example.com"
 raw = os.getenv("CORS_ALLOW_ORIGINS", "https://deen-frontend.vercel.app")
 allow_origins = [o.strip() for o in raw.split(",") if o.strip()]
+
+# In development, allow localhost origins
+if os.getenv("ENV", "development") == "development":
+    allow_origins.extend([
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+    ])
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allow_origins,

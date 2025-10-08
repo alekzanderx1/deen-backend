@@ -3,7 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 class UserProgressBase(BaseModel):
-    user_id: Optional[int] = None
+    user_id: Optional[str] = None
     lesson_id: Optional[int] = None
     content_id: Optional[int] = None
     is_completed: Optional[bool] = None
@@ -14,7 +14,7 @@ class UserProgressBase(BaseModel):
     hikmah_tree_id: Optional[int] = None
 
 class UserProgressCreate(UserProgressBase):
-    user_id: int
+    user_id: str
     lesson_id: int
 
 class UserProgressUpdate(UserProgressBase):
