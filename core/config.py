@@ -17,6 +17,8 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 KEY_PREFIX = os.getenv("REDIS_KEY_PREFIX", "dev:chat")
 TTL_SECONDS = int(os.getenv("REDIS_TTL_SECONDS", "12000"))  # default 30d
 MAX_MESSAGES = int(os.getenv("REDIS_MAX_MESSAGES", "30"))
+COGNITO_REGION = os.getenv("COGNITO_REGION")
+COGNITO_POOL_ID = os.getenv("COGNITO_POOL_ID")
 
 # Database Configuration
 DATABASE_URL = os.getenv("DATABASE_URL")

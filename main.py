@@ -1,8 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from api import chat
 from api import reference
 from api import hikmah
+from models.JWTBearer import JWTBearer
+from core.auth import jwks
 import os
 
 from db.session import engine, Base          # for optional table bootstrap
@@ -18,7 +20,10 @@ from db.routers import (
 # RUN USING: uvicorn main:app --reload
 app = FastAPI()
 
-# CORS
+auth = JWTBearer(jwks)
+
+# Comma-separated list from env, e.g.:
+# CORS_ALLOW_ORIGINS="https://deen-frontend.vercel.app,https://staging.example.com"
 raw = os.getenv("CORS_ALLOW_ORIGINS", "https://deen-frontend.vercel.app")
 allow_origins = [o.strip() for o in raw.split(",") if o.strip()]
 app.add_middleware(
@@ -29,10 +34,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Existing API routers
-app.include_router(reference.ref_router)
-app.include_router(chat.chat_router)
-app.include_router(hikmah.hikmah_router)
+# API routers
+app.include_router(reference.ref_router,dependencies=[Depends(auth)])
+app.include_router(chat.chat_router,dependencies=[Depends(auth)])
+app.include_router(hikmah.hikmah_router,dependencies=[Depends(auth)])
 
 app.include_router(users_router.router)             # /users
 app.include_router(lessons_router.router)           # /lessons
@@ -65,7 +70,7 @@ def db_ping():
 # (DEV ONLY) uncomment once to create tables if the DB is empty
 # Base.metadata.create_all(bind=engine)
 
-@app.get("/")
+@app.get("/",dependencies=[Depends(auth)])
 def home():
     return {"message": "Welcome to the Shia Islam Chat API"}
 
