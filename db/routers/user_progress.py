@@ -15,7 +15,7 @@ def create_user_progress(payload: UserProgressCreate, db: Session = Depends(get_
 @router.get("", response_model=List[UserProgressRead])
 def list_user_progress(
     db: Session = Depends(get_db),
-    user_id: Optional[int] = None,
+    user_id: Optional[str] = None,
     lesson_id: Optional[int] = None,
     content_id: Optional[int] = None,
     skip: int = 0,

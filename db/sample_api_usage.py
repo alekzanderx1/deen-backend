@@ -58,9 +58,9 @@ r = requests.post(f"{BASE_URL}/users", json=user_payload)
 expect_json_ok(r, "create user")
 if r:
     pretty(r)
-    user_id = r.json()["id"]
+    user_id = str(r.json()["id"])
 else:
-    user_id = 4 ## Default Tamieem
+    user_id = "tamim"  ## Default username
 
 
 # -------------------------------------------------------------------
@@ -156,7 +156,7 @@ pretty(r)
 # -------------------------------------------------------------------
 print_header("8️⃣ Create user progress record")
 progress_payload = {
-    "user_id": 4,
+    "user_id": "tamim",
     "lesson_id": lesson_id,
     "content_id": content_id,
     "percent_complete": 100.0,
@@ -174,7 +174,7 @@ else:
 # 9️⃣ Get user progress for that lesson
 # -------------------------------------------------------------------
 print_header("9️⃣ Get user progress by user & lesson")
-r = requests.get(f"{BASE_URL}/user-progress", params={"user_id": 4, "lesson_id": lesson_id})
+r = requests.get(f"{BASE_URL}/user-progress", params={"user_id": "tamim", "lesson_id": lesson_id})
 pretty(r)
 
 # -------------------------------------------------------------------

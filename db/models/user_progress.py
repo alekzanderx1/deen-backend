@@ -1,4 +1,4 @@
-from sqlalchemy import Column, BigInteger, Integer, Text, Boolean, TIMESTAMP, Numeric
+from sqlalchemy import Column, BigInteger, Integer, Text, Boolean, TIMESTAMP, Numeric, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 from ..session import Base
@@ -6,7 +6,7 @@ from ..session import Base
 class UserProgress(Base):
     __tablename__ = "user_progress"
     id = Column(BigInteger, primary_key=True, autoincrement=True)
-    user_id = Column(BigInteger)
+    user_id = Column(String(128), index=True)
     hikmah_tree_id = Column(BigInteger)
     lesson_id = Column(BigInteger)
     content_id = Column(BigInteger)
