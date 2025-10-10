@@ -19,6 +19,8 @@ TTL_SECONDS = int(os.getenv("REDIS_TTL_SECONDS", "12000"))  # default 30d
 MAX_MESSAGES = int(os.getenv("REDIS_MAX_MESSAGES", "30"))
 COGNITO_REGION = os.getenv("COGNITO_REGION")
 COGNITO_POOL_ID = os.getenv("COGNITO_POOL_ID")
+LARGE_LLM = os.getenv("LARGE_LLM")
+SMALL_LLM = os.getenv("SMALL_LLM")
 
 # Database Configuration
 DATABASE_URL = os.getenv("DATABASE_URL")
