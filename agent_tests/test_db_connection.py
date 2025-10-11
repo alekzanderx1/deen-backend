@@ -47,7 +47,7 @@ def test_database_connection():
     
     try:
         # Test connection
-        engine = create_engine(FINAL_DATABASE_URL)
+        engine = create_engine(FINAL_DATABASE_URL, pool_pre_ping=True, connect_args={"sslmode": "require"})
         
         with engine.connect() as connection:
             # Test basic query
@@ -98,7 +98,7 @@ def create_tables_if_needed():
         from sqlalchemy import create_engine
         from agents.models.user_memory_models import Base
         
-        engine = create_engine(FINAL_DATABASE_URL)
+        engine = create_engine(FINAL_DATABASE_URL, pool_pre_ping=True, connect_args={"sslmode": "require"})
         Base.metadata.create_all(bind=engine)
         engine.dispose()
         print("   ✅ Database tables created/verified successfully")
