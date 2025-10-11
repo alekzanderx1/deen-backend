@@ -66,7 +66,7 @@ def chat_pipeline_streaming(user_query: str, session_id: str, target_language: s
 
     # Step 4: Retrieve relevant documents from Pinecone
     # relevant_docs = retriever.retrieve_documents(enhanced_query, 5) # NOTE: Changed to 5 references for chatbot
-    relevant_shia_docs = retriever.retrieve_shia_documents(enhanced_query, 4)
+    relevant_shia_docs = retriever.retrieve_shia_documents(enhanced_query, 5)
     relevant_sunni_docs = retriever.retrieve_sunni_documents(enhanced_query, 2)
 
     all_relevant_docs = relevant_shia_docs + relevant_sunni_docs
