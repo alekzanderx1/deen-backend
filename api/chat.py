@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
 from models.schemas import ChatRequest
 from core import pipeline
 from core.memory import make_history

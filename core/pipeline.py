@@ -66,7 +66,7 @@ def chat_pipeline_streaming(user_query: str, session_id: str, target_language: s
 
     # Step 4: Retrieve relevant documents from Pinecone
     # relevant_docs = retriever.retrieve_documents(enhanced_query, 5) # NOTE: Changed to 5 references for chatbot
-    relevant_shia_docs = retriever.retrieve_shia_documents(enhanced_query, 4)
+    relevant_shia_docs = retriever.retrieve_shia_documents(enhanced_query, 5)
     relevant_sunni_docs = retriever.retrieve_sunni_documents(enhanced_query, 2)
 
     all_relevant_docs = relevant_shia_docs + relevant_sunni_docs
@@ -99,3 +99,19 @@ def references_pipeline(user_query: str, sect: str):
         results["sunni"] = utils.format_references_as_json(retriever.retrieve_sunni_documents(enhanced_query,REFERENCE_FETCH_COUNT))
 
     return results
+
+def hikmah_elaboration_pipeline_streaming(selected_text: str, context_text: str, hikmah_tree_name: str, lesson_name: str, lesson_summary: str, user_id: str = None):
+
+    # Step 1: Retrieve relevant documents from Pinecone based on context
+    relevant_shia_docs = retriever.retrieve_shia_documents(context_text, 4)
+
+    all_relevant_docs = relevant_shia_docs
+
+    # Step 2: Stream the AI response from OpenAI
+    response_generator = stream_generator.generate_elaboration_response_stream(
+        selected_text, context_text, hikmah_tree_name, lesson_name, 
+        lesson_summary, all_relevant_docs, user_id=user_id
+    )
+
+    # Return a StreamingResponse with appropriate media type.
+    return StreamingResponse(response_generator, media_type="text/event-stream")
