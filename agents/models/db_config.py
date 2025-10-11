@@ -20,7 +20,8 @@ engine = create_engine(
     pool_pre_ping=True,  # Verify connections before using them
     pool_recycle=3600,   # Recycle connections after 1 hour
     pool_size=10,        # Connection pool size
-    max_overflow=20      # Max connections beyond pool_size
+    max_overflow=20,      # Max connections beyond pool_size
+    connect_args={"sslmode": "require"}
 )
 async_engine = create_async_engine(ASYNC_DATABASE_URL or DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://"))
 
