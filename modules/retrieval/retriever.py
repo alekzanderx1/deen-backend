@@ -31,12 +31,12 @@ def retrieve_shia_documents(query,no_of_docs=10):
     print("INSIDE shia retrive_documents")
     try:
         dense_vectorstore = vectorstore_module._get_vectorstore(DEEN_DENSE_INDEX_NAME)
-        dense_docs_and_score = dense_vectorstore.similarity_search_with_score(query,filter={'sect':'shia'},k=20)
+        dense_docs_and_score = dense_vectorstore.similarity_search_with_score(query,filter={'sect':'shia'},k=no_of_docs)
 
         sparse_embedding = embedder.generate_sparse_embedding(query)
         spare_vectorstore = vectorstore_module._get_sparse_vectorstore(DEEN_SPARSE_INDEX_NAME)
         sparse_docs = spare_vectorstore.query(
-                top_k=20,
+                top_k=no_of_docs,
                 include_metadata=True,
                 sparse_vector=sparse_embedding,
                 namespace="ns1",
@@ -54,12 +54,12 @@ def retrieve_sunni_documents(query,no_of_docs=10):
     print("INSIDE sunni retrive_documents")
     try:
         dense_vectorstore = vectorstore_module._get_vectorstore(DEEN_DENSE_INDEX_NAME)
-        dense_docs_and_score = dense_vectorstore.similarity_search_with_score(query,filter={'sect':'sunni'},k=20)
+        dense_docs_and_score = dense_vectorstore.similarity_search_with_score(query,filter={'sect':'sunni'},k=no_of_docs)
 
         sparse_embedding = embedder.generate_sparse_embedding(query)
         spare_vectorstore = vectorstore_module._get_sparse_vectorstore(DEEN_SPARSE_INDEX_NAME)
         sparse_docs = spare_vectorstore.query(
-                top_k=20,
+                top_k=no_of_docs,
                 include_metadata=True,
                 sparse_vector=sparse_embedding,
                 namespace="ns1",
