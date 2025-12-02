@@ -61,8 +61,8 @@ def chat_pipeline_streaming(user_query: str, session_id: str, target_language: s
         message = "This is a fiqh-related question. My capabilities are not ready yet to answer such queries. Please consult a qualified scholar."
         return StreamingResponse(utils.stream_message(message), media_type="text/event-stream")
 
-    # Step 3: Enhance the query
-    enhanced_query = enhancer.enhance_query(user_query)
+    # Step 3: Enhance the query (with chat history context if available)
+    enhanced_query = enhancer.enhance_query(user_query, session_id)
 
     # Step 4: Retrieve relevant documents from Pinecone
     # relevant_docs = retriever.retrieve_documents(enhanced_query, 5) # NOTE: Changed to 5 references for chatbot
@@ -82,7 +82,7 @@ def chat_pipeline_streaming(user_query: str, session_id: str, target_language: s
 
 
 
-def references_pipeline(user_query: str, sect: str):
+def references_pipeline(user_query: str, sect: str, limit: int = REFERENCE_FETCH_COUNT):
     # # Step 1: Classify query (fiqh or non-fiqh)
     is_non_islamic = classifier.classify_non_islamic_query(user_query)
     if is_non_islamic:
@@ -91,12 +91,12 @@ def references_pipeline(user_query: str, sect: str):
     # Step 2: Enhance query
     enhanced_query = enhancer.enhance_query(user_query)
 
-    # Step 3: Retrieve relevant documents from Pinecone
+    # Step 3: Retrieve relevant documents from Pinecone with custom limit
     results = {}
     if sect in ["shia", "both"]:
-        results["shia"] = utils.format_references_as_json(retriever.retrieve_shia_documents(enhanced_query,REFERENCE_FETCH_COUNT))
+        results["shia"] = utils.format_references_as_json(retriever.retrieve_shia_documents(enhanced_query, limit))
     if sect in ["sunni", "both"]:
-        results["sunni"] = utils.format_references_as_json(retriever.retrieve_sunni_documents(enhanced_query,REFERENCE_FETCH_COUNT))
+        results["sunni"] = utils.format_references_as_json(retriever.retrieve_sunni_documents(enhanced_query, limit))
 
     return results
 
