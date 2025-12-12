@@ -2,17 +2,18 @@ from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
 from sqlalchemy.orm import Session
 import json
-import uuid
 from enum import Enum
 
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from agents.models.user_memory_models import UserMemoryProfile, MemoryEvent
+from agents.models.user_memory_models import UserMemoryProfile
 from agents.prompts.memory_prompts import chat_memory_analysis_prompt
 from core.chat_models import get_generator_model
 from .memory_consolidator import MemoryConsolidator
+from services.memory_service import MemoryService
+from services.consolidation_service import ConsolidationService
 
 class InteractionType(str, Enum):
     """All possible user interaction types that can trigger memory updates"""
@@ -45,7 +46,9 @@ class UniversalMemoryAgent:
     def __init__(self, db: Session):
         self.db = db
         self.llm = get_generator_model()
-        self.consolidator = MemoryConsolidator(db)
+        self.memory_service = MemoryService(db)
+        self.consolidation_service = ConsolidationService(db)
+        self.consolidator = MemoryConsolidator(self.consolidation_service)
     
     async def analyze_interaction(self, 
                                 user_id: str,
@@ -110,10 +113,7 @@ class UniversalMemoryAgent:
         )
         """
         
-        # Get or create user memory profile
-        memory_profile = await self._get_or_create_memory_profile(user_id)
-        
-        # Create comprehensive event record
+        # Prepare event payloads
         event_data = {
             "interaction_type": interaction_type.value,
             "interaction_data": interaction_data,
@@ -121,16 +121,21 @@ class UniversalMemoryAgent:
             "context": context or {},
             "timestamp": datetime.utcnow().isoformat()
         }
+        trigger_context = {
+            "method": "universal_analysis", 
+            "agent": "UniversalMemoryAgent",
+            "interaction_type": interaction_type.value
+        }
         
-        memory_event = MemoryEvent(
-            user_memory_profile_id=memory_profile.id,
+        # Get or create user memory profile
+        memory_profile = await self._get_or_create_memory_profile(user_id)
+        # Create a pending event record
+        memory_event = self.memory_service.create_event(
+            profile_id=memory_profile.id,
             event_type=interaction_type.value,
             event_data=event_data,
-            trigger_context={
-                "method": "universal_analysis", 
-                "agent": "UniversalMemoryAgent",
-                "interaction_type": interaction_type.value
-            }
+            trigger_context=trigger_context,
+            processing_status="pending",
         )
         
         try:
@@ -146,8 +151,10 @@ class UniversalMemoryAgent:
                     memory_profile, analysis_result["new_notes"]
                 )
                 
+                notes_added = []
                 if filtered_notes:
-                    await self._update_user_memory(memory_profile, filtered_notes)
+                    self.memory_service.add_notes(memory_profile, filtered_notes)
+                    notes_added = filtered_notes
                     
                     # Check if consolidation should be triggered
                     if await self.consolidator.should_trigger_consolidation(memory_profile):
@@ -160,18 +167,22 @@ class UniversalMemoryAgent:
                     print("🔄 All new notes were duplicates, none added")
                 
                 # Update the memory event with results
-                memory_event.notes_added = filtered_notes or []
-                memory_event.processing_reasoning = analysis_result["reasoning"]
-                memory_event.processing_status = "processed"
-                memory_event.processed_at = datetime.utcnow()
+                self.memory_service.update_event_status(
+                    memory_event,
+                    status="processed",
+                    reasoning=analysis_result["reasoning"],
+                    notes_added=notes_added,
+                )
             else:
-                memory_event.processing_reasoning = analysis_result.get("reasoning", "No memory update needed")
-                memory_event.processing_status = "processed"
-                memory_event.processed_at = datetime.utcnow()
+                self.memory_service.update_event_status(
+                    memory_event,
+                    status="processed",
+                    reasoning=analysis_result.get("reasoning", "No memory update needed"),
+                    notes_added=[],
+                )
             
-            # Save the memory event
-            self.db.add(memory_event)
-            self.db.commit()
+            # Commit the full interaction atomically
+            self.memory_service.commit()
             
             return {
                 "memory_updated": analysis_result.get("should_update_memory", False),
@@ -183,16 +194,27 @@ class UniversalMemoryAgent:
             
         except Exception as e:
             # Handle errors gracefully
-            memory_event.processing_status = "failed"
-            memory_event.processing_reasoning = f"Error during analysis: {str(e)}"
-            memory_event.processed_at = datetime.utcnow()
-            self.db.add(memory_event)
-            self.db.commit()
+            self.memory_service.rollback()
+            # Recreate a failure event to ensure the error is logged cleanly
+            failure_event = self.memory_service.create_event(
+                profile_id=memory_profile.id,
+                event_type=interaction_type.value,
+                event_data=event_data,
+                trigger_context=trigger_context,
+                processing_status="failed",
+            )
+            self.memory_service.update_event_status(
+                failure_event,
+                status="failed",
+                reasoning=f"Error during analysis: {str(e)}",
+                notes_added=[],
+            )
+            self.memory_service.commit()
             
             return {
                 "memory_updated": False,
                 "error": str(e),
-                "event_id": memory_event.id,
+                "event_id": failure_event.id,
                 "interaction_type": interaction_type.value
             }
     
@@ -402,25 +424,7 @@ ANALYSIS GUIDELINES FOR ELABORATION REQUESTS:
     # Reuse existing methods from MemoryAgent
     async def _get_or_create_memory_profile(self, user_id: str) -> UserMemoryProfile:
         """Get existing memory profile or create a new one"""
-        
-        profile = self.db.query(UserMemoryProfile).filter(
-            UserMemoryProfile.user_id == user_id
-        ).first()
-        
-        if not profile:
-            profile = UserMemoryProfile(
-                user_id=user_id,
-                learning_notes=[],
-                interest_notes=[],
-                knowledge_notes=[],
-                behavior_notes=[],
-                preference_notes=[]
-            )
-            self.db.add(profile)
-            self.db.commit()
-            self.db.refresh(profile)
-        
-        return profile
+        return self.memory_service.get_or_create_profile(user_id)
     
     def _format_memory_for_context(self, memory_profile: UserMemoryProfile) -> str:
         """Format existing memory into a concise summary for LLM context"""
@@ -456,34 +460,8 @@ ANALYSIS GUIDELINES FOR ELABORATION REQUESTS:
         return "\n".join(memory_summary) if memory_summary else "No existing memory for this user."
     
     async def _update_user_memory(self, memory_profile: UserMemoryProfile, new_notes: List[Dict[str, Any]]) -> None:
-        """Update the user's memory profile with new notes"""
-        
-        # Add timestamps and IDs to new notes
-        for note in new_notes:
-            note["id"] = str(uuid.uuid4())
-            note["created_at"] = datetime.utcnow().isoformat()
-        
-        # Add notes to appropriate categories
-        for note in new_notes:
-            note_type = note.get("note_type", "learning_notes")
-            
-            if note_type == "learning_notes":
-                memory_profile.learning_notes = (memory_profile.learning_notes or []) + [note]
-            elif note_type == "knowledge_notes":
-                memory_profile.knowledge_notes = (memory_profile.knowledge_notes or []) + [note]
-            elif note_type == "interest_notes":
-                memory_profile.interest_notes = (memory_profile.interest_notes or []) + [note]
-            elif note_type == "behavior_notes":
-                memory_profile.behavior_notes = (memory_profile.behavior_notes or []) + [note]
-            elif note_type == "preference_notes":
-                memory_profile.preference_notes = (memory_profile.preference_notes or []) + [note]
-        
-        # Update metadata
-        memory_profile.total_interactions += 1
-        memory_profile.last_significant_update = datetime.utcnow()
-        memory_profile.updated_at = datetime.utcnow()
-        
-        self.db.commit()
+        """Backwards-compatible wrapper to add notes via the memory service"""
+        self.memory_service.add_notes(memory_profile, new_notes)
     
     # Convenience methods for specific interaction types
     async def analyze_chat(self, user_id: str, user_query: str, ai_response: str = None,

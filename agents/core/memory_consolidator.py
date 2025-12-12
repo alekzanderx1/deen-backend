@@ -1,8 +1,6 @@
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta
-from sqlalchemy.orm import Session
 import json
-import uuid
 import numpy as np
 import os
 import sys
@@ -16,9 +14,10 @@ from sentence_transformers import SentenceTransformer
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from agents.models.user_memory_models import UserMemoryProfile, MemoryConsolidation
+from agents.models.user_memory_models import UserMemoryProfile
 from agents.prompts.memory_prompts import memory_consolidation_prompt
 from core.chat_models import get_generator_model
+from services.consolidation_service import ConsolidationService
 
 class MemoryConsolidator:
     """
@@ -29,8 +28,8 @@ class MemoryConsolidator:
     _shared_embedder = None
     _embedder_lock = threading.Lock()
     
-    def __init__(self, db: Session):
-        self.db = db
+    def __init__(self, consolidation_service: ConsolidationService):
+        self.consolidation_service = consolidation_service
         self.llm = get_generator_model()
         # Use a lightweight sentence transformer for semantic similarity
         if MemoryConsolidator._shared_embedder is None:
@@ -40,7 +39,7 @@ class MemoryConsolidator:
         self.embedder = MemoryConsolidator._shared_embedder
         
         # Consolidation thresholds
-        self.SIMILARITY_THRESHOLD = 0.75  # How similar notes need to be to merge (lowered to catch more duplicates)
+        self.SIMILARITY_THRESHOLD = 0.6  # How similar notes need to be to merge (lowered to catch more duplicates)
         self.MAX_NOTES_PER_CATEGORY = 15  # When to trigger consolidation
         self.MIN_CONFIDENCE_TO_KEEP = 0.3  # Remove notes below this confidence
     
@@ -125,9 +124,7 @@ class MemoryConsolidator:
                 return True
         
         # Check if consolidation hasn't happened in a while
-        last_consolidation = self.db.query(MemoryConsolidation).filter(
-            MemoryConsolidation.user_memory_profile_id == memory_profile.id
-        ).order_by(MemoryConsolidation.created_at.desc()).first()
+        last_consolidation = self.consolidation_service.get_last_consolidation(memory_profile.id)
         
         if last_consolidation:
             days_since_last = (datetime.utcnow() - last_consolidation.created_at).days
@@ -165,8 +162,8 @@ class MemoryConsolidator:
             notes_after = self._count_total_notes(memory_profile)
             
             # Log the consolidation
-            consolidation_log = MemoryConsolidation(
-                user_memory_profile_id=memory_profile.id,
+            consolidation_log = self.consolidation_service.log_consolidation(
+                profile_id=memory_profile.id,
                 consolidation_type=consolidation_type,
                 notes_before_count=notes_before,
                 notes_after_count=notes_after,
@@ -175,9 +172,6 @@ class MemoryConsolidator:
                 new_summary_notes=consolidation_result.get("new_summary_notes", []),
                 consolidation_reasoning=consolidation_result.get("reasoning", "")
             )
-            
-            self.db.add(consolidation_log)
-            self.db.commit()
             
             print(f"✅ Consolidation complete: {notes_before} → {notes_after} notes")
             
@@ -302,19 +296,7 @@ class MemoryConsolidator:
         
         consolidated_memory = consolidation_result.get("consolidated_memory", {})
         
-        # Update each category with consolidated notes
-        memory_profile.learning_notes = consolidated_memory.get("learning_notes", [])
-        memory_profile.knowledge_notes = consolidated_memory.get("knowledge_notes", [])
-        memory_profile.interest_notes = consolidated_memory.get("interest_notes", [])
-        memory_profile.behavior_notes = consolidated_memory.get("behavior_notes", [])
-        memory_profile.preference_notes = consolidated_memory.get("preference_notes", [])
-        
-        # Update metadata
-        memory_profile.memory_version += 1
-        memory_profile.last_significant_update = datetime.utcnow()
-        memory_profile.updated_at = datetime.utcnow()
-        
-        self.db.commit()
+        self.consolidation_service.apply_consolidated_memory(memory_profile, consolidated_memory)
     
     async def find_similar_notes_in_category(self, notes: List[Dict[str, Any]], 
                                            similarity_threshold: float = 0.8) -> List[List[int]]:
@@ -371,9 +353,7 @@ class MemoryConsolidator:
             return {"error": "User not found"}
         
         # Get consolidation history
-        consolidations = self.db.query(MemoryConsolidation).filter(
-            MemoryConsolidation.user_memory_profile_id == memory_profile.id
-        ).order_by(MemoryConsolidation.created_at.desc()).all()
+        consolidations = self.consolidation_service.list_recent_consolidations(memory_profile.id, limit=5)
         
         if not consolidations:
             return {
