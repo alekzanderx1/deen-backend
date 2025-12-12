@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 import json
 from enum import Enum
+from math import isnan
 
 import sys
 import os
@@ -168,8 +169,10 @@ class UniversalMemoryAgent:
             # Update memory if analysis indicates we should
             if analysis_result.get("should_update_memory", False):
                 # Check for duplicates before adding
+                raw_notes = analysis_result["new_notes"]
+                normalized_notes = self._normalize_confidence(raw_notes)
                 filtered_notes = await self.consolidator.check_for_duplicates_before_adding(
-                    memory_profile, analysis_result["new_notes"]
+                    memory_profile, normalized_notes
                 )
                 logger.info(
                     "Deduplication results",
@@ -509,6 +512,23 @@ ANALYSIS GUIDELINES FOR ELABORATION REQUESTS:
     async def _update_user_memory(self, memory_profile: UserMemoryProfile, new_notes: List[Dict[str, Any]]) -> None:
         """Backwards-compatible wrapper to add notes via the memory service"""
         self.memory_service.add_notes(memory_profile, new_notes)
+
+    def _normalize_confidence(self, notes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Clamp confidence to [0,1] and default missing/invalid values."""
+        normalized = []
+        for note in notes:
+            c = note.get("confidence", None)
+            try:
+                c_val = float(c)
+                if isnan(c_val):
+                    raise ValueError("nan")
+            except Exception:
+                c_val = 0.5  # default
+            c_val = max(0.0, min(1.0, c_val))
+            note_copy = dict(note)
+            note_copy["confidence"] = c_val
+            normalized.append(note_copy)
+        return normalized
     
     # Convenience methods for specific interaction types
     async def analyze_chat(self, user_id: str, user_query: str, ai_response: str = None,
