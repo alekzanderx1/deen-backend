@@ -1,3 +1,4 @@
+import logging
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -14,6 +15,9 @@ from core.chat_models import get_generator_model
 from .memory_consolidator import MemoryConsolidator
 from services.memory_service import MemoryService
 from services.consolidation_service import ConsolidationService
+from core.logging_config import get_memory_logger
+
+logger = get_memory_logger(level=logging.DEBUG)
 
 class InteractionType(str, Enum):
     """All possible user interaction types that can trigger memory updates"""
@@ -137,11 +141,28 @@ class UniversalMemoryAgent:
             trigger_context=trigger_context,
             processing_status="pending",
         )
+        logger.info(
+            "Analyzing interaction",
+            extra={
+                "user_id": user_id,
+                "interaction_type": interaction_type.value,
+                "session_id": session_id,
+            },
+        )
         
         try:
             # Analyze using interaction-specific logic
             analysis_result = await self._analyze_universal_interaction(
                 memory_profile, interaction_type, interaction_data, context or {}
+            )
+            logger.info(
+                "LLM analysis complete",
+                extra={
+                    "user_id": user_id,
+                    "interaction_type": interaction_type.value,
+                    "should_update_memory": analysis_result.get("should_update_memory", False),
+                    "proposed_notes": len(analysis_result.get("new_notes", []) or []),
+                },
             )
             
             # Update memory if analysis indicates we should
@@ -149,6 +170,15 @@ class UniversalMemoryAgent:
                 # Check for duplicates before adding
                 filtered_notes = await self.consolidator.check_for_duplicates_before_adding(
                     memory_profile, analysis_result["new_notes"]
+                )
+                logger.info(
+                    "Deduplication results",
+                    extra={
+                        "user_id": user_id,
+                        "interaction_type": interaction_type.value,
+                        "proposed_notes": len(analysis_result.get("new_notes", []) or []),
+                        "kept_notes": len(filtered_notes or []),
+                    },
                 )
                 
                 notes_added = []
@@ -158,13 +188,13 @@ class UniversalMemoryAgent:
                     
                     # Check if consolidation should be triggered
                     if await self.consolidator.should_trigger_consolidation(memory_profile):
-                        print("🧠 Triggering memory consolidation...")
+                        logger.info("Triggering memory consolidation", extra={"user_id": user_id})
                         consolidation_result = await self.consolidator.consolidate_user_memory(
                             memory_profile, "automatic"
                         )
-                        print(f"Consolidation result: {consolidation_result}")
+                        logger.debug("Consolidation result", extra={"user_id": user_id, "result": consolidation_result})
                 else:
-                    print("🔄 All new notes were duplicates, none added")
+                    logger.info("All new notes were duplicates, none added", extra={"user_id": user_id})
                 
                 # Update the memory event with results
                 self.memory_service.update_event_status(
@@ -174,6 +204,14 @@ class UniversalMemoryAgent:
                     notes_added=notes_added,
                 )
             else:
+                logger.info(
+                    "No memory update needed",
+                    extra={
+                        "user_id": user_id,
+                        "interaction_type": interaction_type.value,
+                        "reasoning": analysis_result.get("reasoning", ""),
+                    },
+                )
                 self.memory_service.update_event_status(
                     memory_event,
                     status="processed",
@@ -183,6 +221,15 @@ class UniversalMemoryAgent:
             
             # Commit the full interaction atomically
             self.memory_service.commit()
+            logger.info(
+                "Memory event processed",
+                extra={
+                    "user_id": user_id,
+                    "event_id": memory_event.id,
+                    "interaction_type": interaction_type.value,
+                    "notes_added": len(analysis_result.get("new_notes", []) or []),
+                },
+            )
             
             return {
                 "memory_updated": analysis_result.get("should_update_memory", False),
@@ -251,7 +298,7 @@ class UniversalMemoryAgent:
             response_content = response.content
             
             # Debug: Print the raw response
-            print(f"🔍 Raw LLM Response: {response_content[:200]}...")
+            logger.debug("Raw LLM response", extra={"snippet": response_content[:200]})
             
             # Try to extract JSON from response if it contains other text
             if '```json' in response_content:
@@ -266,8 +313,8 @@ class UniversalMemoryAgent:
             analysis_result = json.loads(response_content)
             return analysis_result
         except json.JSONDecodeError as e:
-            print(f"❌ JSON parsing failed: {e}")
-            print(f"Response content: {response.content[:500]}...")
+            logger.warning("JSON parsing failed", extra={"error": str(e)})
+            logger.debug("Full response content", extra={"content": response.content[:500]})
             # Fallback if JSON parsing fails
             return {
                 "should_update_memory": False,

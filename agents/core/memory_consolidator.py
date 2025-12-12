@@ -1,3 +1,4 @@
+import logging
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta
 import json
@@ -18,6 +19,9 @@ from agents.models.user_memory_models import UserMemoryProfile
 from agents.prompts.memory_prompts import memory_consolidation_prompt
 from core.chat_models import get_generator_model
 from services.consolidation_service import ConsolidationService
+from core.logging_config import get_memory_logger
+
+logger = get_memory_logger(level=logging.DEBUG)
 
 class MemoryConsolidator:
     """
@@ -65,7 +69,7 @@ class MemoryConsolidator:
             if not is_duplicate:
                 filtered_notes.append(note)
             else:
-                print(f"🔄 Skipping duplicate note: {note_content[:50]}...")
+                logger.info("Skipping duplicate note", extra={"note_snippet": note_content[:50]})
         
         return filtered_notes
     
@@ -143,7 +147,7 @@ class MemoryConsolidator:
         Perform smart consolidation of user memory using LLM analysis
         """
         
-        print(f"🧠 Starting memory consolidation for user {memory_profile.user_id}")
+        logger.info("Starting memory consolidation", extra={"user_id": memory_profile.user_id})
         
         # Prepare memory data for LLM analysis
         memory_data = self._prepare_memory_for_consolidation(memory_profile)
@@ -173,7 +177,14 @@ class MemoryConsolidator:
                 consolidation_reasoning=consolidation_result.get("reasoning", "")
             )
             
-            print(f"✅ Consolidation complete: {notes_before} → {notes_after} notes")
+            logger.info(
+                "Consolidation complete",
+                extra={
+                    "user_id": memory_profile.user_id,
+                    "notes_before": notes_before,
+                    "notes_after": notes_after,
+                },
+            )
             
             return {
                 "success": True,
@@ -185,7 +196,7 @@ class MemoryConsolidator:
             }
             
         except Exception as e:
-            print(f"❌ Error during consolidation: {e}")
+            logger.error("Error during consolidation", extra={"user_id": memory_profile.user_id, "error": str(e)})
             return {
                 "success": False,
                 "error": str(e)
@@ -256,15 +267,15 @@ class MemoryConsolidator:
             consolidation_result = json.loads(response_content)
             return consolidation_result
         except json.JSONDecodeError as e:
-            print(f"⚠️ JSON parsing failed: {e}")
-            print(f"Response content: {response.content[:200]}...")
+            logger.warning("JSON parsing failed during consolidation", extra={"error": str(e)})
+            logger.debug("Consolidation LLM raw response", extra={"content": response.content[:200]})
             # Fallback consolidation if JSON parsing fails
             return await self._fallback_consolidation(memory_data)
     
     async def _fallback_consolidation(self, memory_data: Dict[str, Any]) -> Dict[str, Any]:
         """Simple rule-based consolidation if LLM fails"""
         
-        print("⚠️ LLM consolidation failed, using fallback rules")
+        logger.warning("LLM consolidation failed, using fallback rules")
         
         consolidated = {
             "consolidated_memory": memory_data["categories"],
