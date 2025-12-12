@@ -15,6 +15,7 @@ from db.routers import (
     users as users_router,
     hikmah_trees as hikmah_trees_router,
 )
+from api import memory_admin
 
 
 # RUN USING: uvicorn main:app --reload
@@ -62,6 +63,7 @@ app.include_router(lessons_router.router)           # /lessons
 app.include_router(lesson_content_router.router)    # /lesson-content
 app.include_router(user_progress_router.router)     # /user-progress
 app.include_router(hikmah_trees_router.router)      # /hikmah-trees
+app.include_router(memory_admin.router)             # /admin/memory
 
 
 from fastapi.responses import JSONResponse
