@@ -42,7 +42,8 @@ async def chat_pipeline_stream_ep(request: ChatRequest):
     Expects:
       {
         "user_query": "What does Islam say about justice?",
-        "session_id": "user42:thread-7"
+        "session_id": "user42:thread-7",
+        "language": "english"
       }
     """
     user_query = (request.user_query or "").strip()
