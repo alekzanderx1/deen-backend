@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api import chat
 from api import reference
 from api import hikmah
+from api import account
 from models.JWTBearer import JWTBearer
 from core.auth import jwks
 import os
@@ -49,6 +50,7 @@ app.add_middleware(
 app.include_router(reference.ref_router,dependencies=[Depends(auth)])
 app.include_router(chat.chat_router,dependencies=[Depends(auth)])
 app.include_router(hikmah.hikmah_router,dependencies=[Depends(auth)])
+app.include_router(account.router,dependencies=[Depends(auth)])  # /account
 
 # app.include_router(reference.ref_router)
 # app.include_router(chat.chat_router)
