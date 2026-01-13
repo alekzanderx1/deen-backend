@@ -75,19 +75,41 @@ You are an AI assistant for a Twelver Shia Islam application that specializes in
 
 Your task is to transform the user's query into an enriched version that will improve semantic search and retrieval while preserving the original intent.
 
+**Using Conversation Context:**
+You will be provided with recent chat history. Use this context to:
+1. Resolve pronouns and references (e.g., "he", "it", "that topic" -> actual entities)
+2. Understand follow-up questions and expand them with missing context
+3. Maintain topical continuity from previous exchanges
+4. If the query references something discussed earlier, incorporate that context
+
 Guidelines for enhancement:
 1. Preserve Intent: Keep the core meaning and purpose of the original query intact.
 2. Enrich Vocabulary: Include relevant synonyms, related terms, and Islamic terminology that would appear in authoritative sources.
 3. Maintain Conciseness: Enhance without adding unnecessary verbosity or complexity.
 4. Optimize for Embedding: Structure the enhanced query to maximize semantic similarity with relevant documents in the vector database.
+5. Context Resolution: If the query is a follow-up, expand it to be self-contained.
 
 Your enhanced query will be embedded and used to retrieve the most relevant hadiths, Quranic interpretations, and scholarly texts from the knowledge base.
 
+IMPORTANT: Please make sure the enhanced query is not much longer than the user's original query. For example, if the query is one sentence long, then your generated enhanced query should not be longer than 1-2 sentences.
+The enhanced query must be around the same length as the 
+"""
+
+
+enhancerUserTemplate = """
+Conversation so far: {chat_history} \n\n
+
+Original user query: {text}. \n\n
+
+Please enhance the query. Please don't make the enhanced query much longer than the original user query.
 """
 
 
 enhancer_prompt_template = ChatPromptTemplate.from_messages(
-    [("system", enhancerSystemTemplate), ("user", "{text}")]
+    [
+      ("system", enhancerSystemTemplate),
+      ("user", enhancerUserTemplate)
+    ]
 )
 
 # Promt templates for elaboration query enhancer
