@@ -46,3 +46,31 @@ You can test the API and view docs at:
 ## 📦 Notes
 
 - Make sure you have a valid `.env` file for any API keys (e.g., OpenAI, Pinecone).
+
+---
+
+### Useful commands to manage EC2 deployment
+
+cd ~/deen-backend
+git pull
+
+#### Stop and remove everything
+
+docker compose down
+
+#### Optional but recommended on small instances
+
+docker system prune -af
+
+##### Rebuild with NO CACHE so pip doesn’t reuse anything
+
+docker compose build --no-cache
+
+##### Start up
+
+docker compose up -d
+
+#### logs checks:
+
+docker logs --tail=200 deen-caddy
+docker logs --tail=200 deen-backend
