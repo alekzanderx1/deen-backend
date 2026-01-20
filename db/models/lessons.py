@@ -1,5 +1,5 @@
 from sqlalchemy import Column, BigInteger, Integer, Text, TIMESTAMP
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.sql import func
 from ..session import Base
 
@@ -19,3 +19,8 @@ class Lesson(Base):
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
     hikmah_tree_id = Column(BigInteger)
     order_position = Column(Integer)
+
+    # Baseline primers (shown to all users)
+    baseline_primer_bullets = Column(JSONB)     # Array of 2-3 bullet strings
+    baseline_primer_glossary = Column(JSONB)    # Optional mini glossary as key-value pairs
+    baseline_primer_updated_at = Column(TIMESTAMP(timezone=True))
