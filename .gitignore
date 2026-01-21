@@ -51,3 +51,4 @@ logs/
 
 # 🔹 Ignore temps folder
 temps/
+.claude/
