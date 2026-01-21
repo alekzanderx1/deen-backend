@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel
 
@@ -14,6 +14,9 @@ class LessonBase(BaseModel):
     published_at: Optional[datetime] = None
     hikmah_tree_id: Optional[int] = None
     order_position: Optional[int] = None
+    baseline_primer_bullets: Optional[List[str]] = None
+    baseline_primer_glossary: Optional[Dict[str, str]] = None
+    baseline_primer_updated_at: Optional[datetime] = None
 
 class LessonCreate(LessonBase):
     title: str
