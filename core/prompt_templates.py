@@ -326,5 +326,58 @@ hikmahElaborationUserTemplate = """Could you please elaborate on the following t
 """
 
 hikmah_elaboration_prompt_template = ChatPromptTemplate.from_messages([
-  ("system", hikmahElaborationSystemTemplate),  
+  ("system", hikmahElaborationSystemTemplate),
   ("user", hikmahElaborationUserTemplate)])
+
+
+# Prompt templates for personalized lesson primers
+
+primerGenerationSystemTemplate = """
+You generate personalized "Key Points to Know Before This Lesson" primers for a Twelver Shia Islamic education platform.
+
+PURPOSE:
+Explain prerequisite concepts from the lesson that the student may struggle with based on their weak points. These primers make lesson content easier to understand by providing essential background knowledge.
+
+RULES:
+1. Each primer: 1-3 sentences, max 3-4 brief lines
+2. Explain a specific concept FROM THE LESSON that relates to the user's gaps/weak points
+3. All explanations must follow Twelver Shia Islamic teachings
+4. Be direct - no meta-references like "based on your profile" or "this lesson covers"
+5. DO NOT repeat baseline primer content
+6. Generate exactly 2-3 primers
+7. Output valid JSON only
+
+GOOD EXAMPLES:
+- "Wudu (ritual ablution) requires washing specific body parts in order: face, arms to elbows, wiping head, and feet. The Shia method wipes the feet rather than washing them, based on the Quranic verse in Surah Al-Ma'idah (5:6)."
+- "Makharij refers to the articulation points where Arabic letters originate. The throat (Halq) produces six letters: ء ه ع ح غ خ - mastering these is essential for correct Tajweed."
+- "In Shia jurisprudence, combining Dhuhr with Asr and Maghrib with Isha prayers is permissible at any time, not just during travel. This is based on authentic hadith from the Prophet (PBUH)."
+
+BAD EXAMPLES:
+- "Based on your learning profile, you've shown difficulty with pronunciation, so this lesson will help you..." (too meta)
+- "This primer is designed to address gaps in your understanding of..." (self-referential)
+
+OUTPUT:
+{{
+  "personalized_bullets": ["Primer 1", "Primer 2", "Primer 3"]
+}}
+"""
+
+primerGenerationUserTemplate = """
+LESSON: {lesson_title}
+Summary: {lesson_summary}
+Tags: {lesson_tags}
+
+BASELINE (don't repeat): {baseline_bullets}
+
+USER'S WEAK POINTS: {user_learning_notes}
+USER'S INTERESTS: {user_interest_notes}
+USER'S KNOWLEDGE LEVEL: {user_knowledge_notes}
+USER'S PREFERENCES: {user_preference_notes}
+
+Generate 2-3 prerequisite explanations for concepts in this lesson that address the user's weak points. Each primer should clarify a concept the user needs to understand before or while studying this lesson.
+"""
+
+primer_generation_prompt_template = ChatPromptTemplate.from_messages([
+  ("system", primerGenerationSystemTemplate),
+  ("user", primerGenerationUserTemplate)
+])

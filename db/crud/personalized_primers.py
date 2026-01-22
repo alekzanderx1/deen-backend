@@ -1,3 +1,5 @@
+
+
 from .base import CRUDBase
 from ..models.personalized_primers import PersonalizedPrimer
 from ..schemas.personalized_primers import PersonalizedPrimerCreate, PersonalizedPrimerUpdate
