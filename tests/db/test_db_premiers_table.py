@@ -38,6 +38,16 @@ with engine.connect() as conn:
             print(f"\nTable: {table_name}")
         print(f"  Column: {column_name}")
 
+# Return 5 rows from lesson_content table
+# with engine.connect() as conn:
+#     result = conn.execute(text("SELECT title, content_body FROM lesson_content WHERE lesson_id=4 LIMIT 5"))
+#     print("\nRows from lesson_content table:")
+#     for row in result:
+#         row_dict = row._mapping
+#         print("title: ",row_dict['title'],"\n")
+#         print("content_body: ",row_dict['content_body'],"\n")
+#         print("----- End of Section ------\n")
+
 # Also want to see the new table personalized_primers in details
 # with engine.connect() as conn:
 #     result = conn.execute(text("""
@@ -52,15 +62,15 @@ with engine.connect() as conn:
 #         print(f"  Column: {column_name}, Type: {data_type}, Nullable: {is_nullable}")
 
 # Return rows of prsonalized_primers table
-with engine.connect() as conn:
-    result = conn.execute(text("SELECT * FROM personalized_primers LIMIT 10"))
-    print("\nRows from personalized_primers table:")
-    for row in result:
-        row_dict = row._mapping
-        print(row_dict['user_id'], row_dict['lesson_id'], "\n\n")
-        for bullet in row_dict['personalized_bullets']:
-            print(f"  - {bullet}")
-        print("-----\n")
+# with engine.connect() as conn:
+#     result = conn.execute(text("SELECT * FROM personalized_primers LIMIT 10"))
+#     print("\nRows from personalized_primers table:")
+#     for row in result:
+#         row_dict = row._mapping
+#         print(row_dict['user_id'], row_dict['lesson_id'], "\n\n")
+#         for bullet in row_dict['personalized_bullets']:
+#             print(f"  - {bullet}")
+#         print("-----\n")
 # return rows of user_memory_profiles table
 
 # with engine.connect() as conn:
