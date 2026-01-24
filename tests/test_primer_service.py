@@ -25,13 +25,30 @@ def mock_db():
     """Create a mock database session"""
     db = Mock(spec=Session)
     db.query = Mock(return_value=Mock())
+    db.execute = Mock()
     return db
 
 
 @pytest.fixture
-def primer_service(mock_db):
-    """Create a PrimerService instance with mock db"""
-    return PrimerService(mock_db)
+def mock_embedding_service():
+    """Create a mock embedding service"""
+    mock_instance = Mock()
+    # Default to tag-based fallback (no embeddings)
+    mock_instance.has_note_embeddings.return_value = False
+    mock_instance.has_lesson_chunks.return_value = False
+    mock_instance.find_similar_notes_to_lesson.return_value = []
+    mock_instance.calculate_signal_quality.return_value = 0.0
+    return mock_instance
+
+
+@pytest.fixture
+def primer_service(mock_db, mock_embedding_service):
+    """Create a PrimerService instance with mock db and embedding service"""
+    with patch('services.primer_service.EmbeddingService') as mock_emb_class:
+        mock_emb_class.return_value = mock_embedding_service
+        service = PrimerService(mock_db)
+        service.embedding_service = mock_embedding_service
+        return service
 
 
 @pytest.fixture
@@ -100,6 +117,7 @@ def sample_user_profile():
         }
     ]
     profile.memory_version = datetime(2026, 1, 18, 14, 0, 0)
+    profile.last_significant_update = datetime(2026, 1, 18, 14, 0, 0)
     profile.total_interactions = 15
     return profile
 
@@ -408,30 +426,111 @@ class TestFetchUserSignals:
         """Test fetching signals when user has no profile"""
         mock_db.query.return_value.filter.return_value.first.return_value = None
 
-        signals = primer_service._fetch_user_signals("user123", ["quran"])
+        signals = primer_service._fetch_user_signals("user123", lesson_id=1, lesson_tags=["quran"])
 
         assert signals["available"] is False
 
-    def test_fetch_signals_with_profile(self, primer_service, mock_db, sample_user_profile):
-        """Test fetching signals with valid profile"""
+    def test_fetch_signals_with_profile_tag_fallback(self, primer_service, mock_db, sample_user_profile):
+        """Test fetching signals with valid profile using tag-based fallback"""
         mock_db.query.return_value.filter.return_value.first.return_value = sample_user_profile
+        # Embeddings not available, so falls back to tags
+        primer_service.embedding_service.has_note_embeddings.return_value = False
+        primer_service.embedding_service.has_lesson_chunks.return_value = False
 
-        signals = primer_service._fetch_user_signals("user123", ["quran", "tajweed"])
+        signals = primer_service._fetch_user_signals("user123", lesson_id=1, lesson_tags=["quran", "tajweed"])
 
         assert signals["available"] is True
         assert "learning_notes" in signals
         assert "interest_notes" in signals
         assert signals["total_interactions"] == 15
+        assert signals["similarity_based"] is False
 
     def test_fetch_signals_filters_by_tags(self, primer_service, mock_db, sample_user_profile):
-        """Test that signals are filtered by lesson tags"""
+        """Test that signals are filtered by lesson tags when using fallback"""
         mock_db.query.return_value.filter.return_value.first.return_value = sample_user_profile
+        primer_service.embedding_service.has_note_embeddings.return_value = False
+        primer_service.embedding_service.has_lesson_chunks.return_value = False
 
-        signals = primer_service._fetch_user_signals("user123", ["tajweed"])
+        signals = primer_service._fetch_user_signals("user123", lesson_id=1, lesson_tags=["tajweed"])
 
         # Should only include notes with "tajweed" tag
         learning_notes = signals["learning_notes"]
         assert all("tajweed" in note.get("tags", []) for note in learning_notes)
+
+    def test_fetch_signals_with_embeddings(self, primer_service, mock_db, sample_user_profile):
+        """Test fetching signals using embeddings when available"""
+        mock_db.query.return_value.filter.return_value.first.return_value = sample_user_profile
+        # Embeddings are available (note embeddings and lesson chunks)
+        primer_service.embedding_service.has_note_embeddings.return_value = True
+        primer_service.embedding_service.has_lesson_chunks.return_value = True
+        primer_service.embedding_service.find_similar_notes_to_lesson.return_value = [
+            ("note1", "learning_notes", 0.85),
+            ("note3", "interest_notes", 0.75),
+        ]
+        primer_service.embedding_service.calculate_signal_quality.return_value = 0.8
+
+        signals = primer_service._fetch_user_signals("user123", lesson_id=1, lesson_tags=["tajweed"])
+
+        assert signals["available"] is True
+        assert signals["similarity_based"] is True
+        assert "avg_similarity" in signals
+        assert "note_similarities" in signals
+
+
+# Test: Similarity-Based Quality Assessment
+class TestSimilarityQualityAssessment:
+    """Test similarity-based signal quality scoring"""
+
+    def test_assess_similarity_quality_high(self, primer_service):
+        """Test similarity quality with high avg_similarity"""
+        signals = {
+            "available": True,
+            "similarity_based": True,
+            "avg_similarity": 0.8,
+            "learning_notes": [{"id": "1"}, {"id": "2"}],
+            "interest_notes": [{"id": "3"}],
+            "knowledge_notes": [],
+            "total_interactions": 15
+        }
+
+        score = primer_service._assess_similarity_quality(signals)
+
+        # Should score: 0.6 (similarity capped) + 0.2 (3 notes) + 0.2 (interactions) = 1.0
+        assert score == 1.0
+
+    def test_assess_similarity_quality_medium(self, primer_service):
+        """Test similarity quality with medium avg_similarity"""
+        signals = {
+            "available": True,
+            "similarity_based": True,
+            "avg_similarity": 0.5,
+            "learning_notes": [{"id": "1"}],
+            "interest_notes": [],
+            "knowledge_notes": [],
+            "total_interactions": 7
+        }
+
+        score = primer_service._assess_similarity_quality(signals)
+
+        # Should score: 0.5 (similarity) + 0.1 (1 note) + 0.1 (5-9 interactions) = 0.7
+        assert 0.6 <= score <= 0.8
+
+    def test_assess_similarity_quality_low(self, primer_service):
+        """Test similarity quality with low avg_similarity"""
+        signals = {
+            "available": True,
+            "similarity_based": True,
+            "avg_similarity": 0.2,
+            "learning_notes": [],
+            "interest_notes": [],
+            "knowledge_notes": [],
+            "total_interactions": 2
+        }
+
+        score = primer_service._assess_similarity_quality(signals)
+
+        # Should score: 0.2 (similarity) + 0 (no notes) + 0 (few interactions) = 0.2
+        assert score == 0.2
 
 
 # Test: Fallback Response

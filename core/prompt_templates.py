@@ -363,9 +363,10 @@ OUTPUT:
 """
 
 primerGenerationUserTemplate = """
-LESSON: {lesson_title}
-Summary: {lesson_summary}
-Tags: {lesson_tags}
+LESSON TITLE: {lesson_title}
+
+LESSON CONTENT:
+{lesson_content}
 
 BASELINE (don't repeat): {baseline_bullets}
 

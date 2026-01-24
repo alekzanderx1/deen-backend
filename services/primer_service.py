@@ -1,5 +1,7 @@
 """
 Service layer for personalized lesson primers generation and management.
+
+Uses embeddings-based similarity search for note relevance (with tag-based fallback).
 """
 
 from typing import Dict, List, Optional, Any
@@ -10,8 +12,10 @@ import logging
 from sqlalchemy.orm import Session
 
 from core.chat_models import get_enhancer_model
+from core.config import NOTE_FILTER_THRESHOLD, SIGNAL_QUALITY_THRESHOLD
 from core.prompt_templates import primer_generation_prompt_template
 from db.crud.personalized_primers import personalized_primer_crud
+from db.models.lesson_content import LessonContent
 from db.utils.personalized_primers_utils import (
     is_primer_fresh,
     compute_inputs_hash,
@@ -20,6 +24,8 @@ from db.utils.personalized_primers_utils import (
 )
 from db.schemas.personalized_primers import PersonalizedPrimerCreate, PersonalizedPrimerUpdate
 from agents.models.user_memory_models import UserMemoryProfile
+from services.embedding_service import EmbeddingService
+from core.config import SIGNAL_QUALITY_THRESHOLD    
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +35,7 @@ class PrimerService:
     Service for generating and managing personalized lesson primers.
 
     Handles:
-    - Fetching user signals from memory profiles
+    - Fetching user signals from memory profiles (using embeddings or tag-based fallback)
     - Assessing signal quality for personalization
     - Generating personalized bullets via LLM
     - Caching and freshness validation
@@ -37,6 +43,7 @@ class PrimerService:
 
     def __init__(self, db: Session):
         self.db = db
+        self.embedding_service = EmbeddingService(db)
 
     async def generate_personalized_primer(
         self,
@@ -119,18 +126,25 @@ class PrimerService:
             logger.error(f"Lesson not found | lesson_id={lesson_id}")
             return self._fallback_response()
 
-        # Fetch user signals
-        user_signals = self._fetch_user_signals(user_id, lesson.tags or [])
+        # Fetch user signals (now passing lesson_id for embedding lookup)
+        user_signals = self._fetch_user_signals(
+            user_id=user_id,
+            lesson_id=lesson_id,
+            lesson_tags=lesson.tags or []
+        )
 
         # Assess signal quality
         signal_quality = self._assess_signal_quality(user_signals)
+        print("Signal Quality Assessed:", signal_quality)
+        # Use signal quality threshold (0.6) for embeddings, rule-based (0.5) for fallback
+        threshold = SIGNAL_QUALITY_THRESHOLD if user_signals.get("similarity_based") else 0.5
 
-        # Check if we have enough signals to personalize
-        if signal_quality < 0.5:
+        if signal_quality < threshold:
             logger.info(
                 f"Insufficient signals for personalization | user_id={user_id} | "
-                f"lesson_id={lesson_id} | quality={signal_quality}"
+                f"lesson_id={lesson_id} | quality={signal_quality:.3f} | threshold={threshold}"
             )
+            print("Insufficient signals, returning fallback.")
             return self._fallback_response()
 
         # Generate bullets with LLM
@@ -138,7 +152,6 @@ class PrimerService:
             lesson=lesson,
             user_signals=user_signals
         )
-
         if not personalized_bullets or len(personalized_bullets) < 2:
             logger.warning(f"LLM generation failed or returned insufficient bullets")
             return self._fallback_response()
@@ -163,18 +176,143 @@ class PrimerService:
     def _fetch_user_signals(
         self,
         user_id: str,
+        lesson_id: int,
         lesson_tags: List[str]
     ) -> Dict[str, Any]:
-        """Fetch relevant user memory notes and progress"""
+        """
+        Fetch relevant user memory notes using embeddings-based similarity.
+        Falls back to tag-based filtering if embeddings don't exist.
+
+        Args:
+            user_id: User identifier
+            lesson_id: Lesson identifier (for embedding lookup)
+            lesson_tags: Lesson tags (for fallback)
+
+        Returns:
+            Dictionary with user signals
+        """
         # Fetch user memory profile
         profile = self.db.query(UserMemoryProfile).filter(
             UserMemoryProfile.user_id == user_id
         ).first()
 
         if not profile:
+            print("No user memory profile found.", user_id)
             return {"available": False}
 
-        # Filter notes by relevance to lesson tags
+        # Check if embeddings exist for both user and lesson
+        has_embeddings = (
+            self.embedding_service.has_note_embeddings(user_id) and
+            self.embedding_service.has_lesson_chunks(lesson_id)
+        )
+
+        if has_embeddings:
+            # Use embeddings-based similarity search
+            return self._fetch_signals_with_embeddings(
+                user_id=user_id,
+                lesson_id=lesson_id,
+                profile=profile
+            )
+        else:
+            # Fallback to tag-based filtering
+            logger.info(
+                f"Falling back to tag-based filtering | user_id={user_id} | "
+                f"lesson_id={lesson_id} | reason=missing_embeddings"
+            )
+            return self._fetch_signals_with_tags(
+                profile=profile,
+                lesson_tags=lesson_tags
+            )
+
+    def _fetch_signals_with_embeddings(
+        self,
+        user_id: str,
+        lesson_id: int,
+        profile: UserMemoryProfile
+    ) -> Dict[str, Any]:
+        """
+        Fetch user signals using embeddings-based similarity search.
+
+        Compares each user note against all lesson chunks. Notes with max
+        similarity >= NOTE_FILTER_THRESHOLD (0.6) are included.
+        """
+        # Find similar notes by comparing against all lesson chunks
+        # Returns notes where max similarity across chunks >= threshold
+        similar_notes = self.embedding_service.find_similar_notes_to_lesson(
+            user_id=user_id,
+            lesson_id=lesson_id,
+            threshold=NOTE_FILTER_THRESHOLD
+        )
+
+        if not similar_notes:
+            logger.info(
+                f"No similar notes found above threshold | user_id={user_id} | "
+                f"lesson_id={lesson_id} | threshold={NOTE_FILTER_THRESHOLD}"
+            )
+
+        # Build note ID to similarity score mapping
+        note_similarities = {note_id: score for note_id, _, score in similar_notes}
+
+        # Retrieve actual note content from profile
+        relevant_learning_notes = self._get_notes_by_ids(
+            profile.learning_notes or [], note_similarities
+        )
+        relevant_interest_notes = self._get_notes_by_ids(
+            profile.interest_notes or [], note_similarities
+        )
+        relevant_knowledge_notes = self._get_notes_by_ids(
+            profile.knowledge_notes or [], note_similarities
+        )
+        relevant_preference_notes = self._get_notes_by_ids(
+            profile.preference_notes or [], note_similarities
+        )
+
+        # Calculate signal quality as average of filtered notes' scores
+        avg_similarity = self.embedding_service.calculate_signal_quality(similar_notes)
+
+        return {
+            "available": True,
+            "learning_notes": relevant_learning_notes,
+            "interest_notes": relevant_interest_notes,
+            "knowledge_notes": relevant_knowledge_notes,
+            "preference_notes": relevant_preference_notes,
+            "memory_version": profile.last_significant_update,
+            "total_interactions": profile.total_interactions,
+            "similarity_based": True,
+            "avg_similarity": avg_similarity,
+            "note_similarities": note_similarities
+        }
+
+    def _get_notes_by_ids(
+        self,
+        notes: List[Dict],
+        note_similarities: Dict[str, float]
+    ) -> List[Dict]:
+        """
+        Get notes that match the IDs in note_similarities.
+        Adds similarity_score to each matched note.
+        """
+        matched_notes = []
+        for note in notes:
+            note_id = note.get("id")
+            if note_id in note_similarities:
+                note_with_score = dict(note)
+                note_with_score["similarity_score"] = note_similarities[note_id]
+                matched_notes.append(note_with_score)
+
+        # Sort by similarity score (highest first)
+        matched_notes.sort(key=lambda x: x.get("similarity_score", 0), reverse=True)
+        return matched_notes
+
+    def _fetch_signals_with_tags(
+        self,
+        profile: UserMemoryProfile,
+        lesson_tags: List[str]
+    ) -> Dict[str, Any]:
+        """
+        Fallback: Fetch user signals using tag-based filtering.
+        Original rule-based implementation.
+        """
         relevant_learning_notes = self._filter_notes_by_tags(
             profile.learning_notes or [], lesson_tags
         )
@@ -194,8 +332,11 @@ class PrimerService:
             "interest_notes": relevant_interest_notes,
             "knowledge_notes": relevant_knowledge_notes,
             "preference_notes": relevant_preference_notes,
-            "memory_version": profile.last_significant_update,  # Use datetime field, not integer counter
-            "total_interactions": profile.total_interactions
+            "memory_version": profile.last_significant_update,
+            "total_interactions": profile.total_interactions,
+            "similarity_based": False,
+            "avg_similarity": None,
+            "note_similarities": {}
         }
 
     def _filter_notes_by_tags(
@@ -203,14 +344,16 @@ class PrimerService:
         notes: List[Dict],
         lesson_tags: List[str]
     ) -> List[Dict]:
-        """Filter notes that have overlapping tags with the lesson"""
+        """
+        Filter notes that have overlapping tags with the lesson.
+        (Original implementation - kept for fallback)
+        """
         if not notes or not lesson_tags:
             return []
 
         relevant = []
         for note in notes:
             note_tags = note.get("tags", [])
-            # Check for tag overlap
             if any(tag in note_tags for tag in lesson_tags):
                 relevant.append(note)
 
@@ -220,12 +363,74 @@ class PrimerService:
         """
         Determine if signals are strong enough for personalization.
 
+        Uses similarity-based scoring when available, falls back to
+        rule-based scoring.
+
         Returns quality score from 0.0 to 1.0.
-        Threshold for personalization: 0.5
+        Threshold: 0.6 (similarity-based) or 0.5 (rule-based)
         """
         if not signals.get("available"):
             return 0.0
 
+        # Embeddings-based quality assessment
+        if signals.get("similarity_based"):
+            print("Assessing similarity-based signal quality.")
+            return self._assess_similarity_quality(signals)
+
+        # Fallback: Rule-based quality assessment
+        print("Assessing rule-based signal quality.")
+        return self._assess_rule_based_quality(signals)
+
+    def _assess_similarity_quality(self, signals: Dict[str, Any]) -> float:
+        """
+        Assess signal quality using embedding similarity scores.
+
+        Quality is based on:
+        - Average similarity of found notes
+        - Number of similar notes found
+        - Interaction count
+        """
+        avg_similarity = signals.get("avg_similarity", 0.0)
+
+        # Count total relevant notes
+        total_notes = (
+            len(signals.get("learning_notes", [])) +
+            len(signals.get("interest_notes", [])) +
+            len(signals.get("knowledge_notes", []))
+        )
+        # Base score from average similarity (max 0.6)
+        similarity_score = min(avg_similarity, SIGNAL_QUALITY_THRESHOLD)
+
+        # Bonus for having multiple relevant notes (max 0.2)
+        # note_bonus = 0.0
+        # if total_notes >= 3:
+        #     note_bonus = 0.2
+        # elif total_notes >= 1:
+        #     note_bonus = 0.1
+
+        # Bonus for interaction history (max 0.2)
+        # interactions = signals.get("total_interactions", 0)
+        # interaction_bonus = 0.0
+        # if interactions >= 10:
+        #     interaction_bonus = 0.2
+        # elif interactions >= 5:
+        #     interaction_bonus = 0.1
+
+        # total_score = similarity_score + note_bonus + interaction_bonus
+
+        # logger.debug(
+        #     f"Similarity quality assessment | avg_sim={avg_similarity:.3f} | "
+        #     f"notes={total_notes} | interactions={interactions} | "
+            # f"total_score={total_score:.3f}"
+        # )
+        print("\"Avg Sim:", similarity_score, "\n\n")
+        # return min(total_score, 1.0)
+        return similarity_score
+
+    def _assess_rule_based_quality(self, signals: Dict[str, Any]) -> float:
+        """
+        Original rule-based quality assessment (fallback).
+        """
         score = 0.0
 
         # Check for relevant notes (max 0.6)
@@ -247,7 +452,7 @@ class PrimerService:
         elif interactions >= 5:
             score += 0.1
 
-        # Check note recency and confidence (max 0.2)
+        # Check note confidence (max 0.2)
         has_high_confidence = any(
             note.get("confidence", 0) >= 0.7
             for note in (
@@ -261,6 +466,48 @@ class PrimerService:
 
         return min(score, 1.0)
 
+    def _fetch_lesson_content(self, lesson_id: int) -> List[Dict[str, str]]:
+        """
+        Fetch all lesson content pages for a lesson, ordered by position.
+
+        Returns:
+            List of dicts with 'title' and 'content_body' for each page
+        """
+        content_rows = (
+            self.db.query(LessonContent)
+            .filter(LessonContent.lesson_id == lesson_id)
+            .order_by(LessonContent.order_position)
+            .all()
+        )
+
+        return [
+            {
+                "title": row.title or "",
+                "content_body": row.content_body or ""
+            }
+            for row in content_rows
+        ]
+
+    def _format_lesson_content(self, content_pages: List[Dict[str, str]]) -> str:
+        """
+        Format lesson content pages into a single string for LLM context.
+
+        Args:
+            content_pages: List of dicts with 'title' and 'content_body'
+
+        Returns:
+            Formatted string with all pages
+        """
+        if not content_pages:
+            return "No lesson content available"
+
+        formatted_sections = []
+        for i, page in enumerate(content_pages, 1):
+            section = f"--- Page {i}: {page['title']} ---\n{page['content_body']}"
+            formatted_sections.append(section)
+
+        return "\n\n".join(formatted_sections)
+
     async def _generate_bullets_with_llm(
         self,
         lesson: Any,
@@ -273,6 +520,10 @@ class PrimerService:
             f"• {bullet}" for bullet in (lesson.baseline_primer_bullets or [])
         ])
 
+        # Fetch and format lesson content from lesson_content table
+        content_pages = self._fetch_lesson_content(lesson.id)
+        lesson_content = self._format_lesson_content(content_pages)
+
         # Format user notes
         def format_notes(notes: List[Dict]) -> str:
             if not notes:
@@ -282,18 +533,56 @@ class PrimerService:
                 for note in notes[:5]  # Limit to top 5
             ])
 
+        # Prepare formatted user notes
+        user_learning_notes = format_notes(user_signals.get("learning_notes", []))
+        user_interest_notes = format_notes(user_signals.get("interest_notes", []))
+        user_knowledge_notes = format_notes(user_signals.get("knowledge_notes", []))
+        user_preference_notes = format_notes(user_signals.get("preference_notes", []))
+
         # Prepare prompt inputs
         prompt_inputs = {
             "lesson_title": lesson.title,
-            "lesson_summary": lesson.summary or "No summary available",
-            "lesson_tags": ", ".join(lesson.tags or []),
+            "lesson_content": lesson_content,
             "baseline_bullets": baseline_bullets or "No baseline bullets available",
-            "user_learning_notes": format_notes(user_signals.get("learning_notes", [])),
-            "user_interest_notes": format_notes(user_signals.get("interest_notes", [])),
-            "user_knowledge_notes": format_notes(user_signals.get("knowledge_notes", [])),
-            "user_preference_notes": format_notes(user_signals.get("preference_notes", [])),
-            "total_interactions": user_signals.get("total_interactions", 0)
+            "user_learning_notes": user_learning_notes,
+            "user_interest_notes": user_interest_notes,
+            "user_knowledge_notes": user_knowledge_notes,
+            "user_preference_notes": user_preference_notes,
         }
+
+        # Log all prompt inputs for visibility
+        print("\n" + "=" * 80)
+        print("PRIMER GENERATION - PROMPT INPUTS")
+        print("=" * 80)
+
+        print(f"\n[v] LESSON TITLE: {lesson.title}")
+
+        print(f"\n[v] LESSON CONTENT PAGES: {len(content_pages)} pages fetched")
+        for i, page in enumerate(content_pages, 1):
+            title_preview = page['title'][:50] + "..." if len(page['title']) > 50 else page['title']
+            content_len = len(page['content_body'])
+            print(f"    Page {i}: {title_preview} ({content_len} chars)")
+
+        print(f"\n[v] BASELINE BULLETS: {len(lesson.baseline_primer_bullets or [])} bullets")
+        for i, bullet in enumerate(lesson.baseline_primer_bullets or [], 1):
+            bullet_preview = bullet[:80] + "..." if len(bullet) > 80 else bullet
+            print(f"    {i}. {bullet_preview}")
+
+        print(f"\n[v] USER LEARNING NOTES (weak points):")
+        print(f"    {user_learning_notes}")
+
+        print(f"\n[v] USER INTEREST NOTES:")
+        print(f"    {user_interest_notes}")
+
+        print(f"\n[v] USER KNOWLEDGE NOTES:")
+        print(f"    {user_knowledge_notes}")
+
+        print(f"\n[v] USER PREFERENCE NOTES:")
+        print(f"    {user_preference_notes}")
+
+        print("\n" + "-" * 80)
+        print("Generating personalized primers with LLM...")
+        print("-" * 80)
 
         # Generate with LLM
         formatted_prompt = primer_generation_prompt_template.invoke(prompt_inputs)
@@ -302,6 +591,17 @@ class PrimerService:
 
         # Parse response
         bullets = self._parse_llm_response(response.content)
+
+        # Log generated output
+        print("\n[v] LLM RESPONSE RECEIVED")
+        print(f"\n[v] GENERATED PERSONALIZED BULLETS: {len(bullets)} bullets")
+        for i, bullet in enumerate(bullets, 1):
+            # bullet_preview = bullet[:100] + "..." if len(bullet) > 100 else bullet
+            print(f"    {i}. {bullet}")
+
+        print("\n" + "=" * 80)
+        print("PRIMER GENERATION COMPLETE")
+        print("=" * 80 + "\n")
 
         return bullets
 
