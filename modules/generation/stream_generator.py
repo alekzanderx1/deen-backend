@@ -1,14 +1,19 @@
+import logging
 from openai import OpenAI
 from core.config import OPENAI_API_KEY
 from core import utils
 from core import chat_models
 from core import prompt_templates
 from core.memory import with_redis_history, trim_history, make_history
+from core.logging_config import setup_logging, get_memory_logger
 import asyncio
 from typing import Optional
 import threading
 
 client = OpenAI(api_key=OPENAI_API_KEY)
+setup_logging()
+logger = logging.getLogger("hikmah.stream")
+memory_logger = get_memory_logger(level=logging.DEBUG)
 
 def generate_response_stream(query: str, retrieved_docs: list, session_id: str, target_language: str = "english"):
     """
@@ -46,6 +51,18 @@ def generate_elaboration_response_stream(selected_text: str, context_text: str, 
     If user_id is provided, triggers memory agent after streaming completes.
     """
     print("INSIDE generate_elaboration_response_stream")
+    logger.info(
+        "Starting hikmah elaboration stream",
+        extra={
+            "user_id": user_id,
+            "selected_text_len": len(selected_text or ""),
+            "selected_text_preview": (selected_text or "")[:120],
+            "context_text_len": len(context_text or ""),
+            "lesson_summary_len": len(lesson_summary or ""),
+            "hikmah_tree_name": hikmah_tree_name,
+            "lesson_name": lesson_name,
+        },
+    )
     # Format retrieved references
     references = utils.compact_format_references(retrieved_docs=retrieved_docs)
 
@@ -74,6 +91,18 @@ def generate_elaboration_response_stream(selected_text: str, context_text: str, 
         # Fire and forget: Run memory update in separate thread
         # Note: We don't pass ai_response or full context_text to avoid overwhelming the agent
         # The selected_text + lesson/tree name is the key signal
+        memory_logger.info(
+            "Scheduling hikmah memory update",
+            extra={
+                "user_id": user_id,
+                "selected_text_len": len(selected_text or ""),
+                "selected_text_preview": (selected_text or "")[:120],
+                "hikmah_tree_name": hikmah_tree_name,
+                "lesson_name": lesson_name,
+                "context_text_passed": False,
+                "lesson_summary_passed": False,
+            },
+        )
         thread = threading.Thread(
             target=_run_memory_update_sync,
             args=(user_id, selected_text, hikmah_tree_name, lesson_name),
@@ -94,6 +123,16 @@ def _run_memory_update_sync(user_id: str, selected_text: str,
     overwhelming the memory agent with verbose data.
     """
     try:
+        memory_logger.debug(
+            "Hikmah memory update thread starting",
+            extra={
+                "user_id": user_id,
+                "selected_text_len": len(selected_text or ""),
+                "selected_text_preview": (selected_text or "")[:120],
+                "hikmah_tree_name": hikmah_tree_name,
+                "lesson_name": lesson_name,
+            },
+        )
         # Create new event loop for this thread
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -132,7 +171,7 @@ async def _update_hikmah_memory(user_id: str, selected_text: str,
     try:
         from agents.models.db_config import SessionLocal
         from agents.core.universal_memory_agent import UniversalMemoryAgent
-        
+
         # Create a fresh database session for this background thread
         # Important: Create session inside try block to ensure proper cleanup
         db = SessionLocal()
@@ -140,6 +179,18 @@ async def _update_hikmah_memory(user_id: str, selected_text: str,
         # Initialize memory agent with the fresh session
         memory_agent = UniversalMemoryAgent(db)
         
+        memory_logger.debug(
+            "Updating hikmah memory",
+            extra={
+                "user_id": user_id,
+                "selected_text_len": len(selected_text or ""),
+                "selected_text_preview": (selected_text or "")[:120],
+                "hikmah_tree_name": hikmah_tree_name,
+                "lesson_name": lesson_name,
+                "context_text_passed": False,
+                "lesson_summary_passed": False,
+            },
+        )
         # Analyze hikmah elaboration interaction with optimized context
         result = await memory_agent.analyze_hikmah_elaboration(
             user_id=user_id,

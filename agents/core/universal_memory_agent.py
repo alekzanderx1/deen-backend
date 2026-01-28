@@ -150,12 +150,53 @@ class UniversalMemoryAgent:
                 "session_id": session_id,
             },
         )
+        if interaction_type == InteractionType.HIKMAH_ELABORATION:
+            logger.debug(
+                "Hikmah interaction payload summary",
+                extra={
+                    "user_id": user_id,
+                    "selected_text_len": len(interaction_data.get("selected_text") or ""),
+                    "selected_text_preview": (interaction_data.get("selected_text") or "")[:120],
+                    "context_text_len": len(interaction_data.get("context_text") or ""),
+                    "lesson_summary_len": len(interaction_data.get("lesson_summary") or ""),
+                    "hikmah_tree_name": interaction_data.get("hikmah_tree_name"),
+                    "lesson_name": interaction_data.get("lesson_name"),
+                    "interaction_keys": list(interaction_data.keys()),
+                },
+            )
+            logger.debug(
+                "Hikmah context summary",
+                extra={
+                    "user_id": user_id,
+                    "context_keys": list((context or {}).keys()),
+                },
+            )
         
         try:
             # Analyze using interaction-specific logic
             analysis_result = await self._analyze_universal_interaction(
                 memory_profile, interaction_type, interaction_data, context or {}
             )
+            if logger.isEnabledFor(logging.DEBUG):
+                notes_preview = [
+                    {
+                        "note_type": note.get("note_type"),
+                        "category": note.get("category"),
+                        "confidence": note.get("confidence"),
+                        "content_preview": (note.get("content") or "")[:120],
+                    }
+                    for note in (analysis_result.get("new_notes") or [])[:3]
+                ]
+                logger.debug(
+                    "Analysis result preview",
+                    extra={
+                        "user_id": user_id,
+                        "interaction_type": interaction_type.value,
+                        "should_update_memory": analysis_result.get("should_update_memory", False),
+                        "notes_preview": notes_preview,
+                        "notes_total": len(analysis_result.get("new_notes") or []),
+                    },
+                )
             logger.info(
                 "LLM analysis complete",
                 extra={
