@@ -91,14 +91,24 @@ Guidelines for enhancement:
 
 Your enhanced query will be embedded and used to retrieve the most relevant hadiths, Quranic interpretations, and scholarly texts from the knowledge base.
 
+IMPORTANT: Please make sure the enhanced query is not much longer than the user's original query. For example, if the query is one sentence long, then your generated enhanced query should not be longer than 1-2 sentences.
+The enhanced query must be around the same length as the 
+"""
+
+
+enhancerUserTemplate = """
+Conversation so far: {chat_history} \n\n
+
+Original user query: {text}. \n\n
+
+Please enhance the query. Please don't make the enhanced query much longer than the original user query.
 """
 
 
 enhancer_prompt_template = ChatPromptTemplate.from_messages(
     [
       ("system", enhancerSystemTemplate),
-      MessagesPlaceholder("chat_history"),
-      ("user", "{text}")
+      ("user", enhancerUserTemplate)
     ]
 )
 
