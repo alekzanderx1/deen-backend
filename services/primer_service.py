@@ -52,7 +52,8 @@ class PrimerService:
         self,
         user_id: str,
         lesson_id: int,
-        force_refresh: bool = False
+        force_refresh: bool = False,
+        filter: bool = False
     ):
         """
         Stream personalized primer generation with real-time updates.
@@ -98,7 +99,7 @@ class PrimerService:
             # Generate new primer with streaming
             yield {"type": "status", "message": "Generating personalized primer..."}
 
-            async for event in self._stream_new_primer(user_id, lesson_id):
+            async for event in self._stream_new_primer(user_id, lesson_id, filter):
                 yield event
 
             total_duration = time.perf_counter() - start_time
@@ -114,7 +115,7 @@ class PrimerService:
                 "personalized_available": False
             }
 
-    async def _stream_new_primer(self, user_id: str, lesson_id: int):
+    async def _stream_new_primer(self, user_id: str, lesson_id: int, filter: bool = False):
         """Generate and stream a new personalized primer"""
         from db.crud.lessons import lesson_crud
 
@@ -134,30 +135,32 @@ class PrimerService:
             }
             return
 
-        # Fetch user signals (includes embeddings)
+        # Fetch user signals
         yield {"type": "status", "message": "Analyzing your learning history..."}
         user_signals = self._fetch_user_signals(
             user_id=user_id,
             lesson_id=lesson_id,
-            lesson_tags=lesson.tags or []
+            lesson_tags=lesson.tags or [],
+            filter=filter
         )
         db_duration = time.perf_counter() - db_start
-        logger.info(f"[DB- including Embedding] {db_duration:.3f}s")
+        logger.info(f"[DB] {db_duration:.3f}s")
 
-        # Assess signal quality
-        yield {"type": "status", "message": "Evaluating personalization potential..."}
-        signal_quality = self._assess_signal_quality(user_signals)
-        threshold = SIGNAL_QUALITY_THRESHOLD if user_signals.get("similarity_based") else 0.5
+        # Signal quality check (only when filtering is enabled)
+        if filter:
+            yield {"type": "status", "message": "Evaluating personalization potential..."}
+            signal_quality = self._assess_signal_quality(user_signals)
+            threshold = SIGNAL_QUALITY_THRESHOLD if user_signals.get("similarity_based") else 0.5
 
-        if signal_quality < threshold:
-            yield {
-                "type": "metadata",
-                "from_cache": False,
-                "generated_at": None,
-                "stale": False,
-                "personalized_available": False
-            }
-            return
+            if signal_quality < threshold:
+                yield {
+                    "type": "metadata",
+                    "from_cache": False,
+                    "generated_at": None,
+                    "stale": False,
+                    "personalized_available": False
+                }
+                return
 
         # Generate bullets with streaming LLM
         yield {"type": "status", "message": "Generating personalized content..."}
@@ -221,7 +224,8 @@ class PrimerService:
         self,
         user_id: str,
         lesson_id: int,
-        force_refresh: bool = False
+        force_refresh: bool = False,
+        filter: bool = False
     ) -> Dict[str, Any]:
         """
         Main entry point for primer generation.
@@ -248,7 +252,7 @@ class PrimerService:
                     return cached_result
 
             # Generate new primer
-            result = await self._generate_new_primer(user_id, lesson_id)
+            result = await self._generate_new_primer(user_id, lesson_id, filter)
 
             total_duration = time.perf_counter() - start_time
             logger.info(f"⏱️ [TOTAL] {total_duration:.3f}s")
@@ -297,7 +301,8 @@ class PrimerService:
     async def _generate_new_primer(
         self,
         user_id: str,
-        lesson_id: int
+        lesson_id: int,
+        filter: bool = False
     ) -> Dict[str, Any]:
         """Generate a new personalized primer"""
         from db.crud.lessons import lesson_crud
@@ -310,21 +315,23 @@ class PrimerService:
             logger.error(f"Lesson not found | lesson_id={lesson_id}")
             return self._fallback_response()
 
-        # Fetch user signals (includes embeddings)
+        # Fetch user signals
         user_signals = self._fetch_user_signals(
             user_id=user_id,
             lesson_id=lesson_id,
-            lesson_tags=lesson.tags or []
+            lesson_tags=lesson.tags or [],
+            filter=filter
         )
         db_duration = time.perf_counter() - db_start
-        logger.info(f"[DB- including Embedding] {db_duration:.3f}s")
+        logger.info(f"[DB] {db_duration:.3f}s")
 
-        # Assess signal quality
-        signal_quality = self._assess_signal_quality(user_signals)
-        threshold = SIGNAL_QUALITY_THRESHOLD if user_signals.get("similarity_based") else 0.5
+        # Signal quality check (only when filtering is enabled)
+        if filter:
+            signal_quality = self._assess_signal_quality(user_signals)
+            threshold = SIGNAL_QUALITY_THRESHOLD if user_signals.get("similarity_based") else 0.5
 
-        if signal_quality < threshold:
-            return self._fallback_response()
+            if signal_quality < threshold:
+                return self._fallback_response()
 
         # Generate bullets with LLM
         llm_start = time.perf_counter()
@@ -363,16 +370,17 @@ class PrimerService:
         self,
         user_id: str,
         lesson_id: int,
-        lesson_tags: List[str]
+        lesson_tags: List[str],
+        filter: bool = False
     ) -> Dict[str, Any]:
         """
-        Fetch relevant user memory notes using embeddings-based similarity.
-        Falls back to tag-based filtering if embeddings don't exist.
+        Fetch user memory notes with optional filtering.
 
         Args:
             user_id: User identifier
             lesson_id: Lesson identifier (for embedding lookup)
             lesson_tags: Lesson tags (for fallback)
+            filter: If True, use embeddings-based filtering. If False, use all notes.
 
         Returns:
             Dictionary with user signals
@@ -386,30 +394,46 @@ class PrimerService:
             logger.warning(f"No user memory profile found | user_id={user_id}")
             return {"available": False}
 
-        # Check if embeddings exist for both user and lesson
-        has_embeddings = (
-            self.embedding_service.has_note_embeddings(user_id) and
-            self.embedding_service.has_lesson_chunks(lesson_id)
-        )
+        # Use filtering logic if filter=True
+        if filter:
+            # Check if embeddings exist for both user and lesson
+            has_embeddings = (
+                self.embedding_service.has_note_embeddings(user_id) and
+                self.embedding_service.has_lesson_chunks(lesson_id)
+            )
 
-        if has_embeddings:
-            # Use embeddings-based similarity search
-            embedding_start = time.perf_counter()
-            result = self._fetch_signals_with_embeddings(
-                user_id=user_id,
-                lesson_id=lesson_id,
-                profile=profile
-            )
-            embedding_duration = time.perf_counter() - embedding_start
-            logger.info(f"[EMBEDDINGS] {embedding_duration:.3f}s")
-            return result
-        else:
-            # Fallback to tag-based filtering
-            result = self._fetch_signals_with_tags(
-                profile=profile,
-                lesson_tags=lesson_tags
-            )
-            return result
+            if has_embeddings:
+                # Use embeddings-based similarity search
+                embedding_start = time.perf_counter()
+                result = self._fetch_signals_with_embeddings(
+                    user_id=user_id,
+                    lesson_id=lesson_id,
+                    profile=profile
+                )
+                embedding_duration = time.perf_counter() - embedding_start
+                logger.info(f"[EMBEDDINGS] {embedding_duration:.3f}s")
+                return result
+            else:
+                # Fallback to tag-based filtering
+                result = self._fetch_signals_with_tags(
+                    profile=profile,
+                    lesson_tags=lesson_tags
+                )
+                return result
+
+        # Return ALL notes without filtering (filter=False)
+        return {
+            "available": True,
+            "learning_notes": profile.learning_notes or [],
+            "interest_notes": profile.interest_notes or [],
+            "knowledge_notes": profile.knowledge_notes or [],
+            "preference_notes": profile.preference_notes or [],
+            "memory_version": profile.last_significant_update,
+            "total_interactions": profile.total_interactions,
+            "similarity_based": False,  # Not using embeddings
+            "avg_similarity": None,
+            "note_similarities": {}
+        }
 
     def _fetch_signals_with_embeddings(
         self,
@@ -710,7 +734,7 @@ class PrimerService:
                 return "None available"
             return "\n".join([
                 f"- {note.get('content', '')} (confidence: {note.get('confidence', 0):.2f})"
-                for note in notes[:5]  # Limit to top 5
+                for note in notes  # Using ALL notes (no limit)
             ])
 
         # Prepare formatted user notes
@@ -812,7 +836,7 @@ class PrimerService:
                 return "None available"
             return "\n".join([
                 f"- {note.get('content', '')} (confidence: {note.get('confidence', 0):.2f})"
-                for note in notes[:5]
+                for note in notes  # Using ALL notes (no limit)
             ])
 
         user_learning_notes = format_notes(user_signals.get("learning_notes", []))

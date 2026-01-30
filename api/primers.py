@@ -68,6 +68,7 @@ async def get_personalized_primer(
     - user_id: User identifier
     - lesson_id: Lesson to generate primer for
     - force_refresh: Optional, bypass cache and regenerate
+    - filter: Optional, if True use embeddings-based filtering, if False use all notes (default: False)
 
     Returns:
     - personalized_bullets: List of 2-3 personalized prerequisite explanations
@@ -79,7 +80,7 @@ async def get_personalized_primer(
     try:
         logger.info(
             f"Generating personalized primer | user_id={request.user_id} | "
-            f"lesson_id={request.lesson_id} | force_refresh={request.force_refresh}"
+            f"lesson_id={request.lesson_id} | force_refresh={request.force_refresh} | filter={request.filter}"
         )
 
         # Validate lesson exists
@@ -92,13 +93,14 @@ async def get_personalized_primer(
         result = await service.generate_personalized_primer(
             user_id=request.user_id,
             lesson_id=request.lesson_id,
-            force_refresh=request.force_refresh
+            force_refresh=request.force_refresh,
+            filter=request.filter
         )
 
         logger.info(
             f"Personalized primer generated | user_id={request.user_id} | "
-            f"lesson_id={request.lesson_id} | from_cache={result.get('from_cache')} | "
-            f"personalized_available={result.get('personalized_available')}"
+            f"lesson_id={request.lesson_id} | filter={request.filter} | "
+            f"from_cache={result.get('from_cache')} | personalized_available={result.get('personalized_available')}"
         )
 
         return PersonalizedPrimerResponse(**result)
@@ -108,7 +110,7 @@ async def get_personalized_primer(
     except Exception as e:
         logger.error(
             f"Error generating personalized primer | user_id={request.user_id} | "
-            f"lesson_id={request.lesson_id} | error={str(e)}"
+            f"lesson_id={request.lesson_id} | filter={request.filter} | error={str(e)}"
         )
         traceback.print_exc()
 
@@ -129,6 +131,12 @@ async def stream_personalized_primer(
 ):
     """
     Stream personalized primer generation in real-time.
+
+    Request body:
+    - user_id: User identifier
+    - lesson_id: Lesson to generate primer for
+    - force_refresh: Optional, bypass cache and regenerate
+    - filter: Optional, if True use embeddings-based filtering, if False use all notes (default: False)
 
     This endpoint returns Server-Sent Events (SSE) with the following event types:
     - status: Status updates (checking cache, generating, etc.)
@@ -157,7 +165,7 @@ async def stream_personalized_primer(
         try:
             logger.info(
                 f"Starting streaming primer generation | user_id={request.user_id} | "
-                f"lesson_id={request.lesson_id} | force_refresh={request.force_refresh}"
+                f"lesson_id={request.lesson_id} | force_refresh={request.force_refresh} | filter={request.filter}"
             )
 
             # Send initial status
@@ -177,7 +185,8 @@ async def stream_personalized_primer(
             async for event in service.stream_personalized_primer(
                 user_id=request.user_id,
                 lesson_id=request.lesson_id,
-                force_refresh=request.force_refresh
+                force_refresh=request.force_refresh,
+                filter=request.filter
             ):
                 event_type = event.get("type", "status")
                 event_data = {k: v for k, v in event.items() if k != "type"}
@@ -190,7 +199,7 @@ async def stream_personalized_primer(
 
             logger.info(
                 f"Streaming primer generation completed | user_id={request.user_id} | "
-                f"lesson_id={request.lesson_id}"
+                f"lesson_id={request.lesson_id} | filter={request.filter}"
             )
 
         except HTTPException as http_exc:
@@ -201,7 +210,7 @@ async def stream_personalized_primer(
         except Exception as e:
             logger.error(
                 f"Error in streaming primer generation | user_id={request.user_id} | "
-                f"lesson_id={request.lesson_id} | error={str(e)}"
+                f"lesson_id={request.lesson_id} | filter={request.filter} | error={str(e)}"
             )
             traceback.print_exc()
 
