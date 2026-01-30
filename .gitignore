@@ -52,3 +52,6 @@ logs/
 # 🔹 Ignore temps folder
 temps/
 .claude/
+examples/
+docs/
+

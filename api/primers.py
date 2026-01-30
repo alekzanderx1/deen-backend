@@ -1,7 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 import logging
 import traceback
+import json
 
 from db.session import get_db
 from db.crud.lessons import lesson_crud
@@ -118,3 +120,101 @@ async def get_personalized_primer(
             stale=False,
             personalized_available=False
         )
+
+
+@primers_router.post("/personalized/stream")
+async def stream_personalized_primer(
+    request: PersonalizedPrimerRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Stream personalized primer generation in real-time.
+
+    This endpoint returns Server-Sent Events (SSE) with the following event types:
+    - status: Status updates (checking cache, generating, etc.)
+    - llm_chunk: Raw LLM tokens as they're generated (real-time streaming)
+    - bullet: Individual parsed bullet after LLM completes
+    - metadata: Final metadata (from_cache, personalized_available, etc.)
+    - error: Error information
+    - done: Completion signal
+
+    Example SSE format:
+    event: status
+    data: {"message": "Checking cache..."}
+
+    event: llm_chunk
+    data: {"content": "{\n  \"person"}
+
+    event: bullet
+    data: {"index": 0, "content": "First personalized bullet..."}
+
+    event: done
+    data: {"success": true}
+    """
+
+    async def event_generator():
+        """Generate SSE events for streaming primer generation"""
+        try:
+            logger.info(
+                f"Starting streaming primer generation | user_id={request.user_id} | "
+                f"lesson_id={request.lesson_id} | force_refresh={request.force_refresh}"
+            )
+
+            # Send initial status
+            yield f"event: status\ndata: {json.dumps({'message': 'Starting primer generation...'})}\n\n"
+
+            # Validate lesson exists
+            lesson = lesson_crud.get(db, request.lesson_id)
+            if not lesson:
+                logger.warning(f"Lesson not found | lesson_id={request.lesson_id}")
+                yield f"event: error\ndata: {json.dumps({'error': 'Lesson not found'})}\n\n"
+                yield f"event: done\ndata: {json.dumps({'success': False})}\n\n"
+                return
+
+            service = PrimerService(db)
+
+            # Stream the generation process
+            async for event in service.stream_personalized_primer(
+                user_id=request.user_id,
+                lesson_id=request.lesson_id,
+                force_refresh=request.force_refresh
+            ):
+                event_type = event.get("type", "status")
+                event_data = {k: v for k, v in event.items() if k != "type"}
+
+                # Format as SSE
+                yield f"event: {event_type}\ndata: {json.dumps(event_data)}\n\n"
+
+            # Send completion event
+            yield f"event: done\ndata: {json.dumps({'success': True})}\n\n"
+
+            logger.info(
+                f"Streaming primer generation completed | user_id={request.user_id} | "
+                f"lesson_id={request.lesson_id}"
+            )
+
+        except HTTPException as http_exc:
+            logger.error(f"HTTP error in streaming | error={str(http_exc)}")
+            yield f"event: error\ndata: {json.dumps({'error': str(http_exc.detail)})}\n\n"
+            yield f"event: done\ndata: {json.dumps({'success': False})}\n\n"
+
+        except Exception as e:
+            logger.error(
+                f"Error in streaming primer generation | user_id={request.user_id} | "
+                f"lesson_id={request.lesson_id} | error={str(e)}"
+            )
+            traceback.print_exc()
+
+            # Send error event
+            yield f"event: error\ndata: {json.dumps({'error': 'Internal server error', 'personalized_available': False})}\n\n"
+            yield f"event: done\ndata: {json.dumps({'success': False})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"  # Disable buffering in nginx
+        }
+    )
