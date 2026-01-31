@@ -14,6 +14,19 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     def get(self, db: Session, id: int) -> Optional[ModelType]:
         return db.get(self.model, id)
 
+    # get by user_id and lesson_id (composite key) - used in personalized primers
+    def get_by_user_and_lesson(
+        self,
+        db: Session,
+        user_id: str,
+        lesson_id: int
+    ) -> Optional[ModelType]:
+        stmt = select(self.model).where(
+            self.model.user_id == user_id,
+            self.model.lesson_id == lesson_id
+        )
+        return db.execute(stmt).scalars().first()
+
     def list(self, db: Session, skip: int = 0, limit: int = 100) -> List[ModelType]:
         stmt = select(self.model).offset(skip).limit(limit)
         return list(db.execute(stmt).scalars())

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import nullslast
 from typing import Optional
 import json
 
@@ -75,6 +76,7 @@ def dashboard():
     <div style="margin-bottom: 12px;">
       <input id="userIdInput" type="text" placeholder="Enter user_id" />
       <button onclick="loadAll()">Load</button>
+      <button onclick="refreshAll()">Refresh</button>
       <span class="small" id="status"></span>
     </div>
 
@@ -113,7 +115,7 @@ function showTab(name) {
 }
 
 async function fetchJson(url) {
-  const res = await fetch(url);
+  const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -129,7 +131,7 @@ function fmtDate(value) {
 }
 
 async function loadSummary(userId) {
-  const data = await fetchJson(`/admin/memory/${userId}/profile`);
+  const data = await fetchJson(`/admin/memory/${encodeURIComponent(userId)}/profile`);
   const cat = data.note_counts || {};
   document.getElementById('summary').innerHTML = `
     <div class="card">
@@ -186,16 +188,17 @@ function renderNotesSection(groups) {
 }
 
 async function loadNotes(userId) {
-  const data = await fetchJson(`/admin/memory/${userId}/notes`);
+  const data = await fetchJson(`/admin/memory/${encodeURIComponent(userId)}/notes`);
   renderNotesSection(data);
 }
 
 async function loadEvents(userId) {
-  const data = await fetchJson(`/admin/memory/${userId}/events?limit=50`);
+  const data = await fetchJson(`/admin/memory/${encodeURIComponent(userId)}/events?limit=50`);
   const rows = data.map(e => `
     <tr>
       <td>${e.event_type}</td>
       <td><span class="pill ${e.processing_status === 'failed' ? 'error' : e.processing_status === 'pending' ? 'warn' : ''}">${e.processing_status}</span></td>
+      <td>${fmtDate(e.created_at) || ''}</td>
       <td>${fmtDate(e.processed_at) || ''}</td>
       <td>${e.notes_added || 0}</td>
       <td class="small">${e.reasoning || ''}</td>
@@ -205,15 +208,15 @@ async function loadEvents(userId) {
     <div style="padding:16px;">
       <h4>Recent Events</h4>
       <table>
-        <thead><tr><th>Type</th><th>Status</th><th>Processed At</th><th>Notes Added</th><th>Reasoning</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="5">No events</td></tr>'}</tbody>
+        <thead><tr><th>Type</th><th>Status</th><th>Created At</th><th>Processed At</th><th>Notes Added</th><th>Reasoning</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="6">No events</td></tr>'}</tbody>
       </table>
     </div>
   `;
 }
 
 async function loadConsolidations(userId) {
-  const data = await fetchJson(`/admin/memory/${userId}/consolidations?limit=20`);
+  const data = await fetchJson(`/admin/memory/${encodeURIComponent(userId)}/consolidations?limit=20`);
   const rows = data.map(c => `
     <tr>
       <td>${fmtDate(c.created_at)}</td>
@@ -238,12 +241,31 @@ async function loadAll() {
   const userId = document.getElementById('userIdInput').value.trim();
   if (!userId) { setStatus('Enter a user_id'); return; }
   setStatus('Loading...');
+  window.__lastUserId = userId;
   try {
     await loadSummary(userId);
     await loadNotes(userId);
     await loadEvents(userId);
     await loadConsolidations(userId);
     setStatus('Loaded');
+    showTab(activeTab);
+  } catch (e) {
+    console.error(e);
+    setStatus('Error: ' + e.message);
+  }
+}
+
+async function refreshAll() {
+  const userId = (window.__lastUserId || document.getElementById('userIdInput').value.trim());
+  if (!userId) { setStatus('Enter a user_id'); return; }
+  document.getElementById('userIdInput').value = userId;
+  setStatus('Refreshing...');
+  try {
+    await loadSummary(userId);
+    await loadNotes(userId);
+    await loadEvents(userId);
+    await loadConsolidations(userId);
+    setStatus('Refreshed');
     showTab(activeTab);
   } catch (e) {
     console.error(e);
@@ -313,7 +335,7 @@ def events(user_id: str, limit: int = 50, db: Session = Depends(get_db)):
     events = (
         db.query(MemoryEvent)
         .filter(MemoryEvent.user_memory_profile_id == profile.id)
-        .order_by(MemoryEvent.created_at.desc())
+        .order_by(nullslast(MemoryEvent.processed_at.desc()), MemoryEvent.created_at.desc())
         .limit(limit)
         .all()
     )

@@ -65,3 +65,13 @@ def build_async_database_url():
 # Build URLs if not provided directly
 FINAL_DATABASE_URL = build_database_url()
 FINAL_ASYNC_DATABASE_URL = build_async_database_url()
+
+# Embedding Configuration (for personalized primers)
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
+EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "1536"))
+
+# Similarity thresholds for note filtering and signal quality
+# Notes with max similarity to lesson content >= NOTE_FILTER_THRESHOLD are included
+NOTE_FILTER_THRESHOLD = float(os.getenv("NOTE_FILTER_THRESHOLD", "0.4"))
+# Personalization requires average similarity of filtered notes >= SIGNAL_QUALITY_THRESHOLD
+SIGNAL_QUALITY_THRESHOLD = float(os.getenv("SIGNAL_QUALITY_THRESHOLD", "0.5"))

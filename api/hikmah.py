@@ -1,7 +1,12 @@
+import logging
 from fastapi import APIRouter, HTTPException
 from models.schemas import ElaborationRequest
 from core import pipeline
+from core.logging_config import setup_logging
 import traceback
+
+setup_logging()
+logger = logging.getLogger("api.hikmah")
 
 hikmah_router = APIRouter(
     prefix="/hikmah",
@@ -24,6 +29,20 @@ async def chat_pipeline_stream_ep(request: ElaborationRequest):
     """
 
     try:
+        logger.info(
+            "Hikmah elaboration request received",
+            extra={
+                "user_id": request.user_id,
+                "selected_text_len": len(request.selected_text or ""),
+                "selected_text_preview": (request.selected_text or "")[:120],
+                "context_text_len": len(request.context_text or ""),
+                "context_text_preview": (request.context_text or "")[:120],
+                "lesson_summary_len": len(request.lesson_summary or ""),
+                "lesson_summary_preview": (request.lesson_summary or "")[:120],
+                "hikmah_tree_name": request.hikmah_tree_name,
+                "lesson_name": request.lesson_name,
+            },
+        )
         # Returns a StreamingResponse from the pipeline
         return pipeline.hikmah_elaboration_pipeline_streaming(
             selected_text=request.selected_text,

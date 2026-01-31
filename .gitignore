@@ -48,3 +48,7 @@ logs/
 # 🔹 Ignore Database Files (if applicable)
 *.db
 *.sqlite3
+
+# 🔹 Ignore temps folder
+temps/
+.claude/

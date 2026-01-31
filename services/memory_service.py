@@ -1,12 +1,15 @@
 from datetime import datetime
 from typing import Dict, List, Optional
 import uuid
+import logging
 
 from sqlalchemy.orm import Session
 
 from db.repositories.memory_profile_repository import MemoryProfileRepository
 from db.repositories.memory_event_repository import MemoryEventRepository
 from agents.models.user_memory_models import UserMemoryProfile, MemoryEvent
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryService:
@@ -93,7 +96,56 @@ class MemoryService:
             updated_at=now,
         )
 
+        # Generate embeddings for new notes
+        self._generate_note_embeddings(profile.user_id, stamped_notes)
+
         return profile
+
+    def _generate_note_embeddings(self, user_id: str, notes: List[Dict]) -> None:
+        """
+        Generate and store embeddings for newly added notes.
+        This is a non-blocking operation - failures are logged but don't affect note storage.
+        """
+        if not notes:
+            return
+
+        try:
+            from services.embedding_service import EmbeddingService
+
+            embedding_service = EmbeddingService(self.db)
+
+            # Group notes by type for batch processing
+            notes_by_type: Dict[str, List[Dict]] = {}
+            for note in notes:
+                note_type = note.get("note_type", "learning_notes")
+                if note_type not in notes_by_type:
+                    notes_by_type[note_type] = []
+                notes_by_type[note_type].append(note)
+
+            # Process each type in batch
+            total_embedded = 0
+            for note_type, type_notes in notes_by_type.items():
+                try:
+                    embeddings = embedding_service.store_note_embeddings_batch(
+                        user_id=user_id,
+                        notes=type_notes,
+                        note_type=note_type
+                    )
+                    total_embedded += len(embeddings)
+                except Exception as e:
+                    logger.error(
+                        f"Failed to store embeddings for {note_type} | "
+                        f"user_id={user_id} | error={e}"
+                    )
+
+            if total_embedded > 0:
+                logger.info(
+                    f"Generated {total_embedded} note embeddings | user_id={user_id}"
+                )
+
+        except Exception as e:
+            # Don't fail the main operation if embedding generation fails
+            logger.error(f"Embedding generation failed | user_id={user_id} | error={e}")
 
     def create_event(
         self,

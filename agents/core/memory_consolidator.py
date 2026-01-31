@@ -43,7 +43,7 @@ class MemoryConsolidator:
         self.embedder = MemoryConsolidator._shared_embedder
         
         # Consolidation thresholds
-        self.SIMILARITY_THRESHOLD = 0.6  # How similar notes need to be to merge (lowered to catch more duplicates)
+        self.SIMILARITY_THRESHOLD = 0.65  # How similar notes need to be to merge (lowered to catch more duplicates)
         self.MAX_NOTES_PER_CATEGORY = 15  # When to trigger consolidation
         self.MIN_CONFIDENCE_TO_KEEP = 0.3  # Remove notes below this confidence
     
@@ -64,20 +64,45 @@ class MemoryConsolidator:
             existing_notes = getattr(memory_profile, note_type, []) or []
             
             # Check for semantic similarity with existing notes
-            is_duplicate = await self._is_note_duplicate(note_content, existing_notes)
+            is_duplicate, max_similarity, best_match = await self._is_note_duplicate(
+                note_content, existing_notes
+            )
+            logger.debug(
+                "Dedup similarity check",
+                extra={
+                    "note_type": note_type,
+                    "existing_notes": len(existing_notes or []),
+                    "max_similarity": round(max_similarity, 4),
+                    "threshold": self.SIMILARITY_THRESHOLD,
+                    "new_note_preview": note_content[:120],
+                    "best_match_preview": (best_match or "")[:120],
+                },
+            )
             
             if not is_duplicate:
                 filtered_notes.append(note)
             else:
-                logger.info("Skipping duplicate note", extra={"note_snippet": note_content[:50]})
+                logger.info(
+                    "Skipping duplicate note",
+                    extra={
+                        "note_snippet": note_content[:50],
+                        "max_similarity": round(max_similarity, 4),
+                        "threshold": self.SIMILARITY_THRESHOLD,
+                        "best_match_preview": (best_match or "")[:120],
+                    },
+                )
         
         return filtered_notes
     
-    async def _is_note_duplicate(self, new_note_content: str, existing_notes: List[Dict[str, Any]]) -> bool:
+    async def _is_note_duplicate(
+        self, new_note_content: str, existing_notes: List[Dict[str, Any]]
+    ) -> Tuple[bool, float, Optional[str]]:
         """Check if a new note is too similar to existing notes"""
         
         if not existing_notes:
-            return False
+            return False, 0.0, None
+        if not (new_note_content or "").strip():
+            return False, 0.0, None
         
         # Get embeddings for the new note
         new_embedding = self.embedder.encode([new_note_content], show_progress_bar=False)
@@ -85,7 +110,7 @@ class MemoryConsolidator:
         # Get embeddings for existing notes
         existing_contents = [note.get("content", "") for note in existing_notes]
         if not existing_contents:
-            return False
+            return False, 0.0, None
         
         existing_embeddings = self.embedder.encode(existing_contents, show_progress_bar=False)
         
@@ -95,8 +120,10 @@ class MemoryConsolidator:
         cosine_similarities = similarities / norms
         
         # Check if any existing note is too similar
-        max_similarity = np.max(cosine_similarities)
-        return max_similarity > self.SIMILARITY_THRESHOLD
+        max_idx = int(np.argmax(cosine_similarities))
+        max_similarity = float(cosine_similarities[max_idx])
+        best_match = existing_notes[max_idx].get("content", "") if existing_notes else None
+        return max_similarity > self.SIMILARITY_THRESHOLD, max_similarity, best_match
     
     async def should_trigger_consolidation(self, memory_profile: UserMemoryProfile) -> bool:
         """Determine if consolidation should be triggered"""
