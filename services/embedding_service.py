@@ -9,7 +9,7 @@ containing title and content_body from the lesson_content table).
 """
 
 from typing import List, Dict, Any, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 import hashlib
 import logging
 
@@ -126,7 +126,7 @@ class EmbeddingService:
 
             existing.content_hash = content_hash
             existing.embedding = embedding
-            existing.updated_at = datetime.utcnow()
+            existing.updated_at = datetime.now(timezone.utc)
 
             logger.info(f"Updated note embedding | user_id={user_id} | note_id={note_id}")
             return existing
@@ -225,7 +225,7 @@ class EmbeddingService:
                     # Update existing
                     existing.content_hash = content_hash
                     existing.embedding = embedding
-                    existing.updated_at = datetime.utcnow()
+                    existing.updated_at = datetime.now(timezone.utc)
                     results.append(existing)
                 else:
                     # Create new

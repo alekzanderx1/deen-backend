@@ -24,6 +24,7 @@ class PersonalizedPrimerRequest(BaseModel):
     user_id: str
     lesson_id: int
     force_refresh: bool = False
+    filter: bool = False
 
 
 class PersonalizedPrimerResponse(BaseModel):

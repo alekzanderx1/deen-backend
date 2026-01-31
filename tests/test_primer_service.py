@@ -9,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, MagicMock, AsyncMock, patch
 from sqlalchemy.orm import Session
 
@@ -580,7 +580,7 @@ class TestGenerationFlow:
         """Test generation returns cached primer when fresh"""
         cached_response = {
             "personalized_bullets": ["Cached bullet 1", "Cached bullet 2"],
-            "generated_at": datetime.utcnow(),
+            "generated_at": datetime.now(timezone.utc),
             "from_cache": True,
             "stale": False,
             "personalized_available": True
