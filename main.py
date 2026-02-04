@@ -4,6 +4,7 @@ from api import chat
 from api import reference
 from api import hikmah
 from api import account
+from api import primers
 from models.JWTBearer import JWTBearer
 from core.auth import jwks
 import os
@@ -47,14 +48,14 @@ app.add_middleware(
 )
 
 # API routers
-app.include_router(reference.ref_router,dependencies=[Depends(auth)])
-app.include_router(chat.chat_router,dependencies=[Depends(auth)])
-app.include_router(hikmah.hikmah_router,dependencies=[Depends(auth)])
-app.include_router(account.router,dependencies=[Depends(auth)])  # /account
+# app.include_router(reference.ref_router,dependencies=[Depends(auth)])
+# app.include_router(chat.chat_router,dependencies=[Depends(auth)])
+# app.include_router(hikmah.hikmah_router,dependencies=[Depends(auth)])
+# app.include_router(account.router,dependencies=[Depends(auth)])  # /account
 
-# app.include_router(reference.ref_router)
-# app.include_router(chat.chat_router)
-# app.include_router(hikmah.hikmah_router)
+app.include_router(reference.ref_router)
+app.include_router(chat.chat_router)
+app.include_router(hikmah.hikmah_router)
 
 # app.include_router(reference.ref_router)
 # app.include_router(chat.chat_router)
@@ -66,6 +67,7 @@ app.include_router(lesson_content_router.router)    # /lesson-content
 app.include_router(user_progress_router.router)     # /user-progress
 app.include_router(hikmah_trees_router.router)      # /hikmah-trees
 app.include_router(memory_admin.router)             # /admin/memory
+app.include_router(primers.primers_router)          # /primers
 
 
 from fastapi.responses import JSONResponse
@@ -92,7 +94,7 @@ def db_ping():
 # (DEV ONLY) uncomment once to create tables if the DB is empty
 # Base.metadata.create_all(bind=engine)
 
-@app.get("/",dependencies=[Depends(auth)])
+@app.get("/")#,dependencies=[Depends(auth)])
 def home():
     return {"message": "Welcome to the Shia Islam Chat API"}
 

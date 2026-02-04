@@ -326,5 +326,71 @@ hikmahElaborationUserTemplate = """Could you please elaborate on the following t
 """
 
 hikmah_elaboration_prompt_template = ChatPromptTemplate.from_messages([
-  ("system", hikmahElaborationSystemTemplate),  
+  ("system", hikmahElaborationSystemTemplate),
   ("user", hikmahElaborationUserTemplate)])
+
+
+# Prompt templates for personalized lesson primers
+
+primerGenerationSystemTemplate = """
+You generate personalized "Key Points to Know Before This Lesson" primers for a Twelver Shia Islamic education platform.
+
+PURPOSE:
+Explain prerequisite concepts that THIS SPECIFIC LESSON covers and that the student may struggle with based on their weak points. Primers help make THIS lesson's content easier to understand by providing essential background knowledge.
+
+CRITICAL RELEVANCE CHECK:
+- ONLY generate primers if the user's weak points/gaps DIRECTLY relate to concepts covered in THIS specific lesson
+- First check: Does THIS lesson cover concepts that address the user's gaps?
+- If the user's notes aren't relevant to THIS lesson's concepts, return an empty array
+- DO NOT force generation just because the user has weak points - they must be relevant to THIS lesson
+- Each primer must be specific to THIS lesson's content, not generic Islamic knowledge
+
+RULES:
+1. Each primer: 1-3 sentences, max 3-4 brief lines
+2. Explain a specific concept FROM THIS LESSON that relates to the user's gaps/weak points
+3. All explanations must follow Twelver Shia Islamic teachings
+4. Be direct - no meta-references like "based on your profile" or "this lesson covers"
+5. DO NOT repeat baseline primer content
+6. Generate 0-3 primers (only generate if relevant to THIS lesson)
+7. Output valid JSON only
+
+GOOD EXAMPLES (lesson-specific):
+- "Wudu (ritual ablution) requires washing specific body parts in order: face, arms to elbows, wiping head, and feet. The Shia method wipes the feet rather than washing them, based on the Quranic verse in Surah Al-Ma'idah (5:6)."
+- "Makharij refers to the articulation points where Arabic letters originate. The throat (Halq) produces six letters: ء ه ع ح غ خ - mastering these is essential for correct Tajweed."
+- "In Shia jurisprudence, combining Dhuhr with Asr and Maghrib with Isha prayers is permissible at any time, not just during travel. This is based on authentic hadith from the Prophet (PBUH)."
+
+BAD EXAMPLES:
+- "Based on your learning profile, you've shown difficulty with pronunciation, so this lesson will help you..." (too meta)
+- "This primer is designed to address gaps in your understanding of..." (self-referential)
+- Generic Islamic knowledge not specific to this lesson's content (e.g., explaining Tawhid when the lesson is about prayer etiquette)
+
+OUTPUT:
+{{
+  "personalized_bullets": ["Primer 1", "Primer 2"]  // or [] if not relevant to this lesson
+}}
+"""
+
+primerGenerationUserTemplate = """
+LESSON TITLE: {lesson_title}
+
+LESSON CONTENT:
+{lesson_content}
+
+BASELINE (don't repeat): {baseline_bullets}
+
+USER'S WEAK POINTS: {user_learning_notes}
+USER'S INTERESTS: {user_interest_notes}
+USER'S KNOWLEDGE LEVEL: {user_knowledge_notes}
+USER'S PREFERENCES: {user_preference_notes}
+
+TASK:
+First, analyze if THIS specific lesson's content addresses any of the user's weak points or gaps.
+Then, generate 0-3 prerequisite explanations ONLY for concepts in THIS lesson that directly relate to the user's weak points.
+If the user's notes aren't relevant to THIS lesson's specific concepts, return an empty array.
+Each primer should clarify a concept from THIS lesson that the user needs to understand to make the lesson easier to follow.
+"""
+
+primer_generation_prompt_template = ChatPromptTemplate.from_messages([
+  ("system", primerGenerationSystemTemplate),
+  ("user", primerGenerationUserTemplate)
+])
