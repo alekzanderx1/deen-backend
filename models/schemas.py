@@ -1,12 +1,14 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from datetime import datetime
+
 
 class ChatRequest(BaseModel):
     user_query: str
     session_id: str
     language: str
     config: Optional[Dict[str, Any]] = None  # Optional agent configuration for agentic endpoint
+
 
 class ElaborationRequest(BaseModel):
     selected_text: str
@@ -16,8 +18,10 @@ class ElaborationRequest(BaseModel):
     lesson_summary: str
     user_id: str = None  # Optional: If provided, memory agent will take notes
 
+
 class ReferenceRequest(BaseModel):
     user_query: str
+
 
 # schemas for Primers API
 
@@ -41,3 +45,37 @@ class BaselinePrimerResponse(BaseModel):
     baseline_bullets: List[str]
     glossary: dict = {}
     updated_at: Optional[datetime] = None
+
+
+# schemas for Hikmah page quizzes
+
+class QuizChoiceResponse(BaseModel):
+    id: int
+    choice_key: str
+    choice_text: str
+    order_position: int
+
+
+class QuizQuestionResponse(BaseModel):
+    id: int
+    prompt: str
+    order_position: int
+    choices: List[QuizChoiceResponse]
+    correct_choice_id: int
+    explanation: Optional[str] = None
+
+
+class LessonPageQuizQuestionsResponse(BaseModel):
+    lesson_content_id: int
+    questions: List[QuizQuestionResponse]
+
+
+class SubmitLessonPageQuizAnswerRequest(BaseModel):
+    user_id: str
+    question_id: int = Field(..., gt=0)
+    selected_choice_id: int = Field(..., gt=0)
+    answered_at: Optional[datetime] = None
+
+
+class QuizSubmissionAckResponse(BaseModel):
+    status: str = "received"
