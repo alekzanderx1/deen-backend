@@ -1,11 +1,12 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 class ChatRequest(BaseModel):
     user_query: str
     session_id: str
     language: str
+    config: Optional[Dict[str, Any]] = None  # Optional agent configuration for agentic endpoint
 
 class ElaborationRequest(BaseModel):
     selected_text: str
