@@ -16,80 +16,183 @@ logger = logging.getLogger(__name__)
 
 
 class HikmahQuizService:
-    """Service for lesson-page quiz retrieval and answer processing."""
+    """Service for lesson-page quiz retrieval, authoring CRUD, and answer processing."""
 
     def __init__(self, db: Session):
         self.db = db
 
+    # -----------------------------
+    # Learner-facing retrieval APIs
+    # -----------------------------
     def get_questions_for_page(self, lesson_content_id: int) -> Dict[str, Any]:
-        """Return all active quiz questions for a lesson content page."""
-        page = self.db.get(LessonContent, lesson_content_id)
-        if not page:
-            raise LookupError("Lesson content page not found")
-
-        questions = (
-            self.db.query(LessonPageQuizQuestion)
-            .filter(
-                LessonPageQuizQuestion.lesson_content_id == lesson_content_id,
-                LessonPageQuizQuestion.is_active.is_(True),
-            )
-            .order_by(LessonPageQuizQuestion.order_position.asc(), LessonPageQuizQuestion.id.asc())
-            .all()
+        """Return active quiz questions for a lesson content page."""
+        questions = self._list_questions_for_page_models(
+            lesson_content_id=lesson_content_id,
+            include_inactive=False,
         )
-
-        if not questions:
-            return {"lesson_content_id": lesson_content_id, "questions": []}
-
-        question_ids = [q.id for q in questions]
-        all_choices = (
-            self.db.query(LessonPageQuizChoice)
-            .filter(LessonPageQuizChoice.question_id.in_(question_ids))
-            .order_by(
-                LessonPageQuizChoice.question_id.asc(),
-                LessonPageQuizChoice.order_position.asc(),
-                LessonPageQuizChoice.id.asc(),
-            )
-            .all()
-        )
-
-        choices_by_question: Dict[int, List[LessonPageQuizChoice]] = {}
-        for choice in all_choices:
-            choices_by_question.setdefault(choice.question_id, []).append(choice)
-
-        response_questions: List[Dict[str, Any]] = []
-        for question in questions:
-            question_choices = choices_by_question.get(question.id, [])
-            correct_choice = next((c for c in question_choices if c.is_correct), None)
-
-            if not correct_choice:
-                raise ValueError(
-                    f"Quiz question id={question.id} has no correct choice configured"
-                )
-
-            response_questions.append(
-                {
-                    "id": int(question.id),
-                    "prompt": question.prompt,
-                    "order_position": int(question.order_position),
-                    "choices": [
-                        {
-                            "id": int(choice.id),
-                            "choice_key": choice.choice_key,
-                            "choice_text": choice.choice_text,
-                            "order_position": int(choice.order_position),
-                        }
-                        for choice in question_choices
-                    ],
-                    "correct_choice_id": int(correct_choice.id),
-                    "explanation": question.explanation,
-                }
-            )
 
         return {
             "lesson_content_id": lesson_content_id,
-            "questions": response_questions,
+            "questions": self._serialize_questions(questions, include_admin_fields=False),
         }
 
+    # ---------------------
+    # Authoring CRUD methods
+    # ---------------------
+    def create_question(self, lesson_content_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a quiz question with choices for a lesson page."""
+        self._ensure_page_exists(lesson_content_id)
+        choices_payload = payload.get("choices") or []
+        self._validate_choices_payload(choices_payload)
+
+        question = LessonPageQuizQuestion(
+            lesson_content_id=lesson_content_id,
+            prompt=payload["prompt"],
+            explanation=payload.get("explanation"),
+            tags=payload.get("tags"),
+            order_position=payload.get("order_position", 1),
+            is_active=payload.get("is_active", True),
+        )
+
+        try:
+            self.db.add(question)
+            self.db.flush()
+
+            for choice in choices_payload:
+                self.db.add(
+                    LessonPageQuizChoice(
+                        question_id=question.id,
+                        choice_key=choice["choice_key"],
+                        choice_text=choice["choice_text"],
+                        order_position=choice.get("order_position", 1),
+                        is_correct=choice.get("is_correct", False),
+                    )
+                )
+
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+
+        return self.get_question_for_page(lesson_content_id, int(question.id))
+
+    def list_questions_for_page_admin(
+        self,
+        lesson_content_id: int,
+        include_inactive: bool = False,
+    ) -> Dict[str, Any]:
+        """List quiz questions for a page in authoring view."""
+        questions = self._list_questions_for_page_models(
+            lesson_content_id=lesson_content_id,
+            include_inactive=include_inactive,
+        )
+
+        return {
+            "lesson_content_id": lesson_content_id,
+            "questions": self._serialize_questions(questions, include_admin_fields=True),
+        }
+
+    def get_question_for_page(self, lesson_content_id: int, question_id: int) -> Dict[str, Any]:
+        """Get one quiz question for a page in authoring view."""
+        self._ensure_page_exists(lesson_content_id)
+        question = self._get_question_for_page(lesson_content_id, question_id)
+        choices_by_question = self._get_choices_by_question_ids([question.id])
+        choices = choices_by_question.get(question.id, [])
+        return self._serialize_question(
+            question,
+            choices,
+            include_admin_fields=True,
+        )
+
+    def replace_question(
+        self,
+        lesson_content_id: int,
+        question_id: int,
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Full replace of question metadata and choices."""
+        self._ensure_page_exists(lesson_content_id)
+        question = self._get_question_for_page(lesson_content_id, question_id)
+
+        choices_payload = payload.get("choices") or []
+        self._validate_choices_payload(choices_payload)
+
+        has_attempts = (
+            self.db.query(LessonPageQuizAttempt)
+            .filter(LessonPageQuizAttempt.question_id == question_id)
+            .first()
+        )
+        if has_attempts:
+            raise ValueError("Cannot replace choices for a question that already has attempts")
+
+        question.prompt = payload["prompt"]
+        question.explanation = payload.get("explanation")
+        question.tags = payload.get("tags")
+        question.order_position = payload.get("order_position", 1)
+        question.is_active = payload.get("is_active", True)
+
+        try:
+            (
+                self.db.query(LessonPageQuizChoice)
+                .filter(LessonPageQuizChoice.question_id == question_id)
+                .delete(synchronize_session=False)
+            )
+
+            for choice in choices_payload:
+                self.db.add(
+                    LessonPageQuizChoice(
+                        question_id=question_id,
+                        choice_key=choice["choice_key"],
+                        choice_text=choice["choice_text"],
+                        order_position=choice.get("order_position", 1),
+                        is_correct=choice.get("is_correct", False),
+                    )
+                )
+
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+
+        return self.get_question_for_page(lesson_content_id, question_id)
+
+    def patch_question(
+        self,
+        lesson_content_id: int,
+        question_id: int,
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Partial update for question metadata (choices are unchanged)."""
+        self._ensure_page_exists(lesson_content_id)
+        question = self._get_question_for_page(lesson_content_id, question_id)
+
+        for field in ["prompt", "explanation", "tags", "order_position", "is_active"]:
+            if field in payload:
+                setattr(question, field, payload[field])
+
+        try:
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+
+        return self.get_question_for_page(lesson_content_id, question_id)
+
+    def delete_question(self, lesson_content_id: int, question_id: int) -> None:
+        """Hard delete question (DB cascades choices and attempts)."""
+        self._ensure_page_exists(lesson_content_id)
+        question = self._get_question_for_page(lesson_content_id, question_id)
+
+        try:
+            self.db.delete(question)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+
+    # ------------------------
+    # Submission + memory flow
+    # ------------------------
     def process_submission(
         self,
         lesson_content_id: int,
@@ -271,6 +374,141 @@ class HikmahQuizService:
             interaction_data=interaction_data,
             context=context,
         )
+
+    # ------------------
+    # Internal utilities
+    # ------------------
+    def _ensure_page_exists(self, lesson_content_id: int) -> LessonContent:
+        page = self.db.get(LessonContent, lesson_content_id)
+        if not page:
+            raise LookupError("Lesson content page not found")
+        return page
+
+    def _get_question_for_page(self, lesson_content_id: int, question_id: int) -> LessonPageQuizQuestion:
+        question = (
+            self.db.query(LessonPageQuizQuestion)
+            .filter(
+                LessonPageQuizQuestion.lesson_content_id == lesson_content_id,
+                LessonPageQuizQuestion.id == question_id,
+            )
+            .first()
+        )
+        if not question:
+            raise LookupError("Quiz question not found for lesson page")
+        return question
+
+    def _list_questions_for_page_models(
+        self,
+        lesson_content_id: int,
+        include_inactive: bool,
+    ) -> List[LessonPageQuizQuestion]:
+        self._ensure_page_exists(lesson_content_id)
+
+        query = self.db.query(LessonPageQuizQuestion).filter(
+            LessonPageQuizQuestion.lesson_content_id == lesson_content_id
+        )
+        if not include_inactive:
+            query = query.filter(LessonPageQuizQuestion.is_active.is_(True))
+
+        return (
+            query.order_by(
+                LessonPageQuizQuestion.order_position.asc(),
+                LessonPageQuizQuestion.id.asc(),
+            ).all()
+        )
+
+    def _validate_choices_payload(self, choices_payload: List[Dict[str, Any]]) -> None:
+        if len(choices_payload) < 2:
+            raise ValueError("A quiz question must include at least 2 choices")
+
+        correct_count = sum(1 for choice in choices_payload if choice.get("is_correct", False))
+        if correct_count != 1:
+            raise ValueError("Exactly one choice must be marked as correct")
+
+        keys = [choice.get("choice_key") for choice in choices_payload]
+        if len(set(keys)) != len(keys):
+            raise ValueError("Each choice_key must be unique within a question")
+
+    def _get_choices_by_question_ids(
+        self,
+        question_ids: List[int],
+    ) -> Dict[int, List[LessonPageQuizChoice]]:
+        if not question_ids:
+            return {}
+
+        all_choices = (
+            self.db.query(LessonPageQuizChoice)
+            .filter(LessonPageQuizChoice.question_id.in_(question_ids))
+            .order_by(
+                LessonPageQuizChoice.question_id.asc(),
+                LessonPageQuizChoice.order_position.asc(),
+                LessonPageQuizChoice.id.asc(),
+            )
+            .all()
+        )
+
+        choices_by_question: Dict[int, List[LessonPageQuizChoice]] = {}
+        for choice in all_choices:
+            choices_by_question.setdefault(choice.question_id, []).append(choice)
+        return choices_by_question
+
+    def _serialize_questions(
+        self,
+        questions: List[LessonPageQuizQuestion],
+        include_admin_fields: bool,
+    ) -> List[Dict[str, Any]]:
+        if not questions:
+            return []
+
+        question_ids = [question.id for question in questions]
+        choices_by_question = self._get_choices_by_question_ids(question_ids)
+
+        return [
+            self._serialize_question(
+                question,
+                choices_by_question.get(question.id, []),
+                include_admin_fields=include_admin_fields,
+            )
+            for question in questions
+        ]
+
+    def _serialize_question(
+        self,
+        question: LessonPageQuizQuestion,
+        question_choices: List[LessonPageQuizChoice],
+        include_admin_fields: bool,
+    ) -> Dict[str, Any]:
+        correct_choice = next((choice for choice in question_choices if choice.is_correct), None)
+        if not correct_choice:
+            raise ValueError(f"Quiz question id={question.id} has no correct choice configured")
+
+        payload: Dict[str, Any] = {
+            "id": int(question.id),
+            "prompt": question.prompt,
+            "order_position": int(question.order_position),
+            "choices": [
+                {
+                    "id": int(choice.id),
+                    "choice_key": choice.choice_key,
+                    "choice_text": choice.choice_text,
+                    "order_position": int(choice.order_position),
+                }
+                for choice in question_choices
+            ],
+            "correct_choice_id": int(correct_choice.id),
+            "explanation": question.explanation,
+        }
+
+        if include_admin_fields:
+            payload.update(
+                {
+                    "lesson_content_id": int(question.lesson_content_id),
+                    "tags": question.tags,
+                    "is_active": bool(question.is_active),
+                }
+            )
+
+        return payload
 
     @staticmethod
     def _to_utc(value: Optional[datetime]) -> datetime:

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
@@ -79,3 +79,79 @@ class SubmitLessonPageQuizAnswerRequest(BaseModel):
 
 class QuizSubmissionAckResponse(BaseModel):
     status: str = "received"
+
+
+# Authoring CRUD schemas
+
+class QuizChoiceWrite(BaseModel):
+    choice_key: str = Field(..., min_length=1)
+    choice_text: str = Field(..., min_length=1)
+    order_position: int = Field(default=1, ge=1)
+    is_correct: bool = False
+
+
+class QuizQuestionCreateRequest(BaseModel):
+    prompt: str = Field(..., min_length=1)
+    explanation: Optional[str] = None
+    tags: Optional[List[str]] = None
+    order_position: int = Field(default=1, ge=1)
+    is_active: bool = True
+    choices: List[QuizChoiceWrite]
+
+    @model_validator(mode="after")
+    def validate_choices(self):
+        if len(self.choices) < 2:
+            raise ValueError("A quiz question must include at least 2 choices")
+
+        correct_count = sum(1 for choice in self.choices if choice.is_correct)
+        if correct_count != 1:
+            raise ValueError("Exactly one choice must be marked as correct")
+
+        keys = [choice.choice_key for choice in self.choices]
+        if len(set(keys)) != len(keys):
+            raise ValueError("Each choice_key must be unique within a question")
+
+        return self
+
+
+class QuizQuestionPutRequest(BaseModel):
+    prompt: str = Field(..., min_length=1)
+    explanation: Optional[str] = None
+    tags: Optional[List[str]] = None
+    order_position: int = Field(default=1, ge=1)
+    is_active: bool = True
+    choices: List[QuizChoiceWrite]
+
+    @model_validator(mode="after")
+    def validate_choices(self):
+        if len(self.choices) < 2:
+            raise ValueError("A quiz question must include at least 2 choices")
+
+        correct_count = sum(1 for choice in self.choices if choice.is_correct)
+        if correct_count != 1:
+            raise ValueError("Exactly one choice must be marked as correct")
+
+        keys = [choice.choice_key for choice in self.choices]
+        if len(set(keys)) != len(keys):
+            raise ValueError("Each choice_key must be unique within a question")
+
+        return self
+
+
+class QuizQuestionPatchRequest(BaseModel):
+    prompt: Optional[str] = Field(default=None, min_length=1)
+    explanation: Optional[str] = None
+    tags: Optional[List[str]] = None
+    order_position: Optional[int] = Field(default=None, ge=1)
+    is_active: Optional[bool] = None
+
+
+class QuizQuestionAdminResponse(QuizQuestionResponse):
+    lesson_content_id: int
+    tags: Optional[List[str]] = None
+    is_active: bool
+
+
+class LessonPageQuizQuestionsAdminResponse(BaseModel):
+    lesson_content_id: int
+    questions: List[QuizQuestionAdminResponse]
