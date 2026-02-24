@@ -27,12 +27,17 @@ The LLM agent autonomously decides which tools to use, when to use them, and in 
 │                         Chat Agent                              │
 │                                                                 │
 │  ┌──────────────┐      ┌──────────────┐      ┌──────────────┐ │
-│  │  Agent Node  │─────▶│  Tool Node   │─────▶│   Generate   │ │
-│  │  (LLM Brain) │      │  (Execute)   │      │   Response   │ │
+│  │  Fiqh Check  │─────▶│  Agent Node  │─────▶│  Tool Node   │ │
+│  │  (Mandatory) │      │  (LLM Brain) │      │  (Execute)   │ │
 │  └──────────────┘      └──────────────┘      └──────────────┘ │
-│         │                      │                               │
-│         └──────────────────────┘                               │
-│              (Decision Loop)                                    │
+│         │                      │                      │         │
+│         └──[if fiqh]──> EXIT   └──────────────────────┘         │
+│                                   (Decision Loop)                │
+│                                          │                       │
+│                                   ┌──────▼────────┐             │
+│                                   │   Generate    │             │
+│                                   │   Response    │             │
+│                                   └───────────────┘             │
 └─────────────────────────────────────────────────────────────────┘
 
                     ┌────────────────┐
@@ -43,7 +48,7 @@ The LLM agent autonomously decides which tools to use, when to use them, and in 
         │                  │                  │
    ┌────▼────┐      ┌─────▼─────┐     ┌─────▼─────┐
    │Classify │      │  Enhance  │     │ Retrieve  │
-   │  Query  │      │   Query   │     │Documents  │
+   │Non-Islam│      │   Query   │     │Documents  │
    └─────────┘      └───────────┘     └───────────┘
 ```
 
@@ -58,18 +63,22 @@ The agent maintains a `ChatState` that tracks:
 
 ### Tool Ecosystem
 
-#### 1. Classification Tools
-- **`check_if_non_islamic_tool`**: Determines if query is about Islamic education
-- **`check_if_fiqh_tool`**: Checks if query asks for a fiqh ruling
+#### 1. Mandatory Pre-Processing
+- **Fiqh Classification**: Automatically checks if query asks for a fiqh ruling (happens before agent)
+  - If fiqh-related → Early exit with polite message
+  - If not fiqh-related → Proceeds to agent
 
-#### 2. Translation Tools
+#### 2. Classification Tools
+- **`check_if_non_islamic_tool`**: Determines if query is about Islamic education
+
+#### 3. Translation Tools
 - **`translate_to_english_tool`**: Translates non-English queries
 - **`translate_response_tool`**: Translates responses to user's language
 
-#### 3. Enhancement Tools
+#### 4. Enhancement Tools
 - **`enhance_query_tool`**: Improves query using chat history context
 
-#### 4. Retrieval Tools
+#### 5. Retrieval Tools
 - **`retrieve_shia_documents_tool`**: Gets documents from Shia sources
 - **`retrieve_sunni_documents_tool`**: Gets documents from Sunni sources
 - **`retrieve_combined_documents_tool`**: Gets documents from both sources
@@ -102,10 +111,10 @@ config = AgentConfig(
         sunni_doc_count=3      # Retrieve 3 Sunni documents
     ),
     model=ModelConfig(
-        agent_model="gpt-4o",
+        agent_model="gpt-4o",  # Or use LARGE_LLM from environment
         temperature=0.7
     ),
-    max_iterations=15,
+    max_iterations=5,
     enable_classification=True,
     enable_enhancement=True
 )
@@ -188,7 +197,7 @@ class RetrievalConfig(BaseModel):
 
 ```python
 class ModelConfig(BaseModel):
-    agent_model: str = "gpt-4o"       # Model for the agent
+    agent_model: str = LARGE_LLM      # Model for the agent (from environment)
     temperature: float = 0.7          # Generation temperature
     max_tokens: Optional[int] = None  # Max response tokens
 ```
@@ -199,7 +208,7 @@ class ModelConfig(BaseModel):
 class AgentConfig(BaseModel):
     retrieval: RetrievalConfig        # Retrieval settings
     model: ModelConfig                # Model settings
-    max_iterations: int = 15          # Max agent iterations
+    max_iterations: int = 5           # Max agent iterations
     enable_classification: bool = True
     enable_translation: bool = True
     enable_enhancement: bool = True
@@ -212,50 +221,66 @@ The agent uses the system prompt in `agents/prompts/agent_prompts.py` to guide i
 
 ### Decision Flow
 
-1. **Initial Assessment**: Agent reads the user query and decides if classification is needed
+1. **Fiqh Classification (Mandatory)**: Before reaching the agent, every query is checked
+   - If fiqh-related (asking for rulings/fatwas) → Early exit with polite message
+   - If not fiqh-related → Proceeds to agent
+   - This ensures the system stays within its educational scope
+
+2. **Initial Assessment**: Agent reads the user query and decides if classification is needed
    - Most Islamic queries skip classification
-   - Only obviously off-topic or fiqh queries trigger classification
+   - Only obviously off-topic queries trigger non-Islamic classification
 
-2. **Language Detection**: If query appears non-English, use translation tool
+3. **Language Detection**: If query appears non-English, use translation tool
 
-3. **Query Enhancement**: Usually enhances query with chat history context
+4. **Query Enhancement**: Usually enhances query with chat history context
    - Adds context from conversation
    - Clarifies ambiguous references
    - Expands abbreviations
 
-4. **Document Retrieval**: Chooses retrieval strategy based on query type
+5. **Document Retrieval**: Chooses retrieval strategy based on query type
    - **Shia-specific topics**: Retrieve Shia documents only
    - **General Islamic topics**: Retrieve both Shia and Sunni
    - **Comparative queries**: May retrieve separately for analysis
 
-5. **Response Generation**: Synthesizes information from retrieved documents
+6. **Response Generation**: Synthesizes information from retrieved documents
 
 ### Example Decision Paths
 
 **Query**: "What is Tawhid?"
 ```
-Agent: ✓ Clearly Islamic, skip classification
-       ✓ English, skip translation
-       ✓ Enhance query with context
-       ✓ Retrieve 5 Shia + 2 Sunni docs (general topic)
-       ✓ Generate comprehensive response
+System: ✓ Fiqh check: NOT fiqh-related → Continue to agent
+Agent:  ✓ Clearly Islamic, skip non-Islamic classification
+        ✓ English, skip translation
+        ✓ Enhance query with context
+        ✓ Retrieve 5 Shia + 2 Sunni docs (general topic)
+        ✓ Generate comprehensive response
 ```
 
 **Query**: "Tell me more about him"
 ```
-Agent: ✓ Skip classification (continuation of conversation)
-       ✓ English, skip translation
-       ✓ Enhance query (crucial - needs context!)
-       → Enhanced: "Tell me more about Imam Ali"
-       ✓ Retrieve 5-7 Shia docs (Shia-specific)
-       ✓ Generate response
+System: ✓ Fiqh check: NOT fiqh-related → Continue to agent
+Agent:  ✓ Skip non-Islamic classification (continuation of conversation)
+        ✓ English, skip translation
+        ✓ Enhance query (crucial - needs context!)
+        → Enhanced: "Tell me more about Imam Ali"
+        ✓ Retrieve 5-7 Shia docs (Shia-specific)
+        ✓ Generate response
+```
+
+**Query**: "Is it halal to eat shrimp?"
+```
+System: ✓ Fiqh check: IS fiqh-related → Early exit
+        → Returns: "This is a fiqh-related question. My capabilities 
+                    are not ready yet to answer such queries. Please 
+                    consult a qualified scholar."
 ```
 
 **Query**: "What's for dinner?"
 ```
-Agent: ✓ Classification needed (suspicious)
-       ✓ Check: is_non_islamic = True
-       → Early exit with polite message
+System: ✓ Fiqh check: NOT fiqh-related → Continue to agent
+Agent:  ✓ Classification needed (suspicious)
+        ✓ Check: is_non_islamic = True
+        → Early exit with polite message
 ```
 
 ## Benefits of the Agentic Approach
