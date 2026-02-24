@@ -5,9 +5,10 @@ Uses embeddings-based similarity search for note relevance (with tag-based fallb
 """
 
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import logging
+import time
 
 from sqlalchemy.orm import Session
 
@@ -29,6 +30,8 @@ from core.config import SIGNAL_QUALITY_THRESHOLD
 
 logger = logging.getLogger(__name__)
 
+# load model here if needed globally
+primers_model = get_enhancer_model()
 
 class PrimerService:
     """
@@ -45,11 +48,184 @@ class PrimerService:
         self.db = db
         self.embedding_service = EmbeddingService(db)
 
+    async def stream_personalized_primer(
+        self,
+        user_id: str,
+        lesson_id: int,
+        force_refresh: bool = False,
+        filter: bool = False
+    ):
+        """
+        Stream personalized primer generation with real-time updates.
+
+        Yields events:
+            {"type": "status", "message": str}
+            {"type": "bullet", "index": int, "content": str}
+            {"type": "metadata", "from_cache": bool, "generated_at": datetime, ...}
+        """
+        start_time = time.perf_counter()
+
+        try:
+            # Check cache first (unless force_refresh)
+            if not force_refresh:
+                yield {"type": "status", "message": "Checking cache..."}
+
+                cached_result = self._get_cached_primer(user_id, lesson_id)
+
+                if cached_result:
+                    # Send cached bullets one by one
+                    yield {"type": "status", "message": "Retrieved from cache"}
+
+                    for idx, bullet in enumerate(cached_result.get("personalized_bullets", [])):
+                        yield {
+                            "type": "bullet",
+                            "index": idx,
+                            "content": bullet
+                        }
+
+                    # Send metadata
+                    yield {
+                        "type": "metadata",
+                        "from_cache": True,
+                        "generated_at": cached_result.get("generated_at").isoformat() if cached_result.get("generated_at") else None,
+                        "stale": False,
+                        "personalized_available": True
+                    }
+
+                    total_duration = time.perf_counter() - start_time
+                    logger.info(f"⏱️ [TOTAL] {total_duration:.3f}s (cache hit)")
+                    return
+
+            # Generate new primer with streaming
+            yield {"type": "status", "message": "Generating personalized primer..."}
+
+            async for event in self._stream_new_primer(user_id, lesson_id, filter):
+                yield event
+
+            total_duration = time.perf_counter() - start_time
+            logger.info(f"⏱️ [TOTAL] {total_duration:.3f}s")
+
+        except Exception as e:
+            total_duration = time.perf_counter() - start_time
+            logger.error(f"Error in streaming | Duration: {total_duration:.3f}s | error={str(e)}")
+
+            yield {
+                "type": "error",
+                "message": str(e),
+                "personalized_available": False
+            }
+
+    async def _stream_new_primer(self, user_id: str, lesson_id: int, filter: bool = False):
+        """Generate and stream a new personalized primer"""
+        from db.crud.lessons import lesson_crud
+
+        # Fetch lesson
+        yield {"type": "status", "message": "Fetching lesson details..."}
+        db_start = time.perf_counter()
+        lesson = lesson_crud.get(self.db, lesson_id)
+
+        if not lesson:
+            logger.error(f"Lesson not found | lesson_id={lesson_id}")
+            yield {
+                "type": "metadata",
+                "from_cache": False,
+                "generated_at": None,
+                "stale": False,
+                "personalized_available": False
+            }
+            return
+
+        # Fetch user signals
+        yield {"type": "status", "message": "Analyzing your learning history..."}
+        user_signals = self._fetch_user_signals(
+            user_id=user_id,
+            lesson_id=lesson_id,
+            lesson_tags=lesson.tags or [],
+            filter=filter
+        )
+        db_duration = time.perf_counter() - db_start
+        logger.info(f"[DB] {db_duration:.3f}s")
+
+        # Signal quality check (only when filtering is enabled)
+        if filter:
+            yield {"type": "status", "message": "Evaluating personalization potential..."}
+            signal_quality = self._assess_signal_quality(user_signals)
+            threshold = SIGNAL_QUALITY_THRESHOLD if user_signals.get("similarity_based") else 0.5
+
+            if signal_quality < threshold:
+                yield {
+                    "type": "metadata",
+                    "from_cache": False,
+                    "generated_at": None,
+                    "stale": False,
+                    "personalized_available": False
+                }
+                return
+
+        # Generate bullets with streaming LLM
+        yield {"type": "status", "message": "Generating personalized content..."}
+
+        generated_bullets = []
+
+        async for chunk_event in self._stream_bullets_with_llm(lesson, user_signals):
+            event_type = chunk_event.get("type")
+
+            if event_type == "llm_chunk":
+                yield {
+                    "type": "llm_chunk",
+                    "content": chunk_event.get("content")
+                }
+            elif event_type == "bullet":
+                bullet_content = chunk_event.get("content")
+                bullet_index = chunk_event.get("index")
+                generated_bullets.append(bullet_content)
+
+                yield {
+                    "type": "bullet",
+                    "index": bullet_index,
+                    "content": bullet_content
+                }
+
+        if not generated_bullets or len(generated_bullets) < 2:
+            logger.warning("LLM generation failed or returned insufficient bullets")
+            yield {
+                "type": "metadata",
+                "from_cache": False,
+                "generated_at": None,
+                "stale": False,
+                "personalized_available": False
+            }
+            return
+
+        # Cache the primer
+        yield {"type": "status", "message": "Saving for future use..."}
+        cache_start = time.perf_counter()
+        self._cache_primer(
+            user_id=user_id,
+            lesson_id=lesson_id,
+            lesson=lesson,
+            bullets=generated_bullets,
+            user_signals=user_signals
+        )
+        cache_duration = time.perf_counter() - cache_start
+        logger.info(f"[CACHE] {cache_duration:.3f}s")
+
+        # Send final metadata
+        generated_at = datetime.now(timezone.utc)
+        yield {
+            "type": "metadata",
+            "from_cache": False,
+            "generated_at": generated_at.isoformat(),
+            "stale": False,
+            "personalized_available": True
+        }
+
     async def generate_personalized_primer(
         self,
         user_id: str,
         lesson_id: int,
-        force_refresh: bool = False
+        force_refresh: bool = False,
+        filter: bool = False
     ) -> Dict[str, Any]:
         """
         Main entry point for primer generation.
@@ -63,18 +239,28 @@ class PrimerService:
                 "personalized_available": bool
             }
         """
+        start_time = time.perf_counter()
+
         try:
             # Check cache first (unless force_refresh)
             if not force_refresh:
                 cached_result = self._get_cached_primer(user_id, lesson_id)
+
                 if cached_result:
+                    total_duration = time.perf_counter() - start_time
+                    logger.info(f"⏱️ [TOTAL] {total_duration:.3f}s (cache hit)")
                     return cached_result
 
             # Generate new primer
-            return await self._generate_new_primer(user_id, lesson_id)
+            result = await self._generate_new_primer(user_id, lesson_id, filter)
+
+            total_duration = time.perf_counter() - start_time
+            logger.info(f"⏱️ [TOTAL] {total_duration:.3f}s")
+            return result
 
         except Exception as e:
-            logger.error(f"Primer generation failed | user_id={user_id} | lesson_id={lesson_id} | error={str(e)}")
+            total_duration = time.perf_counter() - start_time
+            logger.error(f"Error | Duration: {total_duration:.3f}s | error={str(e)}")
             return self._fallback_response()
 
     def _get_cached_primer(
@@ -115,48 +301,53 @@ class PrimerService:
     async def _generate_new_primer(
         self,
         user_id: str,
-        lesson_id: int
+        lesson_id: int,
+        filter: bool = False
     ) -> Dict[str, Any]:
         """Generate a new personalized primer"""
         from db.crud.lessons import lesson_crud
 
-        # Fetch lesson
+        # Fetch lesson and user signals
+        db_start = time.perf_counter()
         lesson = lesson_crud.get(self.db, lesson_id)
+
         if not lesson:
             logger.error(f"Lesson not found | lesson_id={lesson_id}")
             return self._fallback_response()
 
-        # Fetch user signals (now passing lesson_id for embedding lookup)
+        # Fetch user signals
         user_signals = self._fetch_user_signals(
             user_id=user_id,
             lesson_id=lesson_id,
-            lesson_tags=lesson.tags or []
+            lesson_tags=lesson.tags or [],
+            filter=filter
         )
+        db_duration = time.perf_counter() - db_start
+        logger.info(f"[DB] {db_duration:.3f}s")
 
-        # Assess signal quality
-        signal_quality = self._assess_signal_quality(user_signals)
-        print("Signal Quality Assessed:", signal_quality)
-        # Use signal quality threshold (0.6) for embeddings, rule-based (0.5) for fallback
-        threshold = SIGNAL_QUALITY_THRESHOLD if user_signals.get("similarity_based") else 0.5
+        # Signal quality check (only when filtering is enabled)
+        if filter:
+            signal_quality = self._assess_signal_quality(user_signals)
+            threshold = SIGNAL_QUALITY_THRESHOLD if user_signals.get("similarity_based") else 0.5
 
-        if signal_quality < threshold:
-            logger.info(
-                f"Insufficient signals for personalization | user_id={user_id} | "
-                f"lesson_id={lesson_id} | quality={signal_quality:.3f} | threshold={threshold}"
-            )
-            print("Insufficient signals, returning fallback.")
-            return self._fallback_response()
+            if signal_quality < threshold:
+                return self._fallback_response()
 
         # Generate bullets with LLM
+        llm_start = time.perf_counter()
         personalized_bullets = await self._generate_bullets_with_llm(
             lesson=lesson,
             user_signals=user_signals
         )
+        llm_duration = time.perf_counter() - llm_start
+        logger.info(f"[LLM] {llm_duration:.3f}s")
+
         if not personalized_bullets or len(personalized_bullets) < 2:
             logger.warning(f"LLM generation failed or returned insufficient bullets")
             return self._fallback_response()
 
         # Cache the primer
+        cache_start = time.perf_counter()
         self._cache_primer(
             user_id=user_id,
             lesson_id=lesson_id,
@@ -164,10 +355,12 @@ class PrimerService:
             bullets=personalized_bullets,
             user_signals=user_signals
         )
+        cache_duration = time.perf_counter() - cache_start
+        logger.info(f"[CACHE] {cache_duration:.3f}s")
 
         return {
             "personalized_bullets": personalized_bullets,
-            "generated_at": datetime.utcnow(),
+            "generated_at": datetime.now(timezone.utc),
             "from_cache": False,
             "stale": False,
             "personalized_available": True
@@ -177,16 +370,17 @@ class PrimerService:
         self,
         user_id: str,
         lesson_id: int,
-        lesson_tags: List[str]
+        lesson_tags: List[str],
+        filter: bool = False
     ) -> Dict[str, Any]:
         """
-        Fetch relevant user memory notes using embeddings-based similarity.
-        Falls back to tag-based filtering if embeddings don't exist.
+        Fetch user memory notes with optional filtering.
 
         Args:
             user_id: User identifier
             lesson_id: Lesson identifier (for embedding lookup)
             lesson_tags: Lesson tags (for fallback)
+            filter: If True, use embeddings-based filtering. If False, use all notes.
 
         Returns:
             Dictionary with user signals
@@ -197,32 +391,49 @@ class PrimerService:
         ).first()
 
         if not profile:
-            print("No user memory profile found.", user_id)
+            logger.warning(f"No user memory profile found | user_id={user_id}")
             return {"available": False}
 
-        # Check if embeddings exist for both user and lesson
-        has_embeddings = (
-            self.embedding_service.has_note_embeddings(user_id) and
-            self.embedding_service.has_lesson_chunks(lesson_id)
-        )
+        # Use filtering logic if filter=True
+        if filter:
+            # Check if embeddings exist for both user and lesson
+            has_embeddings = (
+                self.embedding_service.has_note_embeddings(user_id) and
+                self.embedding_service.has_lesson_chunks(lesson_id)
+            )
 
-        if has_embeddings:
-            # Use embeddings-based similarity search
-            return self._fetch_signals_with_embeddings(
-                user_id=user_id,
-                lesson_id=lesson_id,
-                profile=profile
-            )
-        else:
-            # Fallback to tag-based filtering
-            logger.info(
-                f"Falling back to tag-based filtering | user_id={user_id} | "
-                f"lesson_id={lesson_id} | reason=missing_embeddings"
-            )
-            return self._fetch_signals_with_tags(
-                profile=profile,
-                lesson_tags=lesson_tags
-            )
+            if has_embeddings:
+                # Use embeddings-based similarity search
+                embedding_start = time.perf_counter()
+                result = self._fetch_signals_with_embeddings(
+                    user_id=user_id,
+                    lesson_id=lesson_id,
+                    profile=profile
+                )
+                embedding_duration = time.perf_counter() - embedding_start
+                logger.info(f"[EMBEDDINGS] {embedding_duration:.3f}s")
+                return result
+            else:
+                # Fallback to tag-based filtering
+                result = self._fetch_signals_with_tags(
+                    profile=profile,
+                    lesson_tags=lesson_tags
+                )
+                return result
+
+        # Return ALL notes without filtering (filter=False)
+        return {
+            "available": True,
+            "learning_notes": profile.learning_notes or [],
+            "interest_notes": profile.interest_notes or [],
+            "knowledge_notes": profile.knowledge_notes or [],
+            "preference_notes": profile.preference_notes or [],
+            "memory_version": profile.last_significant_update,
+            "total_interactions": profile.total_interactions,
+            "similarity_based": False,  # Not using embeddings
+            "avg_similarity": None,
+            "note_similarities": {}
+        }
 
     def _fetch_signals_with_embeddings(
         self,
@@ -237,18 +448,11 @@ class PrimerService:
         similarity >= NOTE_FILTER_THRESHOLD (0.6) are included.
         """
         # Find similar notes by comparing against all lesson chunks
-        # Returns notes where max similarity across chunks >= threshold
         similar_notes = self.embedding_service.find_similar_notes_to_lesson(
             user_id=user_id,
             lesson_id=lesson_id,
             threshold=NOTE_FILTER_THRESHOLD
         )
-
-        if not similar_notes:
-            logger.info(
-                f"No similar notes found above threshold | user_id={user_id} | "
-                f"lesson_id={lesson_id} | threshold={NOTE_FILTER_THRESHOLD}"
-            )
 
         # Build note ID to similarity score mapping
         note_similarities = {note_id: score for note_id, _, score in similar_notes}
@@ -530,7 +734,7 @@ class PrimerService:
                 return "None available"
             return "\n".join([
                 f"- {note.get('content', '')} (confidence: {note.get('confidence', 0):.2f})"
-                for note in notes[:5]  # Limit to top 5
+                for note in notes  # Using ALL notes (no limit)
             ])
 
         # Prepare formatted user notes
@@ -586,9 +790,9 @@ class PrimerService:
 
         # Generate with LLM
         formatted_prompt = primer_generation_prompt_template.invoke(prompt_inputs)
-        model = get_enhancer_model()
-        response = await model.ainvoke(formatted_prompt)
-
+        # model = get_enhancer_model()
+        # response = await model.ainvoke(formatted_prompt)
+        response = await primers_model.ainvoke(formatted_prompt)
         # Parse response
         bullets = self._parse_llm_response(response.content)
 
@@ -604,6 +808,91 @@ class PrimerService:
         print("=" * 80 + "\n")
 
         return bullets
+
+    async def _stream_bullets_with_llm(
+        self,
+        lesson: Any,
+        user_signals: Dict[str, Any]
+    ):
+        """
+        Stream LLM generation of personalized bullets in real-time.
+
+        Yields:
+            {"type": "llm_chunk", "content": str} - Raw LLM tokens as they arrive
+            {"type": "bullet", "index": int, "content": str} - Parsed bullets after completion
+        """
+        # Format baseline bullets
+        baseline_bullets = "\n".join([
+            f"• {bullet}" for bullet in (lesson.baseline_primer_bullets or [])
+        ])
+
+        # Fetch and format lesson content
+        content_pages = self._fetch_lesson_content(lesson.id)
+        lesson_content = self._format_lesson_content(content_pages)
+
+        # Format user notes
+        def format_notes(notes: List[Dict]) -> str:
+            if not notes:
+                return "None available"
+            return "\n".join([
+                f"- {note.get('content', '')} (confidence: {note.get('confidence', 0):.2f})"
+                for note in notes  # Using ALL notes (no limit)
+            ])
+
+        user_learning_notes = format_notes(user_signals.get("learning_notes", []))
+        user_interest_notes = format_notes(user_signals.get("interest_notes", []))
+        user_knowledge_notes = format_notes(user_signals.get("knowledge_notes", []))
+        user_preference_notes = format_notes(user_signals.get("preference_notes", []))
+
+        # Prepare prompt
+        prompt_inputs = {
+            "lesson_title": lesson.title,
+            "lesson_content": lesson_content,
+            "baseline_bullets": baseline_bullets or "No baseline bullets available",
+            "user_learning_notes": user_learning_notes,
+            "user_interest_notes": user_interest_notes,
+            "user_knowledge_notes": user_knowledge_notes,
+            "user_preference_notes": user_preference_notes,
+        }
+
+        # Generate with streaming LLM - stream tokens in real-time
+        formatted_prompt = primer_generation_prompt_template.invoke(prompt_inputs)
+        # model = get_enhancer_model()
+
+        # Stream the response and send chunks immediately
+        accumulated_content = ""
+        first_token_received = False
+        llm_start_time = time.perf_counter()
+
+        # async for chunk in model.astream(formatted_prompt):
+        async for chunk in primers_model.astream(formatted_prompt):
+            if hasattr(chunk, 'content') and chunk.content:
+                # Log first token timing
+                if not first_token_received:
+                    first_token_time = time.perf_counter() - llm_start_time
+                    logger.info(f"[FIRST TOKEN] {first_token_time:.3f}s")
+                    first_token_received = True
+
+                accumulated_content += chunk.content
+                # Yield the chunk immediately for real-time streaming
+                yield {
+                    "type": "llm_chunk",
+                    "content": chunk.content
+                }
+
+        llm_total_time = time.perf_counter() - llm_start_time
+        logger.info(f"[LLM] {llm_total_time:.3f}s")
+
+        # Parse the complete response
+        bullets = self._parse_llm_response(accumulated_content)
+
+        # Yield each parsed bullet
+        for idx, bullet in enumerate(bullets):
+            yield {
+                "type": "bullet",
+                "index": idx,
+                "content": bullet
+            }
 
     def _parse_llm_response(self, response_content: str) -> List[str]:
         """Parse LLM response to extract bullets"""
@@ -649,7 +938,7 @@ class PrimerService:
         user_signals: Dict[str, Any]
     ) -> None:
         """Store generated primer in database"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # Compute inputs hash
         note_ids = [
@@ -709,7 +998,12 @@ class PrimerService:
         ).first()
         # Use last_significant_update as the memory version timestamp
         # (memory_version field is an Integer counter, not a timestamp)
-        return profile.last_significant_update if profile else None
+        if profile and profile.last_significant_update:
+            # Ensure timezone-aware datetime for comparison with other timestamps
+            if profile.last_significant_update.tzinfo is None:
+                return profile.last_significant_update.replace(tzinfo=timezone.utc)
+            return profile.last_significant_update
+        return None
 
     def _fallback_response(self) -> Dict[str, Any]:
         """Return fallback response when personalization is not available"""
