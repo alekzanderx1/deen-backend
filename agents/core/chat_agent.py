@@ -26,7 +26,8 @@ from agents.tools import (
     enhance_query_tool,
     retrieve_shia_documents_tool,
     retrieve_sunni_documents_tool,
-    retrieve_combined_documents_tool
+    retrieve_combined_documents_tool,
+    retrieve_quran_tafsir_tool
 )
 from core.config import OPENAI_API_KEY
 from core import utils
@@ -72,7 +73,8 @@ class ChatAgent:
             enhance_query_tool,
             retrieve_shia_documents_tool,
             retrieve_sunni_documents_tool,
-            retrieve_combined_documents_tool
+            retrieve_combined_documents_tool,
+            retrieve_quran_tafsir_tool
         ]
         
         llm = init_chat_model(
@@ -259,7 +261,8 @@ class ChatAgent:
             enhance_query_tool,
             retrieve_shia_documents_tool,
             retrieve_sunni_documents_tool,
-            retrieve_combined_documents_tool
+            retrieve_combined_documents_tool,
+            retrieve_quran_tafsir_tool
         ])
         
         # Execute tools
@@ -301,7 +304,7 @@ class ChatAgent:
                     except:
                         pass
                 
-                elif tool_name in ["retrieve_shia_documents_tool", "retrieve_sunni_documents_tool", "retrieve_combined_documents_tool"]:
+                elif tool_name in ["retrieve_shia_documents_tool", "retrieve_sunni_documents_tool", "retrieve_combined_documents_tool", "retrieve_quran_tafsir_tool"]:
                     try:
                         import json
                         result_data = json.loads(content) if isinstance(content, str) else content
@@ -316,6 +319,8 @@ class ChatAgent:
                             state["shia_docs_count"] = result_data.get("count", 0)
                         if result_data.get("source") == "sunni":
                             state["sunni_docs_count"] = result_data.get("count", 0)
+                        if result_data.get("source") == "quran_tafsir":
+                            state["quran_docs_count"] = result_data.get("count", 0)
                         
                         state["retrieval_completed"] = True
                     except Exception as e:

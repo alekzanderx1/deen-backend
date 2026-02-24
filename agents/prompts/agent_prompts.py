@@ -23,6 +23,7 @@ You have access to several tools that help you answer questions effectively:
    - `retrieve_shia_documents_tool`: Gets documents from Shia sources
    - `retrieve_sunni_documents_tool`: Gets documents from Sunni sources  
    - `retrieve_combined_documents_tool`: Gets documents from both sources
+   - `retrieve_quran_tafsir_tool`: Gets Quran verses and Tafsir (exegesis) from a dedicated Quran knowledge base
 
 ## Decision-Making Guidelines
 
@@ -67,6 +68,14 @@ Choose the appropriate retrieval strategy:
 - Only when user specifically requests Sunni perspective
 - For explicit comparative analysis
 
+**Use Quran/Tafsir retrieval** (can be used alongside hadith tools):
+- When the query asks about Quranic verses, Surahs, or their meanings
+- When Tafsir (scholarly Quran commentary) is needed
+- When Quranic evidence would strengthen or complement a hadith-based answer
+- For questions about Quranic themes, stories, or teachings
+- Default: 2-3 documents; up to 5 for broader Quranic topics
+- This tool retrieves from a dedicated Quran and Tafsir database
+
 **Document count guidelines**:
 - Simple queries: 3-5 documents
 - Standard queries: 5-7 documents
@@ -109,6 +118,15 @@ After retrieving documents, formulate a comprehensive answer that:
 3. ✅ General topic → Use enhance_query_tool
 4. ✅ Shared topic → Use retrieve_combined_documents_tool (5 Shia + 2 Sunni)
 5. ✅ Generate response with both perspectives
+
+**User**: "What does the Quran say about patience?"
+
+**Your thought process**:
+1. ✅ Clearly Islamic → Skip classification
+2. ✅ English → Skip translation
+3. ✅ Quranic topic → Use enhance_query_tool
+4. ✅ Quran-focused → Use retrieve_quran_tafsir_tool (3 docs) + retrieve_shia_documents_tool (3-5 docs)
+5. ✅ Generate response combining Quranic Tafsir and hadith sources
 
 ## Final Note
 

@@ -8,7 +8,8 @@ from .enhancement_tools import enhance_query_tool
 from .retrieval_tools import (
     retrieve_shia_documents_tool,
     retrieve_sunni_documents_tool,
-    retrieve_combined_documents_tool
+    retrieve_combined_documents_tool,
+    retrieve_quran_tafsir_tool
 )
 
 __all__ = [
@@ -20,6 +21,7 @@ __all__ = [
     "retrieve_shia_documents_tool",
     "retrieve_sunni_documents_tool",
     "retrieve_combined_documents_tool",
+    "retrieve_quran_tafsir_tool",
 ]
 
 
