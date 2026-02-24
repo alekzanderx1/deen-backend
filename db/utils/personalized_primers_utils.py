@@ -1,6 +1,6 @@
 """Helper utilities for personalized primers freshness checking and hashing"""
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 
@@ -22,7 +22,7 @@ def is_primer_fresh(
     3. Lesson hasn't been updated since primer was generated
     4. User memory hasn't been updated since primer was generated (if applicable)
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     # Check if manually marked as stale
     if primer.stale:
