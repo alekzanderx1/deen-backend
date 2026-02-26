@@ -26,7 +26,8 @@ from agents.tools import (
     enhance_query_tool,
     retrieve_shia_documents_tool,
     retrieve_sunni_documents_tool,
-    retrieve_combined_documents_tool
+    retrieve_combined_documents_tool,
+    retrieve_quran_tafsir_tool
 )
 from core.config import OPENAI_API_KEY
 from core import utils
@@ -72,7 +73,8 @@ class ChatAgent:
             enhance_query_tool,
             retrieve_shia_documents_tool,
             retrieve_sunni_documents_tool,
-            retrieve_combined_documents_tool
+            retrieve_combined_documents_tool,
+            retrieve_quran_tafsir_tool
         ]
         
         llm = init_chat_model(
@@ -91,13 +93,24 @@ class ChatAgent:
         workflow = StateGraph(ChatState)
         
         # Add nodes
+        workflow.add_node("fiqh_classification", self._fiqh_classification_node)
         workflow.add_node("agent", self._agent_node)
         workflow.add_node("tools", self._tool_node)
         workflow.add_node("generate_response", self._generate_response_node)
         workflow.add_node("check_early_exit", self._check_early_exit_node)
         
-        # Set entry point
-        workflow.set_entry_point("agent")
+        # Set entry point to fiqh classification (mandatory check)
+        workflow.set_entry_point("fiqh_classification")
+        
+        # Fiqh classification routes to either early exit or agent
+        workflow.add_conditional_edges(
+            "fiqh_classification",
+            self._route_after_fiqh_check,
+            {
+                "exit": "check_early_exit",
+                "continue": "agent"
+            }
+        )
         
         # Add conditional edges from agent
         workflow.add_conditional_edges(
@@ -121,6 +134,47 @@ class ChatAgent:
         workflow.add_edge("check_early_exit", END)
         
         return workflow
+    
+    def _fiqh_classification_node(self, state: ChatState) -> ChatState:
+        """
+        Mandatory fiqh classification node - runs before any other processing.
+        """
+        print("[FIQH CLASSIFICATION NODE] Checking if query is fiqh-related")
+        
+        try:
+            # Import the classifier function directly
+            from modules.classification.classifier import classify_fiqh_query
+            
+            # Check if the query is fiqh-related
+            is_fiqh = classify_fiqh_query(state["user_query"], state["session_id"])
+            
+            state["is_fiqh"] = is_fiqh
+            state["classification_checked"] = True
+            
+            if is_fiqh:
+                print("[FIQH CLASSIFICATION NODE] Query is fiqh-related - will exit early")
+            else:
+                print("[FIQH CLASSIFICATION NODE] Query is not fiqh-related - continuing to agent")
+                
+        except Exception as e:
+            print(f"[FIQH CLASSIFICATION NODE] Error: {e}")
+            # If classification fails, default to False (allow the query to proceed)
+            state["is_fiqh"] = False
+            state["classification_checked"] = True
+            state["errors"].append(f"Fiqh classification error: {str(e)}")
+        
+        return state
+    
+    def _route_after_fiqh_check(self, state: ChatState) -> Literal["exit", "continue"]:
+        """
+        Route after fiqh classification.
+        """
+        if state.get("is_fiqh"):
+            print("[ROUTING] Fiqh query detected - routing to early exit")
+            return "exit"
+        
+        print("[ROUTING] Not a fiqh query - continuing to agent")
+        return "continue"
     
     def _agent_node(self, state: ChatState) -> ChatState:
         """
@@ -207,7 +261,8 @@ class ChatAgent:
             enhance_query_tool,
             retrieve_shia_documents_tool,
             retrieve_sunni_documents_tool,
-            retrieve_combined_documents_tool
+            retrieve_combined_documents_tool,
+            retrieve_quran_tafsir_tool
         ])
         
         # Execute tools
@@ -249,7 +304,7 @@ class ChatAgent:
                     except:
                         pass
                 
-                elif tool_name in ["retrieve_shia_documents_tool", "retrieve_sunni_documents_tool", "retrieve_combined_documents_tool"]:
+                elif tool_name in ["retrieve_shia_documents_tool", "retrieve_sunni_documents_tool", "retrieve_combined_documents_tool", "retrieve_quran_tafsir_tool"]:
                     try:
                         import json
                         result_data = json.loads(content) if isinstance(content, str) else content
@@ -264,6 +319,8 @@ class ChatAgent:
                             state["shia_docs_count"] = result_data.get("count", 0)
                         if result_data.get("source") == "sunni":
                             state["sunni_docs_count"] = result_data.get("count", 0)
+                        if result_data.get("source") == "quran_tafsir":
+                            state["quran_docs_count"] = result_data.get("count", 0)
                         
                         state["retrieval_completed"] = True
                     except Exception as e:

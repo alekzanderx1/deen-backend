@@ -22,53 +22,19 @@ def compact_format_references(retrieved_docs: list, max_chars: int = 1500) -> st
             if isinstance(doc, dict):
                 metadata = doc.get("metadata", {}) or {}
                 page_content_en = doc.get("page_content_en", "") or ""
+                quran_translation = doc.get("quran_translation", "") or ""
             else:
-                # Fallback for LangChain Document objects
                 metadata = getattr(doc, "metadata", {}) or {}
                 page_content_en = getattr(doc, "page_content_en", "") or getattr(doc, "page_content", "") or ""
+                quran_translation = getattr(doc, "quran_translation", "") or ""
 
-            author         = metadata.get("author", "N/A")
-            volume         = metadata.get("volume", "N/A")
-            book_number    = metadata.get("book_number", "N/A")
-            book_title     = metadata.get("book_title", "N/A")
-            chapter_number = metadata.get("chapter_number", "N/A")
-            chapter_title  = metadata.get("chapter_title", "N/A")
-            collection     = metadata.get("collection", "N/A")
-            grade_ar       = metadata.get("grade_ar", "N/A")
-            grade_en       = metadata.get("grade_en", "N/A")
-            hadith_id      = metadata.get("hadith_id", "N/A")
-            hadith_no      = metadata.get("hadith_no", "N/A")
-            hadith_url     = metadata.get("hadith_url", "N/A")
-            lang           = metadata.get("lang", "N/A")
-            sect           = metadata.get("sect", "N/A")
-            reference      = metadata.get("reference", "N/A")
+            is_quran_doc = metadata.get("Type") == "Tafsir" or "surah_name" in metadata
 
-            text_en = page_content_en.strip() if page_content_en else "No text available"
+            if is_quran_doc:
+                block = _format_quran_reference(idx, metadata, page_content_en, quran_translation, max_chars)
+            else:
+                block = _format_hadith_reference(idx, metadata, page_content_en, max_chars)
 
-            elipses = "...." if len(text_en) > max_chars else ""
-
-            block = [
-                "--------------------------------------",
-                f"**Reference {idx}:**",
-                f"- **Book Title:** {book_title}",
-                f"- **Author:** {author}",
-                f"- **Volume:** {volume}",
-                f"- **Book Number:** {book_number}",
-                f"- **Chapter Number:** {chapter_number}",
-                f"- **Chapter Title:** {chapter_title}",
-                f"- **Collection:** {collection}",
-                f"- **Hadith Number:** {hadith_no}",
-                f"- **Hadith ID:** {hadith_id}",
-                f"- **Reference:** {reference}",
-                f"- **Grade (EN):** {grade_en}",
-                f"- **Grade (AR):** {grade_ar}",
-                f"- **Language:** {lang}",
-                f"- **Sect:** {sect}",
-                f"- **URL:** {hadith_url}" if hadith_url and hadith_url != "N/A" else None,
-                f"- **Text (EN):** \"{text_en[:max_chars] + elipses}\"",
-                "---------------------------------------------",
-            ]
-            # Filter out Nones (e.g., URL line when missing)
             lines.append("\n".join([ln for ln in block if ln is not None]))
 
         except Exception as e:
@@ -77,6 +43,83 @@ def compact_format_references(retrieved_docs: list, max_chars: int = 1500) -> st
             lines.append("**Error formatting a reference. Skipping this item.**")
 
     return "\n".join(lines)
+
+
+def _format_hadith_reference(idx, metadata, page_content_en, max_chars):
+    author         = metadata.get("author", "N/A")
+    volume         = metadata.get("volume", "N/A")
+    book_number    = metadata.get("book_number", "N/A")
+    book_title     = metadata.get("book_title", "N/A")
+    chapter_number = metadata.get("chapter_number", "N/A")
+    chapter_title  = metadata.get("chapter_title", "N/A")
+    collection     = metadata.get("collection", "N/A")
+    grade_ar       = metadata.get("grade_ar", "N/A")
+    grade_en       = metadata.get("grade_en", "N/A")
+    hadith_id      = metadata.get("hadith_id", "N/A")
+    hadith_no      = metadata.get("hadith_no", "N/A")
+    hadith_url     = metadata.get("hadith_url", "N/A")
+    lang           = metadata.get("lang", "N/A")
+    sect           = metadata.get("sect", "N/A")
+    reference      = metadata.get("reference", "N/A")
+
+    text_en = page_content_en.strip() if page_content_en else "No text available"
+    elipses = "...." if len(text_en) > max_chars else ""
+
+    return [
+        "--------------------------------------",
+        f"**Reference {idx}:**",
+        f"- **Book Title:** {book_title}",
+        f"- **Author:** {author}",
+        f"- **Volume:** {volume}",
+        f"- **Book Number:** {book_number}",
+        f"- **Chapter Number:** {chapter_number}",
+        f"- **Chapter Title:** {chapter_title}",
+        f"- **Collection:** {collection}",
+        f"- **Hadith Number:** {hadith_no}",
+        f"- **Hadith ID:** {hadith_id}",
+        f"- **Reference:** {reference}",
+        f"- **Grade (EN):** {grade_en}",
+        f"- **Grade (AR):** {grade_ar}",
+        f"- **Language:** {lang}",
+        f"- **Sect:** {sect}",
+        f"- **URL:** {hadith_url}" if hadith_url and hadith_url != "N/A" else None,
+        f"- **Text (EN):** \"{text_en[:max_chars] + elipses}\"",
+        "---------------------------------------------",
+    ]
+
+
+def _format_quran_reference(idx, metadata, tafsir_text, quran_translation, max_chars):
+    surah_name     = metadata.get("surah_name", "N/A")
+    title          = metadata.get("title", "N/A")
+    chapter_number = metadata.get("chapter_number", "N/A")
+    verses_covered = metadata.get("verses_covered", "N/A")
+    author         = metadata.get("author", "N/A")
+    collection     = metadata.get("collection", "N/A")
+    volume         = metadata.get("volume", "N/A")
+    sect           = metadata.get("sect", "N/A")
+
+    tafsir = tafsir_text.strip() if tafsir_text else "No tafsir text available"
+    translation = quran_translation.strip() if quran_translation else ""
+    tafsir_elipses = "...." if len(tafsir) > max_chars else ""
+
+    block = [
+        "--------------------------------------",
+        f"**Reference {idx} (Quran/Tafsir):**",
+        f"- **Surah:** {surah_name} ({title})",
+        f"- **Chapter Number:** {chapter_number}",
+        f"- **Verses:** {verses_covered}",
+        f"- **Tafsir Collection:** {collection}",
+        f"- **Author:** {author}",
+        f"- **Volume:** {volume}",
+        f"- **Sect:** {sect}",
+    ]
+    if translation:
+        trans_elipses = "...." if len(translation) > max_chars else ""
+        block.append(f"- **Quran Translation:** \"{translation[:max_chars] + trans_elipses}\"")
+    block.append(f"- **Tafsir Text:** \"{tafsir[:max_chars] + tafsir_elipses}\"")
+    block.append("---------------------------------------------")
+    return block
+
 
 def format_references(retrieved_docs: list) -> str:
     """
@@ -184,8 +227,8 @@ def format_references_as_json(retrieved_docs: list):
                 "lang": doc['metadata'].get("lang", "N/A"),
                 "sect": doc['metadata'].get("sect", "N/A"),
                 "reference": doc['metadata'].get("reference", "N/A"),
-                "text": doc['page_content_en'].strip() if doc['page_content_en'] else "No text available",
-                "text_ar": doc['page_content_ar'].strip() if doc['page_content_ar'] else "No Arabic text available"
+                "text": doc.get('page_content_en', '').strip() if doc.get('page_content_en') else "No text available",
+                "text_ar": doc.get('page_content_ar', '').strip() if doc.get('page_content_ar') else "No Arabic text available"
             }
             formatted_references.append(reference)
     except Exception as e:

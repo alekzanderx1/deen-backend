@@ -1,7 +1,8 @@
-from core.config import  DEEN_SPARSE_INDEX_NAME, DEEN_DENSE_INDEX_NAME
+from core.config import DEEN_SPARSE_INDEX_NAME, DEEN_DENSE_INDEX_NAME, QURAN_DENSE_INDEX_NAME
 import core.vectorstore as vectorstore_module
 from modules.reranking import reranker
 from modules.embedding import embedder
+from core.utils import decompress_text
 import traceback
 
 
@@ -72,7 +73,42 @@ def retrieve_sunni_documents(query,no_of_docs=10):
         print(f"Error retrieving documents: {e}")
         traceback.print_exc()
         return []
-    
+
+
+def retrieve_quran_documents(query, no_of_docs=5):
+    """
+    Retrieve Quran Tafsir documents from the dedicated dense-only Pinecone index.
+    Uses direct Pinecone query (no sparse search, no reranking).
+    """
+    print("INSIDE quran retrieve_documents")
+    try:
+        query_vector = embedder.getDenseEmbedder().embed_query(query)
+
+        index = vectorstore_module._get_sparse_vectorstore(QURAN_DENSE_INDEX_NAME)
+        results = index.query(
+            vector=query_vector,
+            top_k=no_of_docs,
+            include_metadata=True,
+            namespace="ns1"
+        )
+
+        docs = []
+        for match in results.matches:
+            md = match.metadata or {}
+            text_chunk = decompress_text(md.get("text_chunk", ""))
+            quran_translation = decompress_text(md.get("english_quran_translation", ""))
+            docs.append({
+                "chunk_id": match.id,
+                "metadata": md,
+                "page_content_en": text_chunk,
+                "quran_translation": quran_translation
+            })
+        return docs
+    except Exception as e:
+        print(f"Error retrieving Quran documents: {e}")
+        traceback.print_exc()
+        return []
+
 
 """
 Returns a list of the following:
