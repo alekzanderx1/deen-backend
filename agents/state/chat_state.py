@@ -63,6 +63,9 @@ class ChatState(TypedDict):
     sunni_docs_count: int
     """Number of Sunni documents retrieved"""
     
+    quran_docs_count: int
+    """Number of Quran/Tafsir documents retrieved"""
+    
     retrieval_completed: bool
     """Whether document retrieval has been performed"""
     
@@ -126,6 +129,7 @@ def create_initial_state(
         retrieved_docs=[],
         shia_docs_count=0,
         sunni_docs_count=0,
+        quran_docs_count=0,
         retrieval_completed=False,
         final_response=None,
         response_generated=False,

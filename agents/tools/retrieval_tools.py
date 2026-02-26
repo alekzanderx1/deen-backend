@@ -177,6 +177,60 @@ def retrieve_combined_documents_tool(
         }
 
 
-
-
+@tool
+def retrieve_quran_tafsir_tool(query: str, num_documents: int = 3) -> Dict[str, any]:
+    """
+    Retrieve Quran verses and Tafsir (exegesis/explanation) from the Quran knowledge base.
+    
+    Use this tool to find Quranic content and scholarly Tafsir commentary.
+    The retrieval searches a dedicated Quran and Tafsir vector database.
+    
+    Args:
+        query: The search query (should be enhanced if possible)
+        num_documents: Number of documents to retrieve (default: 3, recommended: 2-5)
+        
+    Returns:
+        Dictionary with:
+        - documents (List[Dict]): Retrieved documents with metadata
+        - count (int): Number of documents retrieved
+        - source (str): "quran_tafsir"
+        
+    Each document contains:
+        - chunk_id: Unique identifier
+        - metadata: Surah name, chapter number, verses covered, author, collection, volume
+        - page_content_en: Tafsir text (English)
+        - quran_translation: English translation of the Quran verses
+        
+    When to use:
+    - When the query asks about Quranic verses, Surahs, or their meanings
+    - When Tafsir (exegesis/commentary) on specific Quran passages is needed
+    - When Quranic evidence would strengthen or complement a response
+    - For questions about Quranic themes, stories, or teachings
+    - Can be used ALONGSIDE hadith retrieval tools for comprehensive answers
+    
+    When NOT to use:
+    - For purely hadith-related questions with no Quranic dimension
+    - When the user only asks about historical events unrelated to the Quran
+    
+    Recommended num_documents:
+    - 2-3: For specific verse or Surah queries
+    - 3-5: For broader Quranic themes or comparative topics
+    """
+    try:
+        docs = retriever.retrieve_quran_documents(query, num_documents)
+        
+        return {
+            "documents": docs,
+            "count": len(docs),
+            "source": "quran_tafsir",
+            "query_used": query
+        }
+    except Exception as e:
+        print(f"[retrieve_quran_tafsir_tool] Error: {e}")
+        return {
+            "documents": [],
+            "count": 0,
+            "source": "quran_tafsir",
+            "error": str(e)
+        }
 

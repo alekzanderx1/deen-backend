@@ -4,7 +4,7 @@ Configuration classes for the LangGraph agentic pipeline.
 
 from pydantic import BaseModel, Field
 from typing import Optional
-from core.config import DENSE_RESULT_WEIGHT, SPARSE_RESULT_WEIGHT
+from core.config import DENSE_RESULT_WEIGHT, SPARSE_RESULT_WEIGHT, LARGE_LLM
 
 
 class RetrievalConfig(BaseModel):
@@ -59,7 +59,7 @@ class ModelConfig(BaseModel):
     """Configuration for LLM models."""
     
     agent_model: str = Field(
-        default="gpt-4o",
+        default=LARGE_LLM or "gpt-4o",
         description="Model to use for the agent (tool calling)"
     )
     
@@ -79,7 +79,7 @@ class ModelConfig(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "agent_model": "gpt-4o",
+                "agent_model": LARGE_LLM or "gpt-4o",
                 "temperature": 0.7,
                 "max_tokens": 2000
             }
@@ -100,7 +100,7 @@ class AgentConfig(BaseModel):
     )
     
     max_iterations: int = Field(
-        default=15,
+        default=5,
         ge=1,
         le=50,
         description="Maximum number of agent iterations"
@@ -134,10 +134,10 @@ class AgentConfig(BaseModel):
                     "sunni_doc_count": 2
                 },
                 "model": {
-                    "agent_model": "gpt-4o",
+                    "agent_model": LARGE_LLM or "gpt-4o",
                     "temperature": 0.7
                 },
-                "max_iterations": 15,
+                "max_iterations": 5,
                 "enable_classification": True,
                 "enable_translation": True,
                 "enable_enhancement": True,
