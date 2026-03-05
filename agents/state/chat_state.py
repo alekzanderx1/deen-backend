@@ -100,7 +100,8 @@ def create_initial_state(
     user_query: str,
     session_id: str,
     target_language: str = "english",
-    config: Optional[Dict[str, Any]] = None
+    config: Optional[Dict[str, Any]] = None,
+    initial_messages: Optional[List[BaseMessage]] = None,
 ) -> ChatState:
     """
     Create initial state for a new chat interaction.
@@ -115,7 +116,7 @@ def create_initial_state(
         ChatState with initial values
     """
     return ChatState(
-        messages=[],
+        messages=initial_messages or [],
         user_query=user_query,
         session_id=session_id,
         target_language=target_language,
@@ -139,7 +140,6 @@ def create_initial_state(
         errors=[],
         iterations=0
     )
-
 
 
 

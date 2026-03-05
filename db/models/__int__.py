@@ -8,6 +8,8 @@ from .embeddings import NoteEmbedding, LessonChunkEmbedding
 from .lesson_page_quiz_questions import LessonPageQuizQuestion
 from .lesson_page_quiz_choices import LessonPageQuizChoice
 from .lesson_page_quiz_attempts import LessonPageQuizAttempt
+from .chat_sessions import ChatSession
+from .chat_messages import ChatMessage
 
 __all__ = [
     "Lesson",
@@ -21,4 +23,6 @@ __all__ = [
     "LessonPageQuizQuestion",
     "LessonPageQuizChoice",
     "LessonPageQuizAttempt",
+    "ChatSession",
+    "ChatMessage",
 ]

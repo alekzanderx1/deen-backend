@@ -423,6 +423,17 @@ Generate a comprehensive, accurate response that directly addresses the user's q
         # Default: continue
         print("[ROUTING] Default: continue")
         return "continue"
+
+    @staticmethod
+    def _load_runtime_messages(session_id: str):
+        try:
+            from core.memory import make_history
+
+            history = make_history(session_id)
+            return history.messages
+        except Exception as e:
+            print(f"[CHAT AGENT] Failed to load history for session {session_id}: {e}")
+            return []
     
     def invoke(self, user_query: str, session_id: str, target_language: str = "english", config: dict = None):
         """
@@ -444,7 +455,8 @@ Generate a comprehensive, accurate response that directly addresses the user's q
             user_query=user_query,
             session_id=session_id,
             target_language=target_language,
-            config=config or self.config.to_dict()
+            config=config or self.config.to_dict(),
+            initial_messages=self._load_runtime_messages(session_id),
         )
         
         # Run the graph
@@ -475,7 +487,8 @@ Generate a comprehensive, accurate response that directly addresses the user's q
             user_query=user_query,
             session_id=session_id,
             target_language=target_language,
-            config=config or self.config.to_dict()
+            config=config or self.config.to_dict(),
+            initial_messages=self._load_runtime_messages(session_id),
         )
         
         # Stream the graph
@@ -484,7 +497,6 @@ Generate a comprehensive, accurate response that directly addresses the user's q
             config={"configurable": {"thread_id": session_id}}
         ):
             yield event
-
 
 
 
