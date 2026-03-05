@@ -218,6 +218,34 @@ python agent_tests/test_memory_agent.py
 python agent_tests/test_hikmah_memory_integration.py
 ```
 
+### Testing the agentic streaming API
+
+This test runs the agentic streaming pipeline and writes the combined SSE output to a markdown file (as the UI would show it: response + hadith and Quran references).
+
+**Recommended: use a virtual environment** so dependencies and paths match the rest of the project:
+
+```bash
+# From repository root (deen-backend)
+python -m venv venv
+venv\Scripts\activate          # Windows
+# source venv/bin/activate    # macOS/Linux
+pip install -r requirements.txt
+```
+
+Ensure `.env` is configured (OpenAI, Redis, Pinecone, etc.). You do **not** need to start the server.
+
+Run from the **project root**:
+
+```bash
+python tests/test_agentic_streaming_sse.py
+```
+
+The script prints the path to the generated markdown file (e.g. a temp file). Open it to see the full response and references.
+
+Optional env vars: `AGENTIC_TEST_QUERY`, `AGENTIC_TEST_SESSION`, `AGENTIC_TEST_OUTPUT` (output file path).
+
+With pytest installed: `python -m pytest tests/test_agentic_streaming_sse.py -v -s`
+
 ## API Examples
 
 ### Chat with the AI

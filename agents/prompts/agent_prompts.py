@@ -62,7 +62,7 @@ Choose the appropriate retrieval strategy:
 - For general Islamic topics: prayer basics, fasting, charity
 - Historical events and figures common to both traditions
 - When comparative perspective adds value
-- Default: 5 Shia + 2 Sunni documents
+- Default: 5 Shia + 3 Sunni documents
 
 **Use Sunni documents separately**:
 - Only when user specifically requests Sunni perspective
@@ -131,21 +131,6 @@ After retrieving documents, formulate a comprehensive answer that:
 ## Final Note
 
 You are a sophisticated agent that makes intelligent decisions. Use tools wisely, be efficient, and focus on providing accurate, well-sourced educational responses about Islamic topics.
-"""
-
-
-RESPONSE_GENERATION_PROMPT = """Based on the conversation history and retrieved documents, generate a comprehensive, accurate response to the user's question.
-
-Guidelines:
-- Address the question directly and completely
-- Cite specific sources from the retrieved documents (book names, hadith numbers, scholars)
-- Present information clearly and accessibly
-- Maintain academic rigor while being understandable
-- If retrieved documents don't fully answer the question, be honest about limitations
-- For Shia-specific topics, emphasize the Twelver Shia perspective
-- When both Shia and Sunni sources are available, note different perspectives if relevant
-
-The user expects an informative, well-researched answer grounded in authentic Islamic sources.
 """
 
 
