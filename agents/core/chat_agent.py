@@ -309,19 +309,21 @@ class ChatAgent:
                         import json
                         result_data = json.loads(content) if isinstance(content, str) else content
                         docs = result_data.get("documents", [])
-                        state["retrieved_docs"].extend(docs)
-                        
-                        if "shia_count" in result_data:
-                            state["shia_docs_count"] = result_data["shia_count"]
-                        if "sunni_count" in result_data:
-                            state["sunni_docs_count"] = result_data["sunni_count"]
-                        if result_data.get("source") == "shia":
-                            state["shia_docs_count"] = result_data.get("count", 0)
-                        if result_data.get("source") == "sunni":
-                            state["sunni_docs_count"] = result_data.get("count", 0)
+
                         if result_data.get("source") == "quran_tafsir":
+                            state["quran_docs"].extend(docs)
                             state["quran_docs_count"] = result_data.get("count", 0)
-                        
+                        else:
+                            state["retrieved_docs"].extend(docs)
+                            if "shia_count" in result_data:
+                                state["shia_docs_count"] = result_data["shia_count"]
+                            if "sunni_count" in result_data:
+                                state["sunni_docs_count"] = result_data["sunni_count"]
+                            if result_data.get("source") == "shia":
+                                state["shia_docs_count"] = result_data.get("count", 0)
+                            if result_data.get("source") == "sunni":
+                                state["sunni_docs_count"] = result_data.get("count", 0)
+
                         state["retrieval_completed"] = True
                     except Exception as e:
                         print(f"[TOOL NODE] Error processing retrieval result: {e}")
@@ -337,8 +339,9 @@ class ChatAgent:
         """
         print("[GENERATE RESPONSE NODE] Generating final response")
         
-        # Format references
-        references = utils.compact_format_references(state["retrieved_docs"])
+        # Format references (include quran docs for non-streaming invoke path)
+        all_docs = state["retrieved_docs"] + state.get("quran_docs", [])
+        references = utils.compact_format_references(all_docs)
         
         # Create generation prompt
         generation_messages = [
@@ -409,8 +412,11 @@ Generate a comprehensive, accurate response that directly addresses the user's q
             print(f"[ROUTING] Continue to tools: {len(last_message.tool_calls)} tool calls")
             return "continue"
         
-        # If we have retrieved docs, generate response
-        if state.get("retrieval_completed") and state.get("retrieved_docs"):
+        # If we have retrieved docs, generate response (or end for streaming mode)
+        if state.get("retrieval_completed") and (state.get("retrieved_docs") or state.get("quran_docs")):
+            if state.get("streaming_mode"):
+                print("[ROUTING] Documents retrieved, streaming_mode=True - ending for pipeline to stream")
+                return "end"
             print("[ROUTING] Documents retrieved, generate response")
             return "generate"
         
@@ -467,7 +473,7 @@ Generate a comprehensive, accurate response that directly addresses the user's q
         
         return final_state
     
-    async def astream(self, user_query: str, session_id: str, target_language: str = "english", config: dict = None):
+    async def astream(self, user_query: str, session_id: str, target_language: str = "english", config: dict = None, streaming_mode: bool = False):
         """
         Stream the agent execution.
         
@@ -476,6 +482,7 @@ Generate a comprehensive, accurate response that directly addresses the user's q
             session_id: Session identifier
             target_language: User's preferred language
             config: Optional configuration overrides
+            streaming_mode: When True, graph skips generate_response so pipeline can stream tokens
             
         Yields:
             State updates as the agent runs
@@ -489,6 +496,7 @@ Generate a comprehensive, accurate response that directly addresses the user's q
             target_language=target_language,
             config=config or self.config.to_dict(),
             initial_messages=self._load_runtime_messages(session_id),
+            streaming_mode=streaming_mode,
         )
         
         # Stream the graph
@@ -497,7 +505,6 @@ Generate a comprehensive, accurate response that directly addresses the user's q
             config={"configurable": {"thread_id": session_id}}
         ):
             yield event
-
 
 
 
