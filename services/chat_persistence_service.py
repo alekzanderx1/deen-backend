@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime
+import json
+import re
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Tuple
 
 from fastapi.responses import StreamingResponse
@@ -29,10 +31,54 @@ def derive_chat_title(first_query: str) -> str:
 
 def extract_answer_text(stream_text: str) -> str:
     text = stream_text or ""
+
     marker_index = text.find(REFERENCES_MARKER)
     if marker_index != -1:
         text = text[:marker_index]
+
+    agentic_text = _extract_agentic_sse_answer_text(text)
+    if agentic_text or _looks_like_sse_stream(text):
+        return agentic_text
+
     return text.strip()
+
+
+def _looks_like_sse_stream(stream_text: str) -> bool:
+    normalized = (stream_text or "").replace("\r\n", "\n").replace("\r", "\n")
+    return "event:" in normalized and "data:" in normalized
+
+
+def _extract_agentic_sse_answer_text(stream_text: str) -> str:
+    normalized = (stream_text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not normalized:
+        return ""
+
+    tokens: List[str] = []
+    for raw_event in re.split(r"\n\n+", normalized):
+        if not raw_event.strip():
+            continue
+
+        event_type = None
+        data_lines: List[str] = []
+        for line in raw_event.split("\n"):
+            if line.startswith("event:"):
+                event_type = line[6:].strip()
+            elif line.startswith("data:"):
+                data_lines.append(line[5:].strip())
+
+        if event_type != "response_chunk" or not data_lines:
+            continue
+
+        try:
+            payload = json.loads("\n".join(data_lines))
+        except json.JSONDecodeError:
+            continue
+
+        token = payload.get("token")
+        if isinstance(token, str) and token:
+            tokens.append(token)
+
+    return "".join(tokens).strip()
 
 
 def _to_text(chunk: Any) -> str:
