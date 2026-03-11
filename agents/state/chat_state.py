@@ -65,7 +65,13 @@ class ChatState(TypedDict):
     
     quran_docs_count: int
     """Number of Quran/Tafsir documents retrieved"""
-    
+
+    quran_docs: List[Dict[str, Any]]
+    """Retrieved Quran/Tafsir documents (stored separately from hadith docs)"""
+
+    streaming_mode: bool
+    """When True, the graph skips generate_response so the pipeline can stream tokens"""
+
     retrieval_completed: bool
     """Whether document retrieval has been performed"""
     
@@ -100,7 +106,8 @@ def create_initial_state(
     user_query: str,
     session_id: str,
     target_language: str = "english",
-    config: Optional[Dict[str, Any]] = None
+    config: Optional[Dict[str, Any]] = None,
+    streaming_mode: bool = False
 ) -> ChatState:
     """
     Create initial state for a new chat interaction.
@@ -130,6 +137,8 @@ def create_initial_state(
         shia_docs_count=0,
         sunni_docs_count=0,
         quran_docs_count=0,
+        quran_docs=[],
+        streaming_mode=streaming_mode,
         retrieval_completed=False,
         final_response=None,
         response_generated=False,
