@@ -202,11 +202,6 @@ async def chat_pipeline_agentic_ep(
             db=db,
             user_id=user_id,
             session_id=session_id,
-            on_assistant_message_saved=lambda assistant_text: chat_persistence_service.append_turn_to_runtime_history(
-                runtime_session_id=runtime_session_id,
-                user_query=user_query,
-                assistant_text=assistant_text,
-            ),
         )
     except Exception as e:
         # Log internally; keep response generic

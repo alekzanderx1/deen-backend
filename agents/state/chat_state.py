@@ -22,9 +22,15 @@ class ChatState(TypedDict):
     
     user_query: str
     """Original user query"""
-    
+
+    working_query: str
+    """Current query used for retrieval after translation/enhancement"""
+
     session_id: str
     """Session identifier for conversation persistence"""
+
+    runtime_session_id: str
+    """Runtime history key used for transcript memory"""
     
     target_language: str
     """User's preferred language (default: "english")"""
@@ -74,6 +80,15 @@ class ChatState(TypedDict):
 
     retrieval_completed: bool
     """Whether document retrieval has been performed"""
+
+    retrieval_attempts: List[Dict[str, Any]]
+    """Ordered list of retrieval attempts with source/query metadata"""
+
+    source_coverage: Dict[str, bool]
+    """Whether Shia, Sunni, and Quran/Tafsir sources have been searched successfully"""
+
+    ready_to_answer: bool
+    """Whether the agent has decided it has enough evidence to answer"""
     
     # Response generation
     final_response: Optional[str]
@@ -127,7 +142,9 @@ def create_initial_state(
     return ChatState(
         messages=initial_messages or [],
         user_query=user_query,
+        working_query=user_query,
         session_id=session_id,
+        runtime_session_id=session_id,
         target_language=target_language,
         is_translated=False,
         original_language=None,
@@ -143,6 +160,13 @@ def create_initial_state(
         quran_docs=[],
         streaming_mode=streaming_mode,
         retrieval_completed=False,
+        retrieval_attempts=[],
+        source_coverage={
+            "shia": False,
+            "sunni": False,
+            "quran_tafsir": False,
+        },
+        ready_to_answer=False,
         final_response=None,
         response_generated=False,
         config=config or {},
@@ -151,6 +175,5 @@ def create_initial_state(
         errors=[],
         iterations=0
     )
-
 
 

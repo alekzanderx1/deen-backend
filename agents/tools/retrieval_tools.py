@@ -57,6 +57,7 @@ def retrieve_shia_documents_tool(query: str, num_documents: int = 5) -> Dict[str
             "documents": [],
             "count": 0,
             "source": "shia",
+            "query_used": query,
             "error": str(e)
         }
 
@@ -115,6 +116,7 @@ def retrieve_sunni_documents_tool(query: str, num_documents: int = 2) -> Dict[st
             "documents": [],
             "count": 0,
             "source": "sunni",
+            "query_used": query,
             "error": str(e)
         }
 
@@ -173,6 +175,7 @@ def retrieve_combined_documents_tool(
             "shia_count": 0,
             "sunni_count": 0,
             "total_count": 0,
+            "query_used": query,
             "error": str(e)
         }
 
@@ -231,6 +234,6 @@ def retrieve_quran_tafsir_tool(query: str, num_documents: int = 3) -> Dict[str, 
             "documents": [],
             "count": 0,
             "source": "quran_tafsir",
+            "query_used": query,
             "error": str(e)
         }
-

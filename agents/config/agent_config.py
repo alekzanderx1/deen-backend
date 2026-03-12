@@ -23,6 +23,13 @@ class RetrievalConfig(BaseModel):
         le=20,
         description="Number of Sunni documents to retrieve"
     )
+
+    quran_doc_count: int = Field(
+        default=3,
+        ge=0,
+        le=20,
+        description="Number of Quran/Tafsir documents to retrieve"
+    )
     
     reranking_enabled: bool = Field(
         default=True,
@@ -48,6 +55,7 @@ class RetrievalConfig(BaseModel):
             "example": {
                 "shia_doc_count": 5,
                 "sunni_doc_count": 2,
+                "quran_doc_count": 3,
                 "reranking_enabled": True,
                 "dense_weight": 0.8,
                 "sparse_weight": 0.2
@@ -131,7 +139,8 @@ class AgentConfig(BaseModel):
             "example": {
                 "retrieval": {
                     "shia_doc_count": 5,
-                    "sunni_doc_count": 2
+                    "sunni_doc_count": 2,
+                    "quran_doc_count": 3
                 },
                 "model": {
                     "agent_model": LARGE_LLM or "gpt-4o",
@@ -157,7 +166,6 @@ class AgentConfig(BaseModel):
 
 # Default configuration instance
 DEFAULT_AGENT_CONFIG = AgentConfig()
-
 
 
 

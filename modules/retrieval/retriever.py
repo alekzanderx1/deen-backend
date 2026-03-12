@@ -6,6 +6,14 @@ from core.utils import decompress_text
 import traceback
 
 
+def _require_index_name(index_name, env_var_name):
+    if not index_name or not str(index_name).strip():
+        raise ValueError(
+            f"{env_var_name} is not configured. Quran/Tafsir retrieval is unavailable until this Pinecone index name is set."
+        )
+    return index_name
+
+
 def retrieve_documents(query,no_of_docs=10):
     print("INSIDE retrive_documents")
     try:
@@ -82,9 +90,10 @@ def retrieve_quran_documents(query, no_of_docs=5):
     """
     print("INSIDE quran retrieve_documents")
     try:
+        index_name = _require_index_name(QURAN_DENSE_INDEX_NAME, "QURAN_DENSE_INDEX_NAME")
         query_vector = embedder.getDenseEmbedder().embed_query(query)
 
-        index = vectorstore_module._get_sparse_vectorstore(QURAN_DENSE_INDEX_NAME)
+        index = vectorstore_module._get_sparse_vectorstore(index_name)
         results = index.query(
             vector=query_vector,
             top_k=no_of_docs,
@@ -104,10 +113,13 @@ def retrieve_quran_documents(query, no_of_docs=5):
                 "quran_translation": quran_translation
             })
         return docs
+    except ValueError as e:
+        print(f"Error retrieving Quran documents: {e}")
+        raise
     except Exception as e:
         print(f"Error retrieving Quran documents: {e}")
         traceback.print_exc()
-        return []
+        raise
 
 
 """

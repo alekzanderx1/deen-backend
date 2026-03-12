@@ -16,33 +16,58 @@ def compact_format_references(retrieved_docs: list, max_chars: int = 1500) -> st
 
     lines = [header]
 
-    for idx, doc in enumerate(retrieved_docs, start=1):
-        try:
-            # Accept either plain dicts or LangChain Documents
-            if isinstance(doc, dict):
-                metadata = doc.get("metadata", {}) or {}
-                page_content_en = doc.get("page_content_en", "") or ""
-                quran_translation = doc.get("quran_translation", "") or ""
-            else:
-                metadata = getattr(doc, "metadata", {}) or {}
-                page_content_en = getattr(doc, "page_content_en", "") or getattr(doc, "page_content", "") or ""
-                quran_translation = getattr(doc, "quran_translation", "") or ""
+    grouped_docs = {
+        "Shia Hadith Sources": [],
+        "Sunni Hadith Sources": [],
+        "Quran and Tafsir Sources": [],
+    }
 
-            is_quran_doc = metadata.get("Type") == "Tafsir" or "surah_name" in metadata
+    for doc in retrieved_docs:
+        metadata = doc.get("metadata", {}) if isinstance(doc, dict) else getattr(doc, "metadata", {}) or {}
+        if _is_quran_doc(metadata):
+            grouped_docs["Quran and Tafsir Sources"].append(doc)
+            continue
 
-            if is_quran_doc:
-                block = _format_quran_reference(idx, metadata, page_content_en, quran_translation, max_chars)
-            else:
-                block = _format_hadith_reference(idx, metadata, page_content_en, max_chars)
+        sect = str(metadata.get("sect", "")).strip().lower()
+        if sect == "sunni":
+            grouped_docs["Sunni Hadith Sources"].append(doc)
+        else:
+            grouped_docs["Shia Hadith Sources"].append(doc)
 
-            lines.append("\n".join([ln for ln in block if ln is not None]))
+    reference_idx = 1
+    for section_title, docs in grouped_docs.items():
+        if not docs:
+            continue
 
-        except Exception as e:
-            print(f"Error formatting a reference: {e}")
-            traceback.print_exc()
-            lines.append("**Error formatting a reference. Skipping this item.**")
+        lines.append(f"\n**{section_title}:**")
+        for doc in docs:
+            try:
+                if isinstance(doc, dict):
+                    metadata = doc.get("metadata", {}) or {}
+                    page_content_en = doc.get("page_content_en", "") or ""
+                    quran_translation = doc.get("quran_translation", "") or ""
+                else:
+                    metadata = getattr(doc, "metadata", {}) or {}
+                    page_content_en = getattr(doc, "page_content_en", "") or getattr(doc, "page_content", "") or ""
+                    quran_translation = getattr(doc, "quran_translation", "") or ""
+
+                if _is_quran_doc(metadata):
+                    block = _format_quran_reference(reference_idx, metadata, page_content_en, quran_translation, max_chars)
+                else:
+                    block = _format_hadith_reference(reference_idx, metadata, page_content_en, max_chars)
+
+                lines.append("\n".join([ln for ln in block if ln is not None]))
+                reference_idx += 1
+            except Exception as e:
+                print(f"Error formatting a reference: {e}")
+                traceback.print_exc()
+                lines.append("**Error formatting a reference. Skipping this item.**")
 
     return "\n".join(lines)
+
+
+def _is_quran_doc(metadata):
+    return metadata.get("Type") == "Tafsir" or "surah_name" in metadata
 
 
 def _format_hadith_reference(idx, metadata, page_content_en, max_chars):

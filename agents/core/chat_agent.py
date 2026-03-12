@@ -1,118 +1,84 @@
 """
 LangGraph-based agentic chat agent for Islamic education.
 
-This agent autonomously decides which tools to use and when,
-replacing the hardcoded pipeline with intelligent decision-making.
+This agent plans retrieval iteratively so it can choose between
+Shia hadith, Sunni hadith, and Quran/Tafsir evidence per query.
 """
 
-from typing import Literal
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
-from langchain.chat_models import init_chat_model
-from langgraph.graph import StateGraph, END
-from langgraph.prebuilt import ToolNode
-from langgraph.checkpoint.memory import MemorySaver
+import json
+from typing import Any, Dict, List, Literal
 
-from agents.state.chat_state import ChatState
+from langchain.chat_models import init_chat_model
+from langchain_core.messages import HumanMessage, SystemMessage
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import END, StateGraph
+from langgraph.prebuilt import ToolNode
+
 from agents.config.agent_config import AgentConfig, DEFAULT_AGENT_CONFIG
 from agents.prompts.agent_prompts import (
     AGENT_SYSTEM_PROMPT,
+    EARLY_EXIT_FIQH,
     EARLY_EXIT_NON_ISLAMIC,
-    EARLY_EXIT_FIQH
 )
+from agents.state.chat_state import ChatState
 from agents.tools import (
     check_if_non_islamic_tool,
-    check_if_fiqh_tool,
-    translate_to_english_tool,
     enhance_query_tool,
+    retrieve_quran_tafsir_tool,
     retrieve_shia_documents_tool,
     retrieve_sunni_documents_tool,
-    retrieve_combined_documents_tool,
-    retrieve_quran_tafsir_tool
+    translate_to_english_tool,
 )
-from core.config import OPENAI_API_KEY
 from core import utils
+from core.config import OPENAI_API_KEY
 
 
 class ChatAgent:
     """
     LangGraph-based agentic chat system for Islamic education.
-    
-    The agent autonomously decides:
-    - Whether to classify the query
-    - Whether to translate
-    - Whether to enhance the query
-    - Which documents to retrieve
-    - When to generate the final response
     """
-    
+
     def __init__(self, config: AgentConfig = None):
-        """
-        Initialize the chat agent.
-        
-        Args:
-            config: Configuration for the agent (uses defaults if not provided)
-        """
         self.config = config or DEFAULT_AGENT_CONFIG
-        
-        # Initialize the LLM with tool binding
-        self.llm = self._create_llm_with_tools()
-        
-        # Build the graph
-        self.graph = self._build_graph()
-        
-        # Compile the graph with checkpointing
-        self.checkpointer = MemorySaver()
-        self.compiled_graph = self.graph.compile(checkpointer=self.checkpointer)
-    
-    def _create_llm_with_tools(self):
-        """Create LLM with tools bound."""
-        tools = [
+        self.tools = [
             check_if_non_islamic_tool,
-            check_if_fiqh_tool,
             translate_to_english_tool,
             enhance_query_tool,
             retrieve_shia_documents_tool,
             retrieve_sunni_documents_tool,
-            retrieve_combined_documents_tool,
-            retrieve_quran_tafsir_tool
+            retrieve_quran_tafsir_tool,
         ]
-        
+        self.llm = self._create_llm_with_tools()
+        self.graph = self._build_graph()
+        self.checkpointer = MemorySaver()
+        self.compiled_graph = self.graph.compile(checkpointer=self.checkpointer)
+
+    def _create_llm_with_tools(self):
         llm = init_chat_model(
             model=self.config.model.agent_model,
             openai_api_key=OPENAI_API_KEY,
             temperature=self.config.model.temperature,
-            max_tokens=self.config.model.max_tokens
+            max_tokens=self.config.model.max_tokens,
         )
-        
-        return llm.bind_tools(tools)
-    
+        return llm.bind_tools(self.tools)
+
     def _build_graph(self) -> StateGraph:
-        """Build the LangGraph StateGraph."""
-        
-        # Create the graph
         workflow = StateGraph(ChatState)
-        
-        # Add nodes
         workflow.add_node("fiqh_classification", self._fiqh_classification_node)
         workflow.add_node("agent", self._agent_node)
         workflow.add_node("tools", self._tool_node)
         workflow.add_node("generate_response", self._generate_response_node)
         workflow.add_node("check_early_exit", self._check_early_exit_node)
-        
-        # Set entry point to fiqh classification (mandatory check)
+
         workflow.set_entry_point("fiqh_classification")
-        
-        # Fiqh classification routes to either early exit or agent
         workflow.add_conditional_edges(
             "fiqh_classification",
             self._route_after_fiqh_check,
             {
                 "exit": "check_early_exit",
-                "continue": "agent"
-            }
+                "continue": "agent",
+            },
         )
-        
-        # Add conditional edges from agent
         workflow.add_conditional_edges(
             "agent",
             self._should_continue,
@@ -120,261 +86,168 @@ class ChatAgent:
                 "continue": "tools",
                 "generate": "generate_response",
                 "exit": "check_early_exit",
-                "end": END
-            }
+                "end": END,
+            },
         )
-        
-        # Tools go back to agent
         workflow.add_edge("tools", "agent")
-        
-        # Generate response ends
         workflow.add_edge("generate_response", END)
-        
-        # Check early exit ends
         workflow.add_edge("check_early_exit", END)
-        
         return workflow
-    
+
     def _fiqh_classification_node(self, state: ChatState) -> ChatState:
-        """
-        Mandatory fiqh classification node - runs before any other processing.
-        """
         print("[FIQH CLASSIFICATION NODE] Checking if query is fiqh-related")
-        
+
         try:
-            # Import the classifier function directly
             from modules.classification.classifier import classify_fiqh_query
-            
-            # Check if the query is fiqh-related
-            is_fiqh = classify_fiqh_query(state["user_query"], state["session_id"])
-            
+
+            is_fiqh = classify_fiqh_query(state["user_query"], state["runtime_session_id"])
             state["is_fiqh"] = is_fiqh
             state["classification_checked"] = True
-            
+
             if is_fiqh:
                 print("[FIQH CLASSIFICATION NODE] Query is fiqh-related - will exit early")
             else:
                 print("[FIQH CLASSIFICATION NODE] Query is not fiqh-related - continuing to agent")
-                
-        except Exception as e:
-            print(f"[FIQH CLASSIFICATION NODE] Error: {e}")
-            # If classification fails, default to False (allow the query to proceed)
+        except Exception as exc:
+            print(f"[FIQH CLASSIFICATION NODE] Error: {exc}")
             state["is_fiqh"] = False
             state["classification_checked"] = True
-            state["errors"].append(f"Fiqh classification error: {str(e)}")
-        
+            state["errors"].append(f"Fiqh classification error: {str(exc)}")
+
         return state
-    
+
     def _route_after_fiqh_check(self, state: ChatState) -> Literal["exit", "continue"]:
-        """
-        Route after fiqh classification.
-        """
         if state.get("is_fiqh"):
             print("[ROUTING] Fiqh query detected - routing to early exit")
             return "exit"
-        
+
         print("[ROUTING] Not a fiqh query - continuing to agent")
         return "continue"
-    
+
     def _agent_node(self, state: ChatState) -> ChatState:
-        """
-        Agent node - makes decisions about which tools to call.
-        """
         print(f"[AGENT NODE] Iteration {state['iterations']}")
-        
-        # Increment iterations
+
         state["iterations"] += 1
-        
-        # Check max iterations
         if state["iterations"] > self.config.max_iterations:
             print(f"[AGENT NODE] Max iterations reached ({self.config.max_iterations})")
             state["should_end"] = True
             state["errors"].append(f"Max iterations ({self.config.max_iterations}) reached")
             return state
-        
-        # Build messages for the agent
-        messages = state["messages"].copy()
-        
-        # Add system prompt if this is the first iteration
+
+        messages = list(state["messages"])
+
         if state["iterations"] == 1:
             messages.insert(0, SystemMessage(content=AGENT_SYSTEM_PROMPT))
-            
-            # Add the user query
-            user_message = f"User query: {state['user_query']}"
-            if state['target_language'] != "english":
-                user_message += f"\nUser's preferred language: {state['target_language']}"
-            
-            messages.append(HumanMessage(content=user_message))
-        
-        # Add context about what has been done so far
-        if state["iterations"] > 1:
-            context_parts = []
-            
-            if state.get("is_non_islamic") is not None:
-                context_parts.append(f"Classification: is_non_islamic={state['is_non_islamic']}")
-            
-            if state.get("is_fiqh") is not None:
-                context_parts.append(f"Classification: is_fiqh={state['is_fiqh']}")
-            
-            if state.get("enhanced_query"):
-                context_parts.append(f"Query enhanced: {state['enhanced_query']}")
-            
-            if state.get("retrieved_docs"):
-                context_parts.append(f"Documents retrieved: {len(state['retrieved_docs'])} docs")
-            
-            if context_parts:
-                context_msg = "Current state:\n" + "\n".join(context_parts)
-                messages.append(HumanMessage(content=context_msg))
-        
-        # Invoke the agent
+            messages.append(HumanMessage(content=self._build_initial_user_message(state)))
+        else:
+            messages.append(HumanMessage(content=self._build_iteration_summary(state)))
+
         try:
             response = self.llm.invoke(messages)
             state["messages"].append(response)
-            
-            print(f"[AGENT NODE] Agent response: {response.content if hasattr(response, 'content') else 'tool calls'}")
-            
-        except Exception as e:
-            print(f"[AGENT NODE] Error: {e}")
-            state["errors"].append(f"Agent error: {str(e)}")
+            if not getattr(response, "tool_calls", None) and self._has_any_documents(state):
+                state["ready_to_answer"] = True
+            print(
+                "[AGENT NODE] Agent response:",
+                response.content if hasattr(response, "content") else "tool calls",
+            )
+        except Exception as exc:
+            print(f"[AGENT NODE] Error: {exc}")
+            state["errors"].append(f"Agent error: {str(exc)}")
             state["should_end"] = True
-        
+
         return state
-    
+
     def _tool_node(self, state: ChatState) -> ChatState:
-        """
-        Tool execution node - executes the tools selected by the agent.
-        """
         print("[TOOL NODE] Executing tools")
-        
-        # Get the last message (should have tool calls)
-        last_message = state["messages"][-1]
-        
-        if not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
+        last_message = state["messages"][-1] if state["messages"] else None
+
+        if last_message is None or not getattr(last_message, "tool_calls", None):
             print("[TOOL NODE] No tool calls found")
             return state
-        
-        # Create tool node and execute
-        tool_node = ToolNode([
-            check_if_non_islamic_tool,
-            check_if_fiqh_tool,
-            translate_to_english_tool,
-            enhance_query_tool,
-            retrieve_shia_documents_tool,
-            retrieve_sunni_documents_tool,
-            retrieve_combined_documents_tool,
-            retrieve_quran_tafsir_tool
-        ])
-        
-        # Execute tools
+
+        self._apply_tool_call_defaults(state, last_message.tool_calls)
+        tool_node = ToolNode(self.tools)
         result = tool_node.invoke(state)
-        
-        # Update state based on tool results
-        for message in result.get("messages", []):
-            if hasattr(message, "name"):
-                tool_name = message.name
-                content = message.content
-                
-                print(f"[TOOL NODE] Tool {tool_name} result: {content[:200] if isinstance(content, str) else content}")
-                
-                # Update state based on tool results
-                if tool_name == "check_if_non_islamic_tool":
-                    try:
-                        import json
-                        result_data = json.loads(content) if isinstance(content, str) else content
-                        state["is_non_islamic"] = result_data.get("is_non_islamic", False)
-                        state["classification_checked"] = True
-                    except:
-                        pass
-                
-                elif tool_name == "check_if_fiqh_tool":
-                    try:
-                        import json
-                        result_data = json.loads(content) if isinstance(content, str) else content
-                        state["is_fiqh"] = result_data.get("is_fiqh", False)
-                        state["classification_checked"] = True
-                    except:
-                        pass
-                
-                elif tool_name == "enhance_query_tool":
-                    try:
-                        import json
-                        result_data = json.loads(content) if isinstance(content, str) else content
-                        state["enhanced_query"] = result_data.get("enhanced_query", state["user_query"])
-                        state["query_enhanced"] = True
-                    except:
-                        pass
-                
-                elif tool_name in ["retrieve_shia_documents_tool", "retrieve_sunni_documents_tool", "retrieve_combined_documents_tool", "retrieve_quran_tafsir_tool"]:
-                    try:
-                        import json
-                        result_data = json.loads(content) if isinstance(content, str) else content
-                        docs = result_data.get("documents", [])
+        result_messages = result.get("messages", [])
 
-                        if result_data.get("source") == "quran_tafsir":
-                            state["quran_docs"].extend(docs)
-                            state["quran_docs_count"] = result_data.get("count", 0)
-                        else:
-                            state["retrieved_docs"].extend(docs)
-                            if "shia_count" in result_data:
-                                state["shia_docs_count"] = result_data["shia_count"]
-                            if "sunni_count" in result_data:
-                                state["sunni_docs_count"] = result_data["sunni_count"]
-                            if result_data.get("source") == "shia":
-                                state["shia_docs_count"] = result_data.get("count", 0)
-                            if result_data.get("source") == "sunni":
-                                state["sunni_docs_count"] = result_data.get("count", 0)
+        for message in result_messages:
+            if not hasattr(message, "name"):
+                continue
 
-                        state["retrieval_completed"] = True
-                    except Exception as e:
-                        print(f"[TOOL NODE] Error processing retrieval result: {e}")
-        
-        # Merge tool messages from result into state and return state
-        # This preserves our state updates while keeping the tool response messages
-        state["messages"] = result.get("messages", state["messages"])
+            tool_name = message.name
+            result_data = self._parse_tool_payload(message.content)
+            print(f"[TOOL NODE] Tool {tool_name} result: {str(result_data)[:200]}")
+
+            if tool_name == "check_if_non_islamic_tool":
+                state["is_non_islamic"] = result_data.get("is_non_islamic", False)
+                state["classification_checked"] = True
+                continue
+
+            if tool_name == "translate_to_english_tool":
+                translated_text = result_data.get("translated_text") or state["working_query"]
+                original_text = result_data.get("original_text") or state["working_query"]
+                source_language = (result_data.get("source_language") or "").strip().lower()
+                state["working_query"] = translated_text
+                state["is_translated"] = bool(source_language and source_language != "english")
+                state["original_language"] = source_language or None
+                if translated_text != original_text:
+                    state["enhanced_query"] = translated_text
+                continue
+
+            if tool_name == "enhance_query_tool":
+                enhanced_query = result_data.get("enhanced_query") or state["working_query"]
+                state["enhanced_query"] = enhanced_query
+                state["query_enhanced"] = True
+                state["working_query"] = enhanced_query
+                continue
+
+            if tool_name in {
+                "retrieve_shia_documents_tool",
+                "retrieve_sunni_documents_tool",
+                "retrieve_quran_tafsir_tool",
+            }:
+                self._record_retrieval_result(state, result_data, tool_name)
+
+        if result_messages:
+            state["messages"].extend(result_messages)
         return state
-    
+
     def _generate_response_node(self, state: ChatState) -> ChatState:
-        """
-        Generate the final response based on retrieved documents.
-        """
         print("[GENERATE RESPONSE NODE] Generating final response")
-        
-        # Format references (include quran docs for non-streaming invoke path)
+
         all_docs = state["retrieved_docs"] + state.get("quran_docs", [])
         references = utils.compact_format_references(all_docs)
-        
-        # Create generation prompt
         generation_messages = [
             SystemMessage(content=AGENT_SYSTEM_PROMPT),
-            HumanMessage(content=f"""User query: {state['user_query']}
+            HumanMessage(
+                content=f"""User query: {state['user_query']}
 
 Retrieved references:
 {references}
 
-Generate a comprehensive, accurate response that directly addresses the user's question using the retrieved sources. Cite specific books, hadith numbers, and scholars when referencing the sources.""")
+Generate a comprehensive, accurate response that directly addresses the user's question using the retrieved sources. Cite specific books, hadith numbers, and scholars when referencing the sources."""
+            ),
         ]
-        
-        # Generate response (non-streaming for now in the graph)
+
         try:
             from core.chat_models import get_generator_model
+
             llm = get_generator_model()
             response = llm.invoke(generation_messages)
             state["final_response"] = response.content
             state["response_generated"] = True
             print(f"[GENERATE RESPONSE NODE] Response generated: {len(response.content)} chars")
-        except Exception as e:
-            print(f"[GENERATE RESPONSE NODE] Error: {e}")
-            state["errors"].append(f"Response generation error: {str(e)}")
+        except Exception as exc:
+            print(f"[GENERATE RESPONSE NODE] Error: {exc}")
+            state["errors"].append(f"Response generation error: {str(exc)}")
             state["final_response"] = "I apologize, but I encountered an error generating the response."
-        
+
         return state
-    
+
     def _check_early_exit_node(self, state: ChatState) -> ChatState:
-        """
-        Handle early exit scenarios (non-Islamic or fiqh queries).
-        """
         print("[CHECK EARLY EXIT NODE]")
-        
+
         if state.get("is_non_islamic"):
             state["final_response"] = EARLY_EXIT_NON_ISLAMIC
             state["early_exit_message"] = EARLY_EXIT_NON_ISLAMIC
@@ -383,52 +256,210 @@ Generate a comprehensive, accurate response that directly addresses the user's q
             state["early_exit_message"] = EARLY_EXIT_FIQH
         else:
             state["final_response"] = "Unable to process the query."
-        
+
         return state
-    
+
     def _should_continue(self, state: ChatState) -> Literal["continue", "generate", "exit", "end"]:
-        """
-        Decide the next step based on the current state.
-        """
-        # Check for early exit conditions
         if state.get("is_non_islamic") or state.get("is_fiqh"):
             print("[ROUTING] Early exit: non-Islamic or fiqh query")
             return "exit"
-        
-        # Check if should end
+
         if state.get("should_end"):
             print("[ROUTING] Should end flag set")
             return "end"
-        
-        # Check the last message
+
         last_message = state["messages"][-1] if state["messages"] else None
-        
         if last_message is None:
             print("[ROUTING] No messages, ending")
             return "end"
-        
-        # If agent called tools, continue to tool execution
-        if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+
+        if getattr(last_message, "tool_calls", None):
             print(f"[ROUTING] Continue to tools: {len(last_message.tool_calls)} tool calls")
             return "continue"
-        
-        # If we have retrieved docs, generate response (or end for streaming mode)
-        if state.get("retrieval_completed") and (state.get("retrieved_docs") or state.get("quran_docs")):
+
+        if state.get("ready_to_answer") and self._has_any_documents(state):
             if state.get("streaming_mode"):
-                print("[ROUTING] Documents retrieved, streaming_mode=True - ending for pipeline to stream")
+                print("[ROUTING] Agent marked evidence sufficient - ending for streaming")
                 return "end"
-            print("[ROUTING] Documents retrieved, generate response")
+            print("[ROUTING] Agent marked evidence sufficient - generating response")
             return "generate"
-        
-        # If no tool calls and no response ready, we might be done
-        # This handles cases where the agent decides it's done without calling more tools
-        if state["iterations"] > 1:
-            print("[ROUTING] No more tool calls, ending")
-            return "end"
-        
-        # Default: continue
-        print("[ROUTING] Default: continue")
-        return "continue"
+
+        if self._has_any_documents(state):
+            if state.get("streaming_mode"):
+                print("[ROUTING] Agent stopped after retrieval - ending for streaming")
+                return "end"
+            print("[ROUTING] Agent stopped after retrieval - generating response")
+            return "generate"
+
+        print("[ROUTING] No evidence available - ending")
+        return "end"
+
+    def _build_initial_user_message(self, state: ChatState) -> str:
+        retrieval_config = self._get_retrieval_config(state)
+        parts = [
+            f"User query: {state['user_query']}",
+            f"Working query: {state['working_query']}",
+            f"Runtime session key: {state['runtime_session_id']}",
+            (
+                "Default retrieval counts: "
+                f"Shia={retrieval_config.get('shia_doc_count', self.config.retrieval.shia_doc_count)}, "
+                f"Sunni={retrieval_config.get('sunni_doc_count', self.config.retrieval.sunni_doc_count)}, "
+                f"Quran/Tafsir={retrieval_config.get('quran_doc_count', self.config.retrieval.quran_doc_count)}"
+            ),
+        ]
+        if state["target_language"] != "english":
+            parts.append(f"User's preferred language: {state['target_language']}")
+        return "\n".join(parts)
+
+    def _build_iteration_summary(self, state: ChatState) -> str:
+        attempts = state.get("retrieval_attempts", [])
+        attempt_lines = []
+        for attempt in attempts[-5:]:
+            status = "ok" if attempt.get("success") else "failed"
+            attempt_lines.append(
+                f"- source={attempt.get('source')} status={status} count={attempt.get('count', 0)} query={attempt.get('query_used')}"
+            )
+
+        coverage = state.get("source_coverage", {})
+        lines = [
+            "Current evidence summary:",
+            f"- working_query={state.get('working_query')}",
+            f"- translated={state.get('is_translated')}",
+            f"- query_enhanced={state.get('query_enhanced')}",
+            f"- shia_docs={state.get('shia_docs_count', 0)}",
+            f"- sunni_docs={state.get('sunni_docs_count', 0)}",
+            f"- quran_docs={state.get('quran_docs_count', 0)}",
+            (
+                "- source_coverage="
+                f"shia:{coverage.get('shia', False)}, "
+                f"sunni:{coverage.get('sunni', False)}, "
+                f"quran_tafsir:{coverage.get('quran_tafsir', False)}"
+            ),
+        ]
+        if attempt_lines:
+            lines.append("Recent retrieval attempts:")
+            lines.extend(attempt_lines)
+        lines.append(
+            "If evidence is sufficient, stop calling tools. If it is incomplete, call another tool or revise the retrieval query."
+        )
+        return "\n".join(lines)
+
+    def _apply_tool_call_defaults(self, state: ChatState, tool_calls: List[Dict[str, Any]]) -> None:
+        retrieval_config = self._get_retrieval_config(state)
+        for tool_call in tool_calls:
+            if not isinstance(tool_call, dict):
+                continue
+
+            tool_name = tool_call.get("name")
+            args = tool_call.setdefault("args", {})
+            if tool_name == "check_if_non_islamic_tool":
+                args.setdefault("query", state["working_query"])
+                args.setdefault("session_id", state["runtime_session_id"])
+            elif tool_name == "translate_to_english_tool":
+                args.setdefault("text", state["working_query"])
+            elif tool_name == "enhance_query_tool":
+                args.setdefault("query", state["working_query"])
+                args.setdefault("session_id", state["runtime_session_id"])
+            elif tool_name == "retrieve_shia_documents_tool":
+                args.setdefault("query", state["working_query"])
+                args.setdefault("num_documents", retrieval_config.get("shia_doc_count", self.config.retrieval.shia_doc_count))
+            elif tool_name == "retrieve_sunni_documents_tool":
+                args.setdefault("query", state["working_query"])
+                args.setdefault("num_documents", retrieval_config.get("sunni_doc_count", self.config.retrieval.sunni_doc_count))
+            elif tool_name == "retrieve_quran_tafsir_tool":
+                args.setdefault("query", state["working_query"])
+                args.setdefault("num_documents", retrieval_config.get("quran_doc_count", self.config.retrieval.quran_doc_count))
+
+    def _record_retrieval_result(self, state: ChatState, result_data: Dict[str, Any], tool_name: str) -> None:
+        source = result_data.get("source") or tool_name.replace("retrieve_", "").replace("_tool", "")
+        docs = result_data.get("documents", []) or []
+        query_used = result_data.get("query_used") or state["working_query"]
+        error = result_data.get("error")
+        count = result_data.get("count", len(docs))
+
+        state["retrieval_attempts"].append(
+            {
+                "source": source,
+                "query_used": query_used,
+                "count": count,
+                "success": bool(docs) and not error,
+                "error": error,
+            }
+        )
+        state["retrieval_completed"] = True
+        state["ready_to_answer"] = False
+
+        if error:
+            state["errors"].append(f"{source} retrieval error: {error}")
+
+        if source == "quran_tafsir":
+            state["quran_docs"] = self._merge_documents(state["quran_docs"], docs, "chunk_id")
+        else:
+            state["retrieved_docs"] = self._merge_documents(state["retrieved_docs"], docs, "hadith_id")
+
+        coverage = state.get("source_coverage", {})
+        coverage[source] = coverage.get(source, False) or bool(docs)
+        state["source_coverage"] = coverage
+        self._refresh_source_counts(state)
+
+    def _refresh_source_counts(self, state: ChatState) -> None:
+        shia_count = 0
+        sunni_count = 0
+        for doc in state.get("retrieved_docs", []):
+            metadata = doc.get("metadata", {}) or {}
+            sect = str(metadata.get("sect", "")).strip().lower()
+            if sect == "shia":
+                shia_count += 1
+            elif sect == "sunni":
+                sunni_count += 1
+
+        state["shia_docs_count"] = shia_count
+        state["sunni_docs_count"] = sunni_count
+        state["quran_docs_count"] = len(state.get("quran_docs", []))
+
+    def _merge_documents(
+        self,
+        existing_docs: List[Dict[str, Any]],
+        new_docs: List[Dict[str, Any]],
+        primary_id_key: str,
+    ) -> List[Dict[str, Any]]:
+        merged: List[Dict[str, Any]] = []
+        seen_ids = set()
+
+        def stable_id(doc: Dict[str, Any]) -> str:
+            metadata = doc.get("metadata", {}) or {}
+            value = doc.get(primary_id_key) or metadata.get(primary_id_key)
+            if value:
+                return str(value)
+            fallback = metadata.get("reference") or metadata.get("title") or doc.get("page_content_en", "")
+            return str(fallback)[:250]
+
+        for doc in existing_docs + list(new_docs or []):
+            if not isinstance(doc, dict):
+                continue
+            identifier = stable_id(doc)
+            if identifier in seen_ids:
+                continue
+            seen_ids.add(identifier)
+            merged.append(doc)
+
+        return merged
+
+    def _get_retrieval_config(self, state: ChatState) -> Dict[str, Any]:
+        return (state.get("config") or {}).get("retrieval", {})
+
+    def _parse_tool_payload(self, content: Any) -> Dict[str, Any]:
+        if isinstance(content, dict):
+            return content
+        if isinstance(content, str):
+            try:
+                return json.loads(content)
+            except json.JSONDecodeError:
+                return {"raw": content}
+        return {}
+
+    def _has_any_documents(self, state: ChatState) -> bool:
+        return bool(state.get("retrieved_docs") or state.get("quran_docs"))
 
     @staticmethod
     def _load_runtime_messages(session_id: str):
@@ -437,26 +468,19 @@ Generate a comprehensive, accurate response that directly addresses the user's q
 
             history = make_history(session_id)
             return history.messages
-        except Exception as e:
-            print(f"[CHAT AGENT] Failed to load history for session {session_id}: {e}")
+        except Exception as exc:
+            print(f"[CHAT AGENT] Failed to load history for session {session_id}: {exc}")
             return []
-    
-    def invoke(self, user_query: str, session_id: str, target_language: str = "english", config: dict = None):
-        """
-        Invoke the agent with a user query.
-        
-        Args:
-            user_query: The user's question
-            session_id: Session identifier
-            target_language: User's preferred language
-            config: Optional configuration overrides
-            
-        Returns:
-            Final state after agent execution
-        """
+
+    def invoke(
+        self,
+        user_query: str,
+        session_id: str,
+        target_language: str = "english",
+        config: dict = None,
+    ):
         from agents.state.chat_state import create_initial_state
-        
-        # Create initial state
+
         initial_state = create_initial_state(
             user_query=user_query,
             session_id=session_id,
@@ -464,32 +488,23 @@ Generate a comprehensive, accurate response that directly addresses the user's q
             config=config or self.config.to_dict(),
             initial_messages=self._load_runtime_messages(session_id),
         )
-        
-        # Run the graph
+
         final_state = self.compiled_graph.invoke(
             initial_state,
-            config={"configurable": {"thread_id": session_id}}
+            config={"configurable": {"thread_id": session_id}},
         )
-        
         return final_state
-    
-    async def astream(self, user_query: str, session_id: str, target_language: str = "english", config: dict = None, streaming_mode: bool = False):
-        """
-        Stream the agent execution.
-        
-        Args:
-            user_query: The user's question
-            session_id: Session identifier
-            target_language: User's preferred language
-            config: Optional configuration overrides
-            streaming_mode: When True, graph skips generate_response so pipeline can stream tokens
-            
-        Yields:
-            State updates as the agent runs
-        """
+
+    async def astream(
+        self,
+        user_query: str,
+        session_id: str,
+        target_language: str = "english",
+        config: dict = None,
+        streaming_mode: bool = False,
+    ):
         from agents.state.chat_state import create_initial_state
-        
-        # Create initial state
+
         initial_state = create_initial_state(
             user_query=user_query,
             session_id=session_id,
@@ -498,13 +513,9 @@ Generate a comprehensive, accurate response that directly addresses the user's q
             initial_messages=self._load_runtime_messages(session_id),
             streaming_mode=streaming_mode,
         )
-        
-        # Stream the graph
+
         async for event in self.compiled_graph.astream(
             initial_state,
-            config={"configurable": {"thread_id": session_id}}
+            config={"configurable": {"thread_id": session_id}},
         ):
             yield event
-
-
-

@@ -20,7 +20,7 @@ The agentic chatbot is a LangGraph-based orchestration layer on top of the exist
 At a high level, it does four things:
 
 1. Receives a chat request from `/chat/stream/agentic` or `/chat/agentic`.
-2. Runs a LangGraph workflow that decides whether to stop early or retrieve source material.
+2. Runs a LangGraph workflow that decides whether to stop early, reformulate the working query, or retrieve source material.
 3. Generates a final answer from retrieved references.
 4. Streams or returns the answer, plus structured references and persistence side effects.
 
@@ -31,6 +31,13 @@ The agent is not a fully autonomous free-form multi-agent system. It is a single
 - a mandatory fiqh gate in front of the agent,
 - an early-exit node,
 - and a final-response node used only for non-streaming mode.
+
+The current design goal is:
+
+- always answer from the Twelver Shia perspective,
+- default to Shia-first retrieval,
+- add Sunni and/or Quran/Tafsir retrieval only when the query and current evidence make that useful,
+- and use transcript memory explicitly rather than relying on implicit history writes during generation.
 
 ## 2. Entry Points
 
@@ -82,7 +89,7 @@ flowchart TD
     H -->|not fiqh| J[Agent node]
     J -->|tool calls| K[Tool node]
     K --> J
-    J -->|retrieval complete| L[Graph ends in streaming mode]
+    J -->|agent decides evidence is sufficient| L[Graph ends in streaming mode]
     J -->|non-streaming only| M[Generate response node]
     L --> N[Pipeline-level response streaming]
     M --> O[JSON response]
@@ -115,7 +122,9 @@ Important fields:
 
 - conversation inputs:
   - `user_query`
+  - `working_query`
   - `session_id`
+  - `runtime_session_id`
   - `target_language`
   - `messages`
 - classification:
@@ -130,6 +139,9 @@ Important fields:
 - retrieval:
   - `retrieved_docs`
   - `quran_docs`
+  - `retrieval_attempts`
+  - `source_coverage`
+  - `ready_to_answer`
   - `shia_docs_count`
   - `sunni_docs_count`
   - `quran_docs_count`
@@ -151,13 +163,16 @@ Important fields:
 The agent binds these tools:
 
 - `check_if_non_islamic_tool`
-- `check_if_fiqh_tool`
 - `translate_to_english_tool`
 - `enhance_query_tool`
 - `retrieve_shia_documents_tool`
 - `retrieve_sunni_documents_tool`
-- `retrieve_combined_documents_tool`
 - `retrieve_quran_tafsir_tool`
+
+Notably:
+
+- fiqh classification is no longer exposed to the agent as a bound tool because it is already hard-gated before the agent node,
+- and combined retrieval is not bound to the agent anymore so it must choose Shia, Sunni, and Quran/Tafsir retrieval deliberately.
 
 ### 4.4 Retrieval / generation modules
 
@@ -184,6 +199,8 @@ There are two different memory mechanisms:
    - loaded with `make_history(session_id)`
    - used by enhancement and final generation
    - optionally hydrated from the SQL DB for authenticated users
+
+For the streaming agentic endpoint, runtime history is now appended explicitly after the streamed answer finishes instead of being written implicitly by `RunnableWithMessageHistory`.
 
 These are separate concerns.
 
@@ -226,8 +243,9 @@ flowchart TD
 - The graph loops `agent -> tools -> agent` until:
   - the agent decides to stop,
   - early-exit conditions are hit,
-  - retrieval has completed,
   - or max iterations is reached.
+
+The important nuance is that retrieval does not automatically stop the loop anymore. The agent sees structured summaries of the current evidence and decides whether to search again, switch sources, or stop.
 
 ## 6. Node-by-Node Behavior
 
@@ -258,8 +276,13 @@ It:
 2. stops if `iterations > max_iterations`,
 3. builds the message list,
 4. inserts the system prompt on the first iteration,
-5. adds the user query as a `HumanMessage`,
-6. on later iterations, injects a synthetic state summary,
+5. adds the user query, runtime session key, and default retrieval counts as a `HumanMessage`,
+6. on later iterations, injects a synthetic state summary with:
+   - `working_query`
+   - translation / enhancement flags
+   - source coverage
+   - retrieved document counts
+   - recent retrieval attempts and query strings used
 7. invokes the bound tool-calling LLM.
 
 The system prompt is `AGENT_SYSTEM_PROMPT` from `agents/prompts/agent_prompts.py`.
@@ -271,6 +294,12 @@ Important detail:
 
 So the agent starts with real prior conversation context, not just the current turn.
 
+Also:
+
+- the agent is instructed to retrieve Shia sources first by default,
+- use source-specific query construction,
+- and only stop calling tools once it believes the evidence is sufficient.
+
 ### 6.3 `tools`
 
 This node runs a LangGraph `ToolNode` over the tool calls requested by the last AI message.
@@ -280,13 +309,17 @@ It also parses tool results back into the shared `ChatState`.
 Current state updates handled in code:
 
 - non-Islamic classifier -> `is_non_islamic`
-- fiqh classifier -> `is_fiqh`
-- enhancement -> `enhanced_query`, `query_enhanced`
-- retrieval tools -> `retrieved_docs`, `quran_docs`, counts, `retrieval_completed`
+- translation -> `working_query`, `is_translated`, `original_language`
+- enhancement -> `enhanced_query`, `query_enhanced`, `working_query`
+- retrieval tools -> `retrieved_docs`, `quran_docs`, counts, `retrieval_completed`, `retrieval_attempts`, `source_coverage`
 
 Important implementation detail:
 
-- tool result messages replace `state["messages"]` at the end of this node using `result.get("messages", state["messages"])`
+- tool call arguments are defaulted from runtime state before execution, including:
+  - `session_id` for classification/enhancement,
+  - `working_query` for retrieval,
+  - configured per-source document counts when the model omits them
+- tool result messages are appended back into `state["messages"]`
 - the tool node does not directly generate user-facing text
 
 ### 6.4 `generate_response`
@@ -329,14 +362,15 @@ It checks, in order:
 2. `should_end`
 3. whether there is a last message
 4. whether the last agent message contains tool calls
-5. whether retrieval has completed and documents exist
-6. whether the graph should stop because there are no more tool calls after multiple iterations
+5. whether `ready_to_answer` is true and documents exist
+6. whether documents exist even if `ready_to_answer` is false
+7. otherwise, it ends without generation
 
 Important streaming-specific rule:
 
-- if retrieval is complete and `streaming_mode=True`, the graph returns `end` instead of `generate`
+- if the agent stops after retrieving documents and `streaming_mode=True`, the graph returns `end` instead of `generate`
 
-That is how streaming mode avoids generating the answer inside the graph.
+That is how streaming mode avoids generating the answer inside the graph while still allowing multiple retrieval rounds before stopping.
 
 ## 8. How Streaming Actually Works
 
@@ -348,7 +382,7 @@ The current implementation is hybrid:
 2. `core/pipeline_langgraph.py` converts those updates into SSE status events.
 3. After the graph finishes, the pipeline inspects the final state.
 4. If an early exit was set, it emits that as a single `response_chunk`.
-5. Otherwise, it performs final answer generation outside the graph using a generator chain.
+5. Otherwise, it performs final answer generation outside the graph using a generator chain fed with explicit runtime history.
 
 ### Streaming generation path
 
@@ -357,13 +391,16 @@ After graph completion, `chat_pipeline_streaming_agentic(...)` does this:
 1. collect `retrieved_docs + quran_docs`,
 2. format them using `core.utils.compact_format_references(...)`,
 3. build `prompt_templates.generator_prompt_template | chat_models.get_generator_model()`,
-4. wrap that chain with `with_redis_history(...)`,
+4. load runtime history explicitly with `make_history(runtime_session_id).messages`,
 5. stream chunks from the model,
 6. emit each token as an SSE `response_chunk`,
-7. emit references as separate SSE events,
-8. emit `done`.
+7. append the final user/assistant turn back into runtime history exactly once,
+8. emit references as separate SSE events,
+9. emit `done`.
 
 So the graph is mainly responsible for orchestration and retrieval readiness, while the final token stream is handled by the outer pipeline.
+
+If no usable documents were retrieved, the pipeline now chooses a fallback message based on recorded retrieval errors. For example, Quran/Tafsir configuration failures produce a source-unavailable fallback instead of a generic “not enough information” message.
 
 ## 9. SSE Contract
 
@@ -384,7 +421,7 @@ Event types:
 Sent for:
 
 - each node reached,
-- each tool observed in the graph messages.
+- each distinct tool call observed in the graph messages.
 
 Examples:
 
@@ -453,6 +490,11 @@ Quran retrieval is different:
 
 That is why the graph stores Quran docs separately in `quran_docs`.
 
+Current implementation note:
+
+- `retrieve_quran_documents(...)` now validates that `QURAN_DENSE_INDEX_NAME` is configured before querying Pinecone.
+- If that config value is missing, the tool returns a clean retrieval error instead of surfacing a low-level Pinecone type error.
+
 ## 11. Prompt and Model Architecture
 
 ### Agent model
@@ -492,7 +534,6 @@ This is different from the graph's non-streaming `generate_response` node, which
 
 - `make_history(session_id)`
 - `trim_history(...)`
-- `with_redis_history(...)`
 
 Behavior:
 
@@ -503,7 +544,7 @@ This history is used in multiple places:
 
 - to seed the agent's initial messages,
 - by the enhancement module,
-- by the streaming generator chain.
+- as explicit input to the streaming generator chain.
 
 ### SQL persistence
 
@@ -521,8 +562,7 @@ Flow for authenticated streaming requests:
 3. `wrap_streaming_response_for_persistence(...)`
    - captures the streamed answer,
    - reconstructs it from SSE,
-   - persists the assistant message in SQL,
-   - optionally appends the turn back into runtime history
+   - persists the assistant message in SQL.
 
 ### Runtime session scoping
 
@@ -554,11 +594,12 @@ The current code actively uses:
 - `model.temperature`
 - `model.max_tokens`
 - `max_iterations`
+- `retrieval.shia_doc_count`
+- `retrieval.sunni_doc_count`
+- `retrieval.quran_doc_count`
 
 The current code stores but does not meaningfully enforce:
 
-- `retrieval.shia_doc_count`
-- `retrieval.sunni_doc_count`
 - `retrieval.reranking_enabled`
 - `retrieval.dense_weight`
 - `retrieval.sparse_weight`
@@ -582,30 +623,34 @@ Consequence:
 - fiqh questions never go through normal retrieval/generation,
 - they are intercepted before the agent loop.
 
-### 14.2 The bound `check_if_fiqh_tool` is mostly redundant
+### 14.2 The agent toolset is now intentionally narrower
 
-The graph already performs a mandatory fiqh check before the agent node.
+The graph already performs a mandatory fiqh check before the agent node, so the agent no longer binds `check_if_fiqh_tool`.
 
-The tool is still bound, but the main fiqh-routing logic does not depend on it.
+Also, combined retrieval is no longer bound. The agent must choose:
 
-### 14.3 Translation support is only partially wired
+- Shia retrieval,
+- Sunni retrieval,
+- Quran/Tafsir retrieval,
 
-The agent can call `translate_to_english_tool`, but the tool node does not currently write translation results back into:
+explicitly and iteratively.
 
-- `user_query`
+### 14.3 Translation support is now state-aware
+
+If the agent calls `translate_to_english_tool`, the tool node now writes the result into:
+
+- `working_query`
 - `is_translated`
 - `original_language`
 
-So translation exists as a tool contract, but its result is not integrated into downstream state-driven behavior.
-
-Also, `translate_response_tool` exists in `agents/tools/translation_tools.py`, but it is not bound into the agent's tool list.
+Downstream retrieval defaults to `working_query`, so translation affects actual retrieval behavior.
 
 ### 14.4 Streaming and non-streaming generation are different code paths
 
 Streaming mode:
 
 - graph stops after retrieval,
-- answer generation happens outside the graph using `generator_prompt_template`.
+- answer generation happens outside the graph using `generator_prompt_template` and explicit chat history input.
 
 Non-streaming mode:
 
@@ -632,13 +677,15 @@ The route layer decides whether to:
 
 That means persistence concerns are not isolated inside the graph itself.
 
-### 14.7 Possible duplicate runtime-history writes in authenticated streaming
+### 14.7 Duplicate runtime-history writes in authenticated streaming were removed
 
-In streaming mode, final generation is wrapped with `RunnableWithMessageHistory`, which typically writes the user/assistant turn to Redis history.
+Streaming generation is no longer wrapped with `RunnableWithMessageHistory`.
 
-The authenticated route also passes an `on_assistant_message_saved` callback that appends the same turn back into runtime history after SQL persistence.
+Instead:
 
-This suggests a risk of duplicated runtime-history entries unless the underlying LangChain history wrapper is intentionally configured to avoid that.
+- the pipeline loads runtime history explicitly,
+- streams the final answer,
+- and appends the final turn to runtime history exactly once.
 
 ## 15. Typical Request Lifecycle
 
@@ -653,8 +700,8 @@ the expected path is:
 3. graph starts
 4. `fiqh_classification` returns false
 5. `agent` decides what tools to call
-6. `tools` executes enhancement and retrieval tools
-7. `agent` sees retrieval state and stops
+6. `tools` executes enhancement / translation / retrieval tools
+7. `agent` sees structured retrieval state and either searches again or stops
 8. outer pipeline streams the final answer with generator prompt
 9. hadith and Quran references are emitted separately
 10. final answer is persisted if authenticated
@@ -702,15 +749,17 @@ If you need to change a specific concern, start here:
 
 The current agentic chatbot is best understood as:
 
-- a LangGraph retrieval orchestrator,
+- a LangGraph retrieval orchestrator with explicit retrieval planning,
 - fronted by a hard-coded fiqh safety gate,
-- backed by tool-based classification/enhancement/retrieval,
+- backed by tool-based classification / translation / enhancement / retrieval,
 - with final answer generation performed outside the graph in streaming mode,
 - and with conversation context split across LangGraph checkpoints, Redis history, and SQL persistence.
 
 That structure works, but it also means the system has some intentional and unintentional asymmetry:
 
 - streaming and non-streaming modes do not generate answers the same way,
-- config is only partially enforced,
-- translation is only partially connected,
+- config is only partially enforced outside per-source doc counts,
+- runtime history is now handled explicitly in streaming mode,
+- translation is connected to retrieval via `working_query`,
+- Quran/Tafsir retrieval depends on `QURAN_DENSE_INDEX_NAME` being configured,
 - and persistence is implemented outside the graph rather than inside it.
