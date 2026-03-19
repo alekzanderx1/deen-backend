@@ -26,7 +26,8 @@ def delete_user_data(user_id: str, db: Session) -> dict:
     2. memory_consolidations (references user_memory_profiles)
     3. user_memory_profiles (has user_id)
     4. user_progress (has user_id)
-    5. users table (optional, if user exists there)
+    5. chat_sessions/chat_messages (has user_id; messages cascade)
+    6. users table (optional, if user exists there)
     
     Args:
         user_id: The Cognito sub (UUID) of the user to delete
@@ -44,6 +45,7 @@ def delete_user_data(user_id: str, db: Session) -> dict:
             "memory_consolidations": 0,
             "user_memory_profiles": 0,
             "user_progress": 0,
+            "chat_sessions": 0,
             "users": 0
         }
         
@@ -86,8 +88,15 @@ def delete_user_data(user_id: str, db: Session) -> dict:
             {"user_id": user_id}
         )
         deleted_counts["user_progress"] = result.rowcount
+
+        # Step 6: Delete saved chat sessions (chat_messages cascade via FK)
+        result = db.execute(
+            text("DELETE FROM chat_sessions WHERE user_id = :user_id"),
+            {"user_id": user_id}
+        )
+        deleted_counts["chat_sessions"] = result.rowcount
         
-        # Step 6: Delete from users table (if exists)
+        # Step 7: Delete from users table (if exists)
         # Note: The users table uses email, not Cognito sub, so we skip this
         # unless we can find a mapping. For now, we'll try to delete by email
         # if the user_id looks like an email, otherwise skip.

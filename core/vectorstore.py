@@ -7,8 +7,15 @@ pc = Pinecone(
         api_key=PINECONE_API_KEY
     )
 
+
+def _require_index_name(index_name):
+    if not index_name or not str(index_name).strip():
+        raise ValueError("Pinecone index name is missing or empty.")
+    return index_name
+
+
 def _get_sparse_vectorstore(index_name):
-    index = pc.Index(index_name)
+    index = pc.Index(_require_index_name(index_name))
     return index
 
 
@@ -16,7 +23,7 @@ def _get_vectorstore(index_name):
     embeddings = embedder.getDenseEmbedder()
     try:
         return PineconeVectorStore(
-            index_name=index_name,
+            index_name=_require_index_name(index_name),
             embedding=embeddings,
             pinecone_api_key=PINECONE_API_KEY,
             namespace="ns1",
