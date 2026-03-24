@@ -26,13 +26,16 @@ Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah
 - ✓ Fiqh book data ingestion pipeline (PDF parsing, chunking, embedding, Pinecone upload) — Validated in Phase 1: Data Foundation
 - ✓ Dedicated Pinecone index(es) for fiqh content (dense + sparse) — Validated in Phase 1: Data Foundation
 
+### Validated
+
+- ✓ Improved fiqh query classifier (6-category: VALID_OBVIOUS/SMALL/LARGE/REASONER/OUT_OF_SCOPE_FIQH/UNETHICAL) using gpt-4o-mini — Validated in Phase 2: Routing and Retrieval
+- ✓ Query decomposition into 1-4 keyword-rich sub-queries with JSON fence stripping and safe fallback — Validated in Phase 2: Routing and Retrieval
+- ✓ Hybrid retrieval with RRF merging (dense + sparse) from fiqh Pinecone indexes, BM25 encoder, deduplication, up to 20 docs — Validated in Phase 2: Routing and Retrieval
+- ✓ ChatState extended with `fiqh_category` field (backwards-compatible alongside `is_fiqh`) — Validated in Phase 2: Routing and Retrieval
+
 ### Active
 
-
-- [ ] Improved query classifier that accurately routes fiqh vs general Islamic queries
 - [ ] FAIR-RAG iterative loop as a LangGraph sub-graph (decompose → retrieve → filter → assess → refine → repeat, max 3 iterations)
-- [ ] Query decomposition into up to 4 semantically independent sub-queries
-- [ ] Hybrid retrieval with RRF merging (dense + sparse) from fiqh index
 - [ ] LLM-based evidence filtering (inclusive, remove only clearly irrelevant docs)
 - [ ] Structured Evidence Assessment (SEA) — checklist-based gap analysis with sufficiency verdict
 - [ ] Iterative query refinement targeting identified gaps using confirmed facts
@@ -101,4 +104,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-24 — Phase 1 complete*
+*Last updated: 2026-03-24 — Phase 2 complete*
