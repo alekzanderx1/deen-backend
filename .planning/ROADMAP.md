@@ -63,7 +63,12 @@ Plans:
   3. When SEA identifies gaps, the query refiner produces 1-4 new refinement queries that reference confirmed facts and do not repeat prior queries
   4. The answer generator produces a response citing only retrieved evidence, with inline [n] tokens, a references list, and a fatwa disclaimer on every ruling answer
   5. When evidence is insufficient after max iterations, the generator produces a partial answer with an explicit insufficient-evidence warning and redirect to official sources — not a hallucinated ruling
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Build filter.py (evidence filter) and sea.py (SEA with Pydantic structured output) + tests
+- [ ] 03-02-PLAN.md — Build refiner.py (query refinement) and generator.py (answer generation with citations) + tests
+- [ ] 03-03-PLAN.md — Build fair_rag.py (FAIR-RAG coordinator: max-3-iteration loop) + tests
 
 ### Phase 4: Assembly and Integration
 **Goal**: The complete FAIR-RAG pipeline runs end-to-end as a LangGraph sub-graph invoked by the live SSE streaming chat endpoint
@@ -88,5 +93,5 @@ Note: Phase 3 depends only on Phase 1 (data), so it can begin in parallel with P
 |-------|----------------|--------|-----------|
 | 1. Data Foundation | 3/3 | Complete   | 2026-03-24 |
 | 2. Routing and Retrieval | 0/3 | Not started | - |
-| 3. FAIR-RAG Core Modules | 0/? | Not started | - |
+| 3. FAIR-RAG Core Modules | 0/3 | Not started | - |
 | 4. Assembly and Integration | 0/? | Not started | - |
