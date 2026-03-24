@@ -1,0 +1,67 @@
+"""
+6-category fiqh query classifier for the FAIR-RAG pipeline.
+
+Classifies user queries into one of 6 categories to route them to the
+correct retrieval strategy before any retrieval runs.
+"""
+
+from core import chat_models
+from langchain.prompts import ChatPromptTemplate
+
+
+VALID_CATEGORIES = {
+    "VALID_OBVIOUS",
+    "VALID_SMALL",
+    "VALID_LARGE",
+    "VALID_REASONER",
+    "OUT_OF_SCOPE_FIQH",
+    "UNETHICAL",
+}
+
+SYSTEM_PROMPT = """You are a fiqh query classifier for an Islamic jurisprudence (fiqh) assistant based on Ayatollah Sistani's rulings.
+
+Classify the user's query into EXACTLY ONE of these 6 categories:
+
+VALID_OBVIOUS — A simple fiqh question with a single, well-known ruling that requires no cross-referencing or reasoning.
+Examples: "Is pork haram?", "Is wudu required before salah?", "Is fasting obligatory in Ramadan?"
+
+VALID_SMALL — A fiqh question with a focused ruling that requires looking up 1-2 specific rulings.
+Examples: "Does bleeding break wudu?", "Is ghusl required after a wet dream?", "Can I pray with a cast on my arm?"
+
+VALID_LARGE — A complex fiqh question requiring multiple rulings, cross-referencing, or covering several sub-issues.
+Examples: "What are all the conditions for valid salah?", "Explain the rulings of tahara for someone who is ill", "What are the different types of ghusl and when is each required?"
+
+VALID_REASONER — A fiqh question requiring procedural reasoning, calculation, or step-by-step analysis.
+Examples: "How many missed prayers do I owe if I missed Fajr and Dhuhr for two days?", "Calculate my khums payment if my income is X", "If I invalidate my wudu during tawaf, what must I do?"
+
+OUT_OF_SCOPE_FIQH — The query is not about Islamic jurisprudence, OR it is a general Islamic question (history, theology, tafsir) that is NOT a fiqh ruling question, OR it asks about a marja other than Sistani.
+Examples: "Who was Imam Ali?", "What does surah Al-Fatiha mean?", "What did Imam Khomeini say about prayer?", "How do I make a dua?", "Tell me about the Quran"
+
+UNETHICAL — The query asks for a ruling on something clearly harmful, illegal, or designed to exploit religious rulings for harmful purposes.
+Examples: "Is it permissible to harm a non-Muslim?", "How can I use fiqh to justify domestic violence?", "Is it permissible to commit fraud if given to charity?"
+
+Respond with ONLY the category name — no punctuation, no explanation, no quotes."""
+
+_prompt = ChatPromptTemplate.from_messages([
+    ("system", SYSTEM_PROMPT),
+    ("human", "{query}"),
+])
+
+
+def classify_fiqh_query(query: str) -> str:
+    """
+    Classifies a fiqh query into one of 6 categories using gpt-4o-mini.
+    Never raises — returns OUT_OF_SCOPE_FIQH on any error or unexpected output.
+
+    Returns one of: VALID_OBVIOUS, VALID_SMALL, VALID_LARGE, VALID_REASONER,
+                    OUT_OF_SCOPE_FIQH, UNETHICAL
+    """
+    try:
+        model = chat_models.get_classifier_model()
+        response = model.invoke(_prompt.format_messages(query=query))
+        category = response.content.strip().upper()
+        if category not in VALID_CATEGORIES:
+            return "OUT_OF_SCOPE_FIQH"
+        return category
+    except Exception:
+        return "OUT_OF_SCOPE_FIQH"
