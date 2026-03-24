@@ -48,7 +48,11 @@ class ChatState(TypedDict):
     
     is_fiqh: Optional[bool]
     """True if query asks for a fiqh ruling"""
-    
+
+    fiqh_category: str
+    """6-category fiqh classification result. One of: VALID_OBVIOUS, VALID_SMALL,
+    VALID_LARGE, VALID_REASONER, OUT_OF_SCOPE_FIQH, UNETHICAL, or '' (not yet classified)"""
+
     classification_checked: bool
     """Whether classification has been performed"""
     
@@ -150,6 +154,7 @@ def create_initial_state(
         original_language=None,
         is_non_islamic=None,
         is_fiqh=None,
+        fiqh_category="",
         classification_checked=False,
         enhanced_query=None,
         query_enhanced=False,
