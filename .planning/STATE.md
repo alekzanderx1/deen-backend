@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Completed 01-data-foundation-01-03-PLAN.md
-last_updated: "2026-03-24T02:38:34.665Z"
+status: Ready to execute
+stopped_at: Completed 02-routing-and-retrieval-02-01-PLAN.md
+last_updated: "2026-03-24T10:57:44.494Z"
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 6
+  completed_plans: 4
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah Sistani's published rulings — the system refuses to answer rather than hallucinate or speculate.
-**Current focus:** Phase 01 — data-foundation
+**Current focus:** Phase 02 — routing-and-retrieval
 
 ## Current Position
 
-Phase: 2
-Plan: Not started
+Phase: 02 (routing-and-retrieval) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -49,6 +49,7 @@ Plan: Not started
 | Phase 01-data-foundation P01 | 2 | 3 tasks | 4 files |
 | Phase 01-data-foundation P02 | 6 | 1 tasks | 4 files |
 | Phase 01-data-foundation P03 | 2 | 1 tasks | 1 files |
+| Phase 02-routing-and-retrieval P01 | 1 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -69,6 +70,8 @@ Recent decisions affecting current work:
 - [Phase 01-data-foundation]: No module-level env var guard for fiqh indexes: guard lives inside _run_ingestion() to avoid blocking server startup for developers without fiqh indexes configured
 - [Phase 01-data-foundation]: BM25 encoder persisted to data/fiqh_bm25_encoder.json using JSON serialization for portability and Phase 2 query-time reload
 - [Phase 01-data-foundation]: Dense embedding sub-batch size 32 (conservative within 32-64 safe range) to prevent OOM with all-mpnet-base-v2
+- [Phase 02-routing-and-retrieval]: Inline SYSTEM_PROMPT in fiqh/classifier.py: new standalone classifier, not a port of existing one; no session_id parameter needed
+- [Phase 02-routing-and-retrieval]: fiqh_category: str added after is_fiqh in ChatState TypedDict with default '' in create_initial_state() for backward-compatible FAIR-RAG routing
 
 ### Pending Todos
 
@@ -83,6 +86,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T01:54:35.993Z
-Stopped at: Completed 01-data-foundation-01-03-PLAN.md
+Last session: 2026-03-24T10:57:44.482Z
+Stopped at: Completed 02-routing-and-retrieval-02-01-PLAN.md
 Resume file: None
