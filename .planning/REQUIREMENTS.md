@@ -39,11 +39,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Evidence Assessment
 
-- [ ] **EVID-01**: LLM-based evidence filter removes clearly irrelevant documents while preserving partially relevant ones (inclusive approach)
-- [ ] **EVID-02**: Evidence filtering uses the large LLM (gpt-4.1) for subtle relevance judgments
-- [ ] **EVID-03**: Structured Evidence Assessment (SEA) deconstructs the query into a numbered checklist of required findings
-- [ ] **EVID-04**: SEA checks each required finding against retrieved evidence, classifying as confirmed (with logical inferences) or gap
-- [ ] **EVID-05**: SEA produces a sufficiency verdict (Yes/No) — "Yes" only when ALL required findings are confirmed
+- [x] **EVID-01**: LLM-based evidence filter removes clearly irrelevant documents while preserving partially relevant ones (inclusive approach)
+- [x] **EVID-02**: Evidence filtering uses the large LLM (gpt-4.1) for subtle relevance judgments
+- [x] **EVID-03**: Structured Evidence Assessment (SEA) deconstructs the query into a numbered checklist of required findings
+- [x] **EVID-04**: SEA checks each required finding against retrieved evidence, classifying as confirmed (with logical inferences) or gap
+- [x] **EVID-05**: SEA produces a sufficiency verdict (Yes/No) — "Yes" only when ALL required findings are confirmed
 - [ ] **EVID-06**: When SEA identifies gaps, the system generates 1-4 targeted refinement queries using confirmed facts to narrow the search
 - [ ] **EVID-07**: The retrieval-assess-refine loop runs a maximum of 3 iterations, with early exit when SEA declares sufficiency
 - [ ] **EVID-08**: Query refinement uses the large LLM (gpt-4.1) and never repeats or rephrases previous queries
@@ -57,7 +57,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **AGEN-05**: When evidence is insufficient after max iterations, system provides a partial answer with an explicit warning and redirect to official sources
 - [ ] **AGEN-06**: When no relevant evidence exists, system states this clearly and redirects to Sistani's official resources
 - [ ] **AGEN-07**: Answer generation uses the large LLM (gpt-4.1)
-- [ ] **AGEN-08**: Dynamic LLM allocation routes small tasks (classification, decomposition, SEA) to gpt-4o-mini and heavy tasks (filtering, refinement, generation) to gpt-4.1
+- [x] **AGEN-08**: Dynamic LLM allocation routes small tasks (classification, decomposition, SEA) to gpt-4o-mini and heavy tasks (filtering, refinement, generation) to gpt-4.1
 
 ### Integration
 
@@ -123,11 +123,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RETR-02 | Phase 2 | Complete |
 | RETR-03 | Phase 2 | Complete |
 | RETR-04 | Phase 2 | Complete |
-| EVID-01 | Phase 3 | Pending |
-| EVID-02 | Phase 3 | Pending |
-| EVID-03 | Phase 3 | Pending |
-| EVID-04 | Phase 3 | Pending |
-| EVID-05 | Phase 3 | Pending |
+| EVID-01 | Phase 3 | Complete |
+| EVID-02 | Phase 3 | Complete |
+| EVID-03 | Phase 3 | Complete |
+| EVID-04 | Phase 3 | Complete |
+| EVID-05 | Phase 3 | Complete |
 | EVID-06 | Phase 3 | Pending |
 | EVID-07 | Phase 3 | Pending |
 | EVID-08 | Phase 3 | Pending |
@@ -138,7 +138,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AGEN-05 | Phase 3 | Pending |
 | AGEN-06 | Phase 3 | Pending |
 | AGEN-07 | Phase 3 | Pending |
-| AGEN-08 | Phase 3 | Pending |
+| AGEN-08 | Phase 3 | Complete |
 | INTG-01 | Phase 4 | Pending |
 | INTG-02 | Phase 4 | Pending |
 | INTG-03 | Phase 4 | Pending |

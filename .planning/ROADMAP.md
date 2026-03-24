@@ -66,7 +66,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Build filter.py (evidence filter) and sea.py (SEA with Pydantic structured output) + tests
+- [x] 03-01-PLAN.md — Build filter.py (evidence filter) and sea.py (SEA with Pydantic structured output) + tests
 - [ ] 03-02-PLAN.md — Build refiner.py (query refinement) and generator.py (answer generation with citations) + tests
 - [ ] 03-03-PLAN.md — Build fair_rag.py (FAIR-RAG coordinator: max-3-iteration loop) + tests
 
@@ -93,5 +93,5 @@ Note: Phase 3 depends only on Phase 1 (data), so it can begin in parallel with P
 |-------|----------------|--------|-----------|
 | 1. Data Foundation | 3/3 | Complete   | 2026-03-24 |
 | 2. Routing and Retrieval | 0/3 | Not started | - |
-| 3. FAIR-RAG Core Modules | 0/3 | Not started | - |
+| 3. FAIR-RAG Core Modules | 1/3 | In Progress|  |
 | 4. Assembly and Integration | 0/? | Not started | - |
