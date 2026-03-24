@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 02-routing-and-retrieval-02-01-PLAN.md
-last_updated: "2026-03-24T10:57:44.494Z"
+stopped_at: Completed 02-routing-and-retrieval-02-02-PLAN.md
+last_updated: "2026-03-24T11:00:56.248Z"
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 02 (routing-and-retrieval) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -50,6 +50,7 @@ Plan: 2 of 3
 | Phase 01-data-foundation P02 | 6 | 1 tasks | 4 files |
 | Phase 01-data-foundation P03 | 2 | 1 tasks | 1 files |
 | Phase 02-routing-and-retrieval P01 | 1 | 2 tasks | 3 files |
+| Phase 02-routing-and-retrieval P02 | 1 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,8 @@ Recent decisions affecting current work:
 - [Phase 01-data-foundation]: Dense embedding sub-batch size 32 (conservative within 32-64 safe range) to prevent OOM with all-mpnet-base-v2
 - [Phase 02-routing-and-retrieval]: Inline SYSTEM_PROMPT in fiqh/classifier.py: new standalone classifier, not a port of existing one; no session_id parameter needed
 - [Phase 02-routing-and-retrieval]: fiqh_category: str added after is_fiqh in ChatState TypedDict with default '' in create_initial_state() for backward-compatible FAIR-RAG routing
+- [Phase 02-routing-and-retrieval]: decompose_query uses get_classifier_model() (gpt-4o-mini) per QPRO-03: cost efficiency for decomposition step
+- [Phase 02-routing-and-retrieval]: Fallback returns [query] not [] on any parse/exception: caller always gets at least one retrieval query
 
 ### Pending Todos
 
@@ -86,6 +89,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T10:57:44.482Z
-Stopped at: Completed 02-routing-and-retrieval-02-01-PLAN.md
+Last session: 2026-03-24T11:00:56.236Z
+Stopped at: Completed 02-routing-and-retrieval-02-02-PLAN.md
 Resume file: None

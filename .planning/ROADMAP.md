@@ -50,7 +50,7 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md — Create modules/fiqh package, 6-category classifier, and ChatState fiqh_category field
-- [ ] 02-02-PLAN.md — Build query decomposer and unit tests for classifier + decomposer (mocked LLM)
+- [x] 02-02-PLAN.md — Build query decomposer and unit tests for classifier + decomposer (mocked LLM)
 - [ ] 02-03-PLAN.md — Build hybrid RRF retriever and unit tests for retriever (mocked Pinecone)
 
 ### Phase 3: FAIR-RAG Core Modules

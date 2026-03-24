@@ -18,17 +18,17 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Query Classification
 
-- [ ] **CLAS-01**: System classifies incoming queries into exactly one of 6 categories: VALID_OBVIOUS, VALID_SMALL, VALID_LARGE, VALID_REASONER, OUT_OF_SCOPE_FIQH, UNETHICAL
-- [ ] **CLAS-02**: OUT_OF_SCOPE_FIQH queries are politely rejected with a redirect message before any retrieval occurs
-- [ ] **CLAS-03**: UNETHICAL queries are immediately rejected
-- [ ] **CLAS-04**: Classification uses the small LLM (gpt-4o-mini) for cost efficiency
-- [ ] **CLAS-05**: Negative rejection accuracy targets >95% — system correctly refuses out-of-scope and unanswerable questions at both the classification and generation layers
+- [x] **CLAS-01**: System classifies incoming queries into exactly one of 6 categories: VALID_OBVIOUS, VALID_SMALL, VALID_LARGE, VALID_REASONER, OUT_OF_SCOPE_FIQH, UNETHICAL
+- [x] **CLAS-02**: OUT_OF_SCOPE_FIQH queries are politely rejected with a redirect message before any retrieval occurs
+- [x] **CLAS-03**: UNETHICAL queries are immediately rejected
+- [x] **CLAS-04**: Classification uses the small LLM (gpt-4o-mini) for cost efficiency
+- [x] **CLAS-05**: Negative rejection accuracy targets >95% — system correctly refuses out-of-scope and unanswerable questions at both the classification and generation layers
 
 ### Query Processing
 
-- [ ] **QPRO-01**: Complex fiqh queries are decomposed into 1-4 semantically independent, keyword-rich sub-queries optimized for retrieval
-- [ ] **QPRO-02**: Sub-queries include domain-specific fiqh terminology (Arabic/Persian transliterated terms) where appropriate
-- [ ] **QPRO-03**: Query decomposition uses the small LLM (gpt-4o-mini)
+- [x] **QPRO-01**: Complex fiqh queries are decomposed into 1-4 semantically independent, keyword-rich sub-queries optimized for retrieval
+- [x] **QPRO-02**: Sub-queries include domain-specific fiqh terminology (Arabic/Persian transliterated terms) where appropriate
+- [x] **QPRO-03**: Query decomposition uses the small LLM (gpt-4o-mini)
 
 ### Retrieval
 
@@ -111,14 +111,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INGE-04 | Phase 1 | Complete |
 | INGE-05 | Phase 1 | Complete |
 | INGE-06 | Phase 1 | Complete |
-| CLAS-01 | Phase 2 | Pending |
-| CLAS-02 | Phase 2 | Pending |
-| CLAS-03 | Phase 2 | Pending |
-| CLAS-04 | Phase 2 | Pending |
-| CLAS-05 | Phase 2 | Pending |
-| QPRO-01 | Phase 2 | Pending |
-| QPRO-02 | Phase 2 | Pending |
-| QPRO-03 | Phase 2 | Pending |
+| CLAS-01 | Phase 2 | Complete |
+| CLAS-02 | Phase 2 | Complete |
+| CLAS-03 | Phase 2 | Complete |
+| CLAS-04 | Phase 2 | Complete |
+| CLAS-05 | Phase 2 | Complete |
+| QPRO-01 | Phase 2 | Complete |
+| QPRO-02 | Phase 2 | Complete |
+| QPRO-03 | Phase 2 | Complete |
 | RETR-01 | Phase 2 | Pending |
 | RETR-02 | Phase 2 | Pending |
 | RETR-03 | Phase 2 | Pending |
