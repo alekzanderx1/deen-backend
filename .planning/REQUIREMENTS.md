@@ -105,51 +105,51 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INGE-01 | — | Pending |
-| INGE-02 | — | Pending |
-| INGE-03 | — | Pending |
-| INGE-04 | — | Pending |
-| INGE-05 | — | Pending |
-| INGE-06 | — | Pending |
-| CLAS-01 | — | Pending |
-| CLAS-02 | — | Pending |
-| CLAS-03 | — | Pending |
-| CLAS-04 | — | Pending |
-| CLAS-05 | — | Pending |
-| QPRO-01 | — | Pending |
-| QPRO-02 | — | Pending |
-| QPRO-03 | — | Pending |
-| RETR-01 | — | Pending |
-| RETR-02 | — | Pending |
-| RETR-03 | — | Pending |
-| RETR-04 | — | Pending |
-| EVID-01 | — | Pending |
-| EVID-02 | — | Pending |
-| EVID-03 | — | Pending |
-| EVID-04 | — | Pending |
-| EVID-05 | — | Pending |
-| EVID-06 | — | Pending |
-| EVID-07 | — | Pending |
-| EVID-08 | — | Pending |
-| AGEN-01 | — | Pending |
-| AGEN-02 | — | Pending |
-| AGEN-03 | — | Pending |
-| AGEN-04 | — | Pending |
-| AGEN-05 | — | Pending |
-| AGEN-06 | — | Pending |
-| AGEN-07 | — | Pending |
-| AGEN-08 | — | Pending |
-| INTG-01 | — | Pending |
-| INTG-02 | — | Pending |
-| INTG-03 | — | Pending |
-| INTG-04 | — | Pending |
-| INTG-05 | — | Pending |
+| INGE-01 | Phase 1 | Pending |
+| INGE-02 | Phase 1 | Pending |
+| INGE-03 | Phase 1 | Pending |
+| INGE-04 | Phase 1 | Pending |
+| INGE-05 | Phase 1 | Pending |
+| INGE-06 | Phase 1 | Pending |
+| CLAS-01 | Phase 2 | Pending |
+| CLAS-02 | Phase 2 | Pending |
+| CLAS-03 | Phase 2 | Pending |
+| CLAS-04 | Phase 2 | Pending |
+| CLAS-05 | Phase 2 | Pending |
+| QPRO-01 | Phase 2 | Pending |
+| QPRO-02 | Phase 2 | Pending |
+| QPRO-03 | Phase 2 | Pending |
+| RETR-01 | Phase 2 | Pending |
+| RETR-02 | Phase 2 | Pending |
+| RETR-03 | Phase 2 | Pending |
+| RETR-04 | Phase 2 | Pending |
+| EVID-01 | Phase 3 | Pending |
+| EVID-02 | Phase 3 | Pending |
+| EVID-03 | Phase 3 | Pending |
+| EVID-04 | Phase 3 | Pending |
+| EVID-05 | Phase 3 | Pending |
+| EVID-06 | Phase 3 | Pending |
+| EVID-07 | Phase 3 | Pending |
+| EVID-08 | Phase 3 | Pending |
+| AGEN-01 | Phase 3 | Pending |
+| AGEN-02 | Phase 3 | Pending |
+| AGEN-03 | Phase 3 | Pending |
+| AGEN-04 | Phase 3 | Pending |
+| AGEN-05 | Phase 3 | Pending |
+| AGEN-06 | Phase 3 | Pending |
+| AGEN-07 | Phase 3 | Pending |
+| AGEN-08 | Phase 3 | Pending |
+| INTG-01 | Phase 4 | Pending |
+| INTG-02 | Phase 4 | Pending |
+| INTG-03 | Phase 4 | Pending |
+| INTG-04 | Phase 4 | Pending |
+| INTG-05 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 39 total
-- Mapped to phases: 0
-- Unmapped: 39 ⚠️
+- Mapped to phases: 39
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-23*
-*Last updated: 2026-03-23 after initial definition*
+*Last updated: 2026-03-23 after roadmap creation — all 39 requirements mapped*
