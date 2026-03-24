@@ -21,10 +21,14 @@ Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah
 - ✓ PostgreSQL persistence with Alembic migrations — existing
 - ✓ AWS Cognito JWT authentication — existing
 
+### Validated
+
+- ✓ Fiqh book data ingestion pipeline (PDF parsing, chunking, embedding, Pinecone upload) — Validated in Phase 1: Data Foundation
+- ✓ Dedicated Pinecone index(es) for fiqh content (dense + sparse) — Validated in Phase 1: Data Foundation
+
 ### Active
 
-- [ ] Fiqh book data ingestion pipeline (PDF parsing, chunking, embedding, Pinecone upload)
-- [ ] Dedicated Pinecone index(es) for fiqh content (dense + sparse)
+
 - [ ] Improved query classifier that accurately routes fiqh vs general Islamic queries
 - [ ] FAIR-RAG iterative loop as a LangGraph sub-graph (decompose → retrieve → filter → assess → refine → repeat, max 3 iterations)
 - [ ] Query decomposition into up to 4 semantically independent sub-queries
@@ -72,7 +76,7 @@ Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Separate Pinecone index for fiqh | Keep fiqh corpus isolated from hadith/Quran for precision | — Pending |
+| Separate Pinecone index for fiqh | Keep fiqh corpus isolated from hadith/Quran for precision | deen-fiqh-dense + deen-fiqh-sparse, 3000 chunks in ns1 |
 | FAIR-RAG as LangGraph sub-graph | Integrates cleanly with existing agent architecture; main agent routes to fiqh sub-graph | — Pending |
 | Dynamic LLM allocation | 13% cheaper than static large with better negative rejection (97% vs 94%) per FARSIQA research | — Pending |
 | Max 3 iterations | Both FAIR-RAG and FARSIQA papers show iteration 4 gives negligible or negative improvement | — Pending |
@@ -97,4 +101,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-23 after initialization*
+*Last updated: 2026-03-24 — Phase 1 complete*
