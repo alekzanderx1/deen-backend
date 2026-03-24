@@ -25,8 +25,18 @@ import fitz  # pymupdf
 import nltk
 import tiktoken
 from langchain_text_splitters import TokenTextSplitter
+from pinecone import Pinecone, ServerlessSpec
+from pinecone.db_data.dataclasses import Vector
+from pinecone_text.sparse import BM25Encoder
 
+from core.config import (
+    DEEN_DENSE_INDEX_NAME,
+    DEEN_FIQH_DENSE_INDEX_NAME,
+    DEEN_FIQH_SPARSE_INDEX_NAME,
+    PINECONE_API_KEY,
+)
 from core.logging_config import setup_logging
+from modules.embedding.embedder import getDenseEmbedder
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -229,9 +239,165 @@ def chunk_rulings(full_text: str) -> list[dict[str, Any]]:
 def _run_ingestion(chunks: list[dict[str, Any]]) -> None:
     """Embed and upsert all chunks into Pinecone fiqh indexes.
 
-    Implemented in plan 03. Calling this in plan 02 raises NotImplementedError.
+    Full ingestion pipeline:
+    1. Download NLTK data
+    2. Create Pinecone indexes (idempotent)
+    3. Fit BM25 encoder on all chunk texts and persist
+    4. Embed all chunks (dense) in sub-batches of 32
+    5. Encode all chunks (sparse) with BM25
+    6. Upsert to dense index in batches of UPSERT_BATCH_SIZE
+    7. Upsert to sparse index in batches of UPSERT_BATCH_SIZE
     """
-    raise NotImplementedError("Embedding and Pinecone upsert implemented in plan 03")
+    # --- Guard env vars ---
+    if not PINECONE_API_KEY:
+        raise ValueError("PINECONE_API_KEY is not set in .env")
+    if not DEEN_FIQH_DENSE_INDEX_NAME:
+        raise ValueError("DEEN_FIQH_DENSE_INDEX_NAME is not set in .env")
+    if not DEEN_FIQH_SPARSE_INDEX_NAME:
+        raise ValueError("DEEN_FIQH_SPARSE_INDEX_NAME is not set in .env")
+
+    # --- Step 1: NLTK data (required by BM25Encoder) ---
+    logger.info("Downloading NLTK data...")
+    ssl._create_default_https_context = ssl._create_unverified_context  # macOS workaround
+    nltk.download("stopwords", quiet=True)
+    nltk.download("punkt_tab", quiet=True)
+
+    # --- Step 2: Pinecone index creation (idempotent) ---
+    logger.info("Initialising Pinecone client...")
+    pc = Pinecone(api_key=PINECONE_API_KEY)
+
+    # Discover cloud/region from existing index to satisfy D-09
+    existing_names = [i.name for i in pc.list_indexes()]
+    if DEEN_DENSE_INDEX_NAME and DEEN_DENSE_INDEX_NAME in existing_names:
+        existing_spec = pc.describe_index(DEEN_DENSE_INDEX_NAME).spec.serverless
+        cloud = existing_spec.cloud
+        region = existing_spec.region
+        logger.info(
+            "Using cloud=%s region=%s (from existing %s index)",
+            cloud,
+            region,
+            DEEN_DENSE_INDEX_NAME,
+        )
+    else:
+        cloud, region = "aws", "us-east-1"
+        logger.warning(
+            "Could not read existing index spec; defaulting to cloud=%s region=%s",
+            cloud,
+            region,
+        )
+
+    if DEEN_FIQH_DENSE_INDEX_NAME not in existing_names:
+        logger.info(
+            "Creating dense fiqh index: %s (768 dims, cosine)", DEEN_FIQH_DENSE_INDEX_NAME
+        )
+        pc.create_index(
+            name=DEEN_FIQH_DENSE_INDEX_NAME,
+            dimension=768,
+            metric="cosine",
+            vector_type="dense",
+            spec=ServerlessSpec(cloud=cloud, region=region),
+        )
+        logger.info("Waiting for dense index to become ready...")
+        time.sleep(10)  # Pinecone serverless provisioning delay (Pitfall 7)
+    else:
+        logger.info("Dense fiqh index already exists: %s", DEEN_FIQH_DENSE_INDEX_NAME)
+
+    if DEEN_FIQH_SPARSE_INDEX_NAME not in existing_names:
+        logger.info(
+            "Creating sparse fiqh index: %s (dotproduct)", DEEN_FIQH_SPARSE_INDEX_NAME
+        )
+        pc.create_index(
+            name=DEEN_FIQH_SPARSE_INDEX_NAME,
+            metric="dotproduct",
+            vector_type="sparse",  # NO dimension parameter (Pitfall 2)
+            spec=ServerlessSpec(cloud=cloud, region=region),
+        )
+        logger.info("Waiting for sparse index to become ready...")
+        time.sleep(10)
+    else:
+        logger.info("Sparse fiqh index already exists: %s", DEEN_FIQH_SPARSE_INDEX_NAME)
+
+    # --- Step 3: Fit BM25 encoder on full corpus and persist ---
+    chunk_texts: list[str] = [c["text"] for c in chunks]
+    logger.info("Fitting BM25 encoder on %d chunk texts...", len(chunk_texts))
+    encoder = BM25Encoder()
+    encoder.fit(chunk_texts)  # Must fit before encode (Pitfall 3)
+
+    encoder_path = BM25_ENCODER_PATH
+    Path(encoder_path).parent.mkdir(parents=True, exist_ok=True)
+    encoder.dump(encoder_path)
+    logger.info("BM25 encoder persisted to %s", encoder_path)
+
+    # --- Step 4: Dense embedding in sub-batches of 32 (Pitfall 6) ---
+    logger.info("Loading dense embedder (all-mpnet-base-v2)...")
+    embedder = getDenseEmbedder()
+    dense_vecs: list[list[float]] = []
+    embed_batch_size = 32
+    for i in range(0, len(chunks), embed_batch_size):
+        batch_texts = chunk_texts[i : i + embed_batch_size]
+        batch_vecs = embedder.embed_documents(batch_texts)
+        dense_vecs.extend(batch_vecs)
+        logger.info(
+            "Embedded %d/%d chunks", min(i + embed_batch_size, len(chunks)), len(chunks)
+        )
+
+    # --- Step 5: Sparse encoding (BM25) ---
+    logger.info("Encoding sparse vectors with BM25...")
+    sparse_vecs = encoder.encode_documents(chunk_texts)  # list of {"indices": [...], "values": [...]}
+
+    # --- Step 6: Dense upsert in batches of UPSERT_BATCH_SIZE ---
+    dense_idx = pc.Index(DEEN_FIQH_DENSE_INDEX_NAME)
+    total = len(chunks)
+    for batch_start in range(0, total, UPSERT_BATCH_SIZE):
+        batch_chunks = chunks[batch_start : batch_start + UPSERT_BATCH_SIZE]
+        batch_dense = dense_vecs[batch_start : batch_start + UPSERT_BATCH_SIZE]
+        vectors = [
+            Vector(
+                id=chunk["id"],
+                values=dense_vec,
+                metadata={
+                    "text_en": chunk["text"],
+                    "source_book": chunk["source_book"],
+                    "chapter": chunk["chapter"],
+                    "section": chunk["section"],
+                    "ruling_number": chunk["ruling_number"],
+                    "topic_tags": chunk["topic_tags"],
+                },
+            )
+            for chunk, dense_vec in zip(batch_chunks, batch_dense)
+        ]
+        dense_idx.upsert(vectors=vectors, namespace="ns1")
+        uploaded = min(batch_start + UPSERT_BATCH_SIZE, total)
+        logger.info("Uploaded %d/%d chunks to dense index", uploaded, total)
+
+    # --- Step 7: Sparse upsert in batches of UPSERT_BATCH_SIZE ---
+    sparse_idx = pc.Index(DEEN_FIQH_SPARSE_INDEX_NAME)
+    for batch_start in range(0, total, UPSERT_BATCH_SIZE):
+        batch_chunks = chunks[batch_start : batch_start + UPSERT_BATCH_SIZE]
+        batch_sparse = sparse_vecs[batch_start : batch_start + UPSERT_BATCH_SIZE]
+        vectors_sparse = [
+            {
+                "id": chunk["id"],
+                "sparse_values": {
+                    "indices": sv["indices"],
+                    "values": sv["values"],
+                },
+                "metadata": {
+                    "text_en": chunk["text"],
+                    "source_book": chunk["source_book"],
+                    "chapter": chunk["chapter"],
+                    "section": chunk["section"],
+                    "ruling_number": chunk["ruling_number"],
+                    "topic_tags": chunk["topic_tags"],
+                },
+            }
+            for chunk, sv in zip(batch_chunks, batch_sparse)
+        ]
+        sparse_idx.upsert(vectors=vectors_sparse, namespace="ns1")
+        uploaded = min(batch_start + UPSERT_BATCH_SIZE, total)
+        logger.info("Uploaded %d/%d chunks to sparse index", uploaded, total)
+
+    logger.info("Ingestion complete. %d chunks in both fiqh indexes.", total)
 
 
 # ------------------------------------------------------------------ #
