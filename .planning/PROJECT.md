@@ -33,17 +33,21 @@ Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah
 - ✓ Hybrid retrieval with RRF merging (dense + sparse) from fiqh Pinecone indexes, BM25 encoder, deduplication, up to 20 docs — Validated in Phase 2: Routing and Retrieval
 - ✓ ChatState extended with `fiqh_category` field (backwards-compatible alongside `is_fiqh`) — Validated in Phase 2: Routing and Retrieval
 
+### Validated
+
+- ✓ LLM-based evidence filtering (inclusive, remove only clearly irrelevant docs) — Validated in Phase 3: FAIR-RAG Core Modules
+- ✓ Structured Evidence Assessment (SEA) — checklist-based gap analysis with sufficiency verdict — Validated in Phase 3: FAIR-RAG Core Modules
+- ✓ Iterative query refinement targeting identified gaps using confirmed facts — Validated in Phase 3: FAIR-RAG Core Modules
+- ✓ Faithful answer generation with strict evidence-only grounding — Validated in Phase 3: FAIR-RAG Core Modules
+- ✓ Dynamic LLM allocation (gpt-4o-mini for SEA, gpt-4.1 for filtering/refinement/generation) — Validated in Phase 3: FAIR-RAG Core Modules
+- ✓ Inline citations [n] linking to source passages with references list — Validated in Phase 3: FAIR-RAG Core Modules
+- ✓ Fatwa disclaimer on every ruling response — Validated in Phase 3: FAIR-RAG Core Modules
+- ✓ Insufficient evidence handling — partial answers with redirect to official sources — Validated in Phase 3: FAIR-RAG Core Modules
+- ✓ FAIR-RAG coordinator: max-3-iteration retrieve→filter→assess→refine loop, doc accumulation, early exit — Validated in Phase 3: FAIR-RAG Core Modules
+
 ### Active
 
-- [ ] FAIR-RAG iterative loop as a LangGraph sub-graph (decompose → retrieve → filter → assess → refine → repeat, max 3 iterations)
-- [ ] LLM-based evidence filtering (inclusive, remove only clearly irrelevant docs)
-- [ ] Structured Evidence Assessment (SEA) — checklist-based gap analysis with sufficiency verdict
-- [ ] Iterative query refinement targeting identified gaps using confirmed facts
-- [ ] Faithful answer generation with strict evidence-only grounding
-- [ ] Dynamic LLM allocation (gpt-4o-mini for routing/decomposition/SEA, gpt-4.1 for filtering/refinement/generation)
-- [ ] Inline citations [n] linking to source passages with references list
-- [ ] Fatwa disclaimer on every ruling response
-- [ ] Insufficient evidence handling — partial answers with redirect to official sources
+- [ ] FAIR-RAG iterative loop wired as a LangGraph node (Phase 4 integration — calls run_fair_rag from fiqh LangGraph node)
 - [ ] SSE streaming of intermediate pipeline status (decomposing, retrieving, assessing, refining)
 - [ ] Negative rejection — refuse to answer when evidence is insufficient or question is out of scope
 
