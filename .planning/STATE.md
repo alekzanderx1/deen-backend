@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 01-data-foundation-01-02-PLAN.md
-last_updated: "2026-03-24T01:48:57.845Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 01-data-foundation-01-03-PLAN.md
+last_updated: "2026-03-24T01:54:36.005Z"
 progress:
   total_phases: 4
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
+  completed_plans: 3
 ---
 
 # Project State
@@ -48,6 +48,7 @@ Plan: 3 of 3
 *Updated after each plan completion*
 | Phase 01-data-foundation P01 | 2 | 3 tasks | 4 files |
 | Phase 01-data-foundation P02 | 6 | 1 tasks | 4 files |
+| Phase 01-data-foundation P03 | 2 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -65,6 +66,9 @@ Recent decisions affecting current work:
 - [Phase 01-02]: Deduplicate ruling numbers via seen_ruling_numbers set — PDF contains 83 inline cross-references matching RULING_PATTERN; only first occurrence of each ruling number is processed
 - [Phase 01-02]: Chunk count expectation corrected from 1000-1600 to ~3000: 2796 rulings each produce their own chunk; research merger assumption was incorrect
 - [Phase 01-02]: Zero overlap in secondary chunk splitting: each ruling is atomic; overlap between adjacent rulings has no retrieval benefit
+- [Phase 01-data-foundation]: No module-level env var guard for fiqh indexes: guard lives inside _run_ingestion() to avoid blocking server startup for developers without fiqh indexes configured
+- [Phase 01-data-foundation]: BM25 encoder persisted to data/fiqh_bm25_encoder.json using JSON serialization for portability and Phase 2 query-time reload
+- [Phase 01-data-foundation]: Dense embedding sub-batch size 32 (conservative within 32-64 safe range) to prevent OOM with all-mpnet-base-v2
 
 ### Pending Todos
 
@@ -79,6 +83,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T01:48:57.835Z
-Stopped at: Completed 01-data-foundation-01-02-PLAN.md
+Last session: 2026-03-24T01:54:35.993Z
+Stopped at: Completed 01-data-foundation-01-03-PLAN.md
 Resume file: None

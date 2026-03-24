@@ -12,7 +12,7 @@ Four phases build the FAIR-RAG pipeline from the ground up: first the fiqh corpu
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Data Foundation** - Ingest Sistani's "Islamic Laws" into dedicated Pinecone fiqh indexes
+- [x] **Phase 1: Data Foundation** - Ingest Sistani's "Islamic Laws" into dedicated Pinecone fiqh indexes (completed 2026-03-24)
 - [ ] **Phase 2: Routing and Retrieval** - Upgrade query classifier and build hybrid fiqh retrieval
 - [ ] **Phase 3: FAIR-RAG Core Modules** - Build evidence filtering, SEA, query refinement, and answer generation
 - [ ] **Phase 4: Assembly and Integration** - Wire sub-graph into the main agent and SSE streaming layer
@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [x] 01-01-PLAN.md — Add dependencies (pymupdf, pinecone-text) and register fiqh env vars in core/config.py
 - [x] 01-02-PLAN.md — Write PDF parsing and chunking layer (parse_pdf, chunk_rulings, --dry-run)
-- [ ] 01-03-PLAN.md — Implement embedding + dual Pinecone upsert; run full ingestion and verify
+- [x] 01-03-PLAN.md — Implement embedding + dual Pinecone upsert; run full ingestion and verify
 
 ### Phase 2: Routing and Retrieval
 **Goal**: Fiqh queries are accurately classified and retrieved against the fiqh corpus with hybrid search
@@ -81,7 +81,7 @@ Note: Phase 3 depends only on Phase 1 (data), so it can begin in parallel with P
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Data Foundation | 2/3 | In Progress|  |
+| 1. Data Foundation | 3/3 | Complete   | 2026-03-24 |
 | 2. Routing and Retrieval | 0/? | Not started | - |
 | 3. FAIR-RAG Core Modules | 0/? | Not started | - |
 | 4. Assembly and Integration | 0/? | Not started | - |
