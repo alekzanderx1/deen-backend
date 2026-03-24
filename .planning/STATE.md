@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 01-data-foundation plan 01 — dependencies and config bootstrap
-last_updated: "2026-03-24T01:42:14.131Z"
+stopped_at: Completed 01-data-foundation-01-02-PLAN.md
+last_updated: "2026-03-24T01:48:57.845Z"
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 01 (data-foundation) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -47,6 +47,7 @@ Plan: 2 of 3
 
 *Updated after each plan completion*
 | Phase 01-data-foundation P01 | 2 | 3 tasks | 4 files |
+| Phase 01-data-foundation P02 | 6 | 1 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -61,6 +62,9 @@ Recent decisions affecting current work:
 - Max 3 iterations — both FAIR-RAG and FARSIQA papers show diminishing returns beyond iteration 3
 - Improved classifier over existing — current binary classifier does not route fiqh queries accurately
 - [Phase 01-data-foundation]: No module-level ValueError guard for fiqh index env vars — guard lives in ingestion script to avoid breaking server startup for developers without fiqh indexes configured
+- [Phase 01-02]: Deduplicate ruling numbers via seen_ruling_numbers set — PDF contains 83 inline cross-references matching RULING_PATTERN; only first occurrence of each ruling number is processed
+- [Phase 01-02]: Chunk count expectation corrected from 1000-1600 to ~3000: 2796 rulings each produce their own chunk; research merger assumption was incorrect
+- [Phase 01-02]: Zero overlap in secondary chunk splitting: each ruling is atomic; overlap between adjacent rulings has no retrieval benefit
 
 ### Pending Todos
 
@@ -75,6 +79,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T01:42:14.121Z
-Stopped at: Completed 01-data-foundation plan 01 — dependencies and config bootstrap
+Last session: 2026-03-24T01:48:57.835Z
+Stopped at: Completed 01-data-foundation-01-02-PLAN.md
 Resume file: None
