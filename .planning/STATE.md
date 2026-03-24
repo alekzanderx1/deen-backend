@@ -1,3 +1,17 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: Ready to execute
+stopped_at: Completed 01-data-foundation plan 01 — dependencies and config bootstrap
+last_updated: "2026-03-24T01:42:14.131Z"
+progress:
+  total_phases: 4
+  completed_phases: 0
+  total_plans: 3
+  completed_plans: 1
+---
+
 # Project State
 
 ## Project Reference
@@ -5,20 +19,17 @@
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah Sistani's published rulings — the system refuses to answer rather than hallucinate or speculate.
-**Current focus:** Phase 1 — Data Foundation
+**Current focus:** Phase 01 — data-foundation
 
 ## Current Position
 
-Phase: 1 of 4 (Data Foundation)
-Plan: 0 of ? in current phase
-Status: Ready to plan
-Last activity: 2026-03-23 — Roadmap created, ready to begin Phase 1 planning
-
-Progress: [░░░░░░░░░░] 0%
+Phase: 01 (data-foundation) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 0
 - Average duration: —
 - Total execution time: 0 hours
@@ -30,10 +41,12 @@ Progress: [░░░░░░░░░░] 0%
 | - | - | - | - |
 
 **Recent Trend:**
+
 - Last 5 plans: —
 - Trend: —
 
 *Updated after each plan completion*
+| Phase 01-data-foundation P01 | 2 | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -47,6 +60,7 @@ Recent decisions affecting current work:
 - Dynamic LLM allocation — gpt-4o-mini for routing/decomposition/SEA; gpt-4.1 for filtering/refinement/generation
 - Max 3 iterations — both FAIR-RAG and FARSIQA papers show diminishing returns beyond iteration 3
 - Improved classifier over existing — current binary classifier does not route fiqh queries accurately
+- [Phase 01-data-foundation]: No module-level ValueError guard for fiqh index env vars — guard lives in ingestion script to avoid breaking server startup for developers without fiqh indexes configured
 
 ### Pending Todos
 
@@ -61,6 +75,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23
-Stopped at: Roadmap created — ROADMAP.md, STATE.md, and REQUIREMENTS.md traceability written
+Last session: 2026-03-24T01:42:14.121Z
+Stopped at: Completed 01-data-foundation plan 01 — dependencies and config bootstrap
 Resume file: None

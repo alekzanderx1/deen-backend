@@ -12,9 +12,9 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **INGE-01**: System can parse Sistani's "Islamic Laws" (4th edition) PDF into structured text preserving chapter/section hierarchy and ruling numbers
 - [ ] **INGE-02**: System chunks parsed text at ~300-400 tokens with ruling-number boundaries as primary split points, paragraph boundaries as secondary
 - [ ] **INGE-03**: Each chunk is tagged with metadata: source book, chapter, section, ruling number(s), topic tags (tahara, salah, sawm, hajj, khums, etc.)
-- [ ] **INGE-04**: System generates dense embeddings for all chunks and uploads to a dedicated Pinecone fiqh dense index
-- [ ] **INGE-05**: System generates sparse embeddings using Pinecone's sparse encoder (pinecone-text BM25) for all chunks and uploads to a dedicated Pinecone fiqh sparse index
-- [ ] **INGE-06**: Sparse encoder is initialized with the fiqh corpus vocabulary for consistent encoding at both ingestion and query time
+- [x] **INGE-04**: System generates dense embeddings for all chunks and uploads to a dedicated Pinecone fiqh dense index
+- [x] **INGE-05**: System generates sparse embeddings using Pinecone's sparse encoder (pinecone-text BM25) for all chunks and uploads to a dedicated Pinecone fiqh sparse index
+- [x] **INGE-06**: Sparse encoder is initialized with the fiqh corpus vocabulary for consistent encoding at both ingestion and query time
 
 ### Query Classification
 
@@ -108,9 +108,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INGE-01 | Phase 1 | Pending |
 | INGE-02 | Phase 1 | Pending |
 | INGE-03 | Phase 1 | Pending |
-| INGE-04 | Phase 1 | Pending |
-| INGE-05 | Phase 1 | Pending |
-| INGE-06 | Phase 1 | Pending |
+| INGE-04 | Phase 1 | Complete |
+| INGE-05 | Phase 1 | Complete |
+| INGE-06 | Phase 1 | Complete |
 | CLAS-01 | Phase 2 | Pending |
 | CLAS-02 | Phase 2 | Pending |
 | CLAS-03 | Phase 2 | Pending |
