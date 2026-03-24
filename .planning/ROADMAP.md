@@ -46,7 +46,12 @@ Plans:
   3. A complex multi-part fiqh query is decomposed into 2-4 independent, terminology-rich sub-queries
   4. Hybrid retrieval (dense + sparse + RRF) returns top-5 documents with source metadata for each sub-query
   5. Dense-only and sparse-only queries on fiqh terminology differ in ranking, confirming both paths are active
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Create modules/fiqh package, 6-category classifier, and ChatState fiqh_category field
+- [ ] 02-02-PLAN.md — Build query decomposer and unit tests for classifier + decomposer (mocked LLM)
+- [ ] 02-03-PLAN.md — Build hybrid RRF retriever and unit tests for retriever (mocked Pinecone)
 
 ### Phase 3: FAIR-RAG Core Modules
 **Goal**: The four FAIR-RAG processing modules — evidence filter, SEA, query refiner, and answer generator — each work correctly in isolation against synthetic evidence sets
@@ -82,6 +87,6 @@ Note: Phase 3 depends only on Phase 1 (data), so it can begin in parallel with P
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Data Foundation | 3/3 | Complete   | 2026-03-24 |
-| 2. Routing and Retrieval | 0/? | Not started | - |
+| 2. Routing and Retrieval | 0/3 | Not started | - |
 | 3. FAIR-RAG Core Modules | 0/? | Not started | - |
 | 4. Assembly and Integration | 0/? | Not started | - |
