@@ -28,8 +28,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Each chunk in Pinecone contains source metadata: book, chapter, section, and ruling number
   3. A test query to the dense index returns semantically relevant rulings from the correct chapter
   4. A test query to the sparse index returns keyword-matched results including Arabic/Persian fiqh terms
-  5. The TF-IDF vectorizer is persisted to disk and reloadable for query-time sparse encoding
-**Plans**: TBD
+  5. The BM25 encoder is persisted to disk and reloadable for query-time sparse encoding
+**Plans**: 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Add dependencies (pymupdf, pinecone-text) and register fiqh env vars in core/config.py
+- [ ] 01-02-PLAN.md — Write PDF parsing and chunking layer (parse_pdf, chunk_rulings, --dry-run)
+- [ ] 01-03-PLAN.md — Implement embedding + dual Pinecone upsert; run full ingestion and verify
 
 ### Phase 2: Routing and Retrieval
 **Goal**: Fiqh queries are accurately classified and retrieved against the fiqh corpus with hybrid search
@@ -76,7 +81,7 @@ Note: Phase 3 depends only on Phase 1 (data), so it can begin in parallel with P
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Data Foundation | 0/? | Not started | - |
+| 1. Data Foundation | 0/3 | Not started | - |
 | 2. Routing and Retrieval | 0/? | Not started | - |
 | 3. FAIR-RAG Core Modules | 0/? | Not started | - |
 | 4. Assembly and Integration | 0/? | Not started | - |
