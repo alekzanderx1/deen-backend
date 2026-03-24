@@ -44,19 +44,19 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **EVID-03**: Structured Evidence Assessment (SEA) deconstructs the query into a numbered checklist of required findings
 - [x] **EVID-04**: SEA checks each required finding against retrieved evidence, classifying as confirmed (with logical inferences) or gap
 - [x] **EVID-05**: SEA produces a sufficiency verdict (Yes/No) — "Yes" only when ALL required findings are confirmed
-- [ ] **EVID-06**: When SEA identifies gaps, the system generates 1-4 targeted refinement queries using confirmed facts to narrow the search
+- [x] **EVID-06**: When SEA identifies gaps, the system generates 1-4 targeted refinement queries using confirmed facts to narrow the search
 - [ ] **EVID-07**: The retrieval-assess-refine loop runs a maximum of 3 iterations, with early exit when SEA declares sufficiency
-- [ ] **EVID-08**: Query refinement uses the large LLM (gpt-4.1) and never repeats or rephrases previous queries
+- [x] **EVID-08**: Query refinement uses the large LLM (gpt-4.1) and never repeats or rephrases previous queries
 
 ### Answer Generation
 
-- [ ] **AGEN-01**: Final answer is generated exclusively from retrieved evidence — no parametric LLM knowledge used
-- [ ] **AGEN-02**: Every factual claim includes an inline citation token [n] linking to the source document
-- [ ] **AGEN-03**: Response includes a references list at the end with book, chapter, section, and ruling number for each cited source
-- [ ] **AGEN-04**: Every response that states a ruling includes a fatwa disclaimer: "This is based on Ayatollah Sistani's published works. For a definitive ruling, consult a qualified jurist or Sistani's official office."
-- [ ] **AGEN-05**: When evidence is insufficient after max iterations, system provides a partial answer with an explicit warning and redirect to official sources
-- [ ] **AGEN-06**: When no relevant evidence exists, system states this clearly and redirects to Sistani's official resources
-- [ ] **AGEN-07**: Answer generation uses the large LLM (gpt-4.1)
+- [x] **AGEN-01**: Final answer is generated exclusively from retrieved evidence — no parametric LLM knowledge used
+- [x] **AGEN-02**: Every factual claim includes an inline citation token [n] linking to the source document
+- [x] **AGEN-03**: Response includes a references list at the end with book, chapter, section, and ruling number for each cited source
+- [x] **AGEN-04**: Every response that states a ruling includes a fatwa disclaimer: "This is based on Ayatollah Sistani's published works. For a definitive ruling, consult a qualified jurist or Sistani's official office."
+- [x] **AGEN-05**: When evidence is insufficient after max iterations, system provides a partial answer with an explicit warning and redirect to official sources
+- [x] **AGEN-06**: When no relevant evidence exists, system states this clearly and redirects to Sistani's official resources
+- [x] **AGEN-07**: Answer generation uses the large LLM (gpt-4.1)
 - [x] **AGEN-08**: Dynamic LLM allocation routes small tasks (classification, decomposition, SEA) to gpt-4o-mini and heavy tasks (filtering, refinement, generation) to gpt-4.1
 
 ### Integration
@@ -128,16 +128,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EVID-03 | Phase 3 | Complete |
 | EVID-04 | Phase 3 | Complete |
 | EVID-05 | Phase 3 | Complete |
-| EVID-06 | Phase 3 | Pending |
+| EVID-06 | Phase 3 | Complete |
 | EVID-07 | Phase 3 | Pending |
-| EVID-08 | Phase 3 | Pending |
-| AGEN-01 | Phase 3 | Pending |
-| AGEN-02 | Phase 3 | Pending |
-| AGEN-03 | Phase 3 | Pending |
-| AGEN-04 | Phase 3 | Pending |
-| AGEN-05 | Phase 3 | Pending |
-| AGEN-06 | Phase 3 | Pending |
-| AGEN-07 | Phase 3 | Pending |
+| EVID-08 | Phase 3 | Complete |
+| AGEN-01 | Phase 3 | Complete |
+| AGEN-02 | Phase 3 | Complete |
+| AGEN-03 | Phase 3 | Complete |
+| AGEN-04 | Phase 3 | Complete |
+| AGEN-05 | Phase 3 | Complete |
+| AGEN-06 | Phase 3 | Complete |
+| AGEN-07 | Phase 3 | Complete |
 | AGEN-08 | Phase 3 | Complete |
 | INTG-01 | Phase 4 | Pending |
 | INTG-02 | Phase 4 | Pending |
