@@ -32,10 +32,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Retrieval
 
-- [ ] **RETR-01**: System performs hybrid retrieval (dense + sparse) from dedicated fiqh Pinecone indexes for each sub-query
-- [ ] **RETR-02**: Dense and sparse results are merged using Reciprocal Rank Fusion (RRF, k=60)
-- [ ] **RETR-03**: Top-5 documents per sub-query are retained after RRF merging
-- [ ] **RETR-04**: Retrieved documents include source metadata (book, chapter, section, ruling number) for citation
+- [x] **RETR-01**: System performs hybrid retrieval (dense + sparse) from dedicated fiqh Pinecone indexes for each sub-query
+- [x] **RETR-02**: Dense and sparse results are merged using Reciprocal Rank Fusion (RRF, k=60)
+- [x] **RETR-03**: Top-5 documents per sub-query are retained after RRF merging
+- [x] **RETR-04**: Retrieved documents include source metadata (book, chapter, section, ruling number) for citation
 
 ### Evidence Assessment
 
@@ -119,10 +119,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | QPRO-01 | Phase 2 | Complete |
 | QPRO-02 | Phase 2 | Complete |
 | QPRO-03 | Phase 2 | Complete |
-| RETR-01 | Phase 2 | Pending |
-| RETR-02 | Phase 2 | Pending |
-| RETR-03 | Phase 2 | Pending |
-| RETR-04 | Phase 2 | Pending |
+| RETR-01 | Phase 2 | Complete |
+| RETR-02 | Phase 2 | Complete |
+| RETR-03 | Phase 2 | Complete |
+| RETR-04 | Phase 2 | Complete |
 | EVID-01 | Phase 3 | Pending |
 | EVID-02 | Phase 3 | Pending |
 | EVID-03 | Phase 3 | Pending |

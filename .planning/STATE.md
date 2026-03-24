@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 02-routing-and-retrieval-02-02-PLAN.md
-last_updated: "2026-03-24T11:00:56.248Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 02-routing-and-retrieval-02-03-PLAN.md
+last_updated: "2026-03-24T11:05:28.750Z"
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
 ---
 
 # Project State
@@ -51,6 +51,7 @@ Plan: 3 of 3
 | Phase 01-data-foundation P03 | 2 | 1 tasks | 1 files |
 | Phase 02-routing-and-retrieval P01 | 1 | 2 tasks | 3 files |
 | Phase 02-routing-and-retrieval P02 | 1 | 2 tasks | 3 files |
+| Phase 02-routing-and-retrieval P03 | 5 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,9 @@ Recent decisions affecting current work:
 - [Phase 02-routing-and-retrieval]: fiqh_category: str added after is_fiqh in ChatState TypedDict with default '' in create_initial_state() for backward-compatible FAIR-RAG routing
 - [Phase 02-routing-and-retrieval]: decompose_query uses get_classifier_model() (gpt-4o-mini) per QPRO-03: cost efficiency for decomposition step
 - [Phase 02-routing-and-retrieval]: Fallback returns [query] not [] on any parse/exception: caller always gets at least one retrieval query
+- [Phase 02-routing-and-retrieval]: Use _get_sparse_vectorstore() for both dense and sparse fiqh index access: raw Pinecone index returns match.id (chunk_id) needed for RRF deduplication
+- [Phase 02-routing-and-retrieval]: sparse_vector= kwarg for sparse index query (not vector=): mixing causes 400 error on sparse-type Pinecone indexes
+- [Phase 02-routing-and-retrieval]: BM25_ENCODER_PATH resolved via Path(__file__).resolve(): cwd-independent path for fiqh_bm25_encoder.json regardless of server/test/ingestion context
 
 ### Pending Todos
 
@@ -89,6 +93,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T11:00:56.236Z
-Stopped at: Completed 02-routing-and-retrieval-02-02-PLAN.md
+Last session: 2026-03-24T11:05:28.740Z
+Stopped at: Completed 02-routing-and-retrieval-02-03-PLAN.md
 Resume file: None
