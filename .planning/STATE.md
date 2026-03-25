@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Milestone complete
+status: v1.0 milestone complete
 stopped_at: "Completed 04-03-PLAN.md: SSE Streaming Integration for Fiqh Path"
-last_updated: "2026-03-25T02:23:26.901Z"
+last_updated: "2026-03-25T23:54:54.494Z"
 progress:
   total_phases: 4
   completed_phases: 4
@@ -16,15 +16,14 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-23)
+See: .planning/PROJECT.md (updated 2026-03-25 after v1.0 milestone)
 
 **Core value:** Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah Sistani's published rulings — the system refuses to answer rather than hallucinate or speculate.
-**Current focus:** Phase 04 — assembly-and-integration
+**Current focus:** Planning next milestone — run `/gsd:new-milestone` to define v2.0 requirements
 
 ## Current Position
 
-Phase: 04
-Plan: Not started
+Milestone v1.0 shipped. No active phase.
 
 ## Performance Metrics
 
@@ -108,13 +107,10 @@ None yet.
 
 ### Blockers/Concerns
 
-- **TF-IDF vectorizer persistence**: Unclear whether the existing pipeline persists the fitted vectorizer to disk. Must audit `modules/embedding/embedder.py` before finalizing ingestion script design — if persistence pattern does not exist, it must be built.
-- **LangGraph 0.2.64 sub-graph API**: Sub-graph composition (`.invoke()` vs `.astream()` for nested graphs) should be verified against release notes before Phase 4 implementation begins.
-- **pymupdf4llm version**: Version 0.0.17 was current at knowledge cutoff; verify latest on PyPI before pinning.
-- **Sistani PDF ruling-number format**: Chunking regex anchoring logic assumes numbered rulings (e.g., "Issue 712:"); confirm actual 4th edition format before writing the parser.
+None. v1.0 shipped clean. 6 tech debt items tracked in `.planning/milestones/v1.0-MILESTONE-AUDIT.md`.
 
 ## Session Continuity
 
-Last session: 2026-03-25T02:16:32.565Z
-Stopped at: Completed 04-03-PLAN.md: SSE Streaming Integration for Fiqh Path
+Last session: 2026-03-25
+Stopped at: Milestone v1.0 archived and tagged
 Resume file: None
