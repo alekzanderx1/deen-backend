@@ -6,7 +6,7 @@ import gzip
 def compact_format_references(retrieved_docs: list, max_chars: int = 1500) -> str:
     """
     Formats retrieved hadiths and Quranic references for LLM-friendly Markdown output,
-    aligned with the updated JSON structure used in `format_references_as_json`, 
+    aligned with the updated JSON structure used in `format_references_as_json`,
     in a short compact form to reduce LLM token usage.
     """
     print("INSIDE format_references")
@@ -245,7 +245,7 @@ def format_references_as_json(retrieved_docs: list):
                 "chapter_title": doc['metadata'].get("chapter_title", "N/A"),
                 "collection": doc['metadata'].get("collection", "N/A"),
                 "grade_ar": doc['metadata'].get("grade_ar", "N/A"),
-                "grade_en": doc['metadata'].get("grade_en", "N/A"),                
+                "grade_en": doc['metadata'].get("grade_en", "N/A"),
                 "hadith_id": doc['metadata'].get("hadith_id", "N/A"),
                 "hadith_no": doc['metadata'].get("hadith_no", "N/A"),
                 "hadith_url": doc['metadata'].get("hadith_url", "N/A"),
@@ -260,9 +260,9 @@ def format_references_as_json(retrieved_docs: list):
         print(f"Error formatting references: {e}")
         traceback.print_exc()
         return result
-    
+
     result = formatted_references
-    
+
     return result
 
 def format_quran_references_as_json(quran_docs: list) -> list:
@@ -290,6 +290,28 @@ def format_quran_references_as_json(quran_docs: list) -> list:
             })
     except Exception as e:
         print(f"Error formatting Quran references: {e}")
+        traceback.print_exc()
+    return result
+
+
+def format_fiqh_references_as_json(fiqh_docs: list) -> list:
+    """
+    Formats fiqh documents into citation JSON for the fiqh_references SSE event.
+    Each entry carries book, chapter, section, and ruling_number from chunk metadata.
+    Used by pipeline_langgraph.py after streaming a fiqh answer.
+    """
+    result = []
+    try:
+        for doc in fiqh_docs:
+            md = doc.get("metadata", {}) or {}
+            result.append({
+                "book": md.get("source_book", "Islamic Laws"),
+                "chapter": md.get("chapter", ""),
+                "section": md.get("section", ""),
+                "ruling_number": md.get("ruling_number", ""),
+            })
+    except Exception as e:
+        print(f"Error formatting fiqh references: {e}")
         traceback.print_exc()
     return result
 
