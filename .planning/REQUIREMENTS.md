@@ -45,7 +45,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **EVID-04**: SEA checks each required finding against retrieved evidence, classifying as confirmed (with logical inferences) or gap
 - [x] **EVID-05**: SEA produces a sufficiency verdict (Yes/No) — "Yes" only when ALL required findings are confirmed
 - [x] **EVID-06**: When SEA identifies gaps, the system generates 1-4 targeted refinement queries using confirmed facts to narrow the search
-- [ ] **EVID-07**: The retrieval-assess-refine loop runs a maximum of 3 iterations, with early exit when SEA declares sufficiency
+- [x] **EVID-07**: The retrieval-assess-refine loop runs a maximum of 3 iterations, with early exit when SEA declares sufficiency
 - [x] **EVID-08**: Query refinement uses the large LLM (gpt-4.1) and never repeats or rephrases previous queries
 
 ### Answer Generation
@@ -61,11 +61,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Integration
 
-- [ ] **INTG-01**: FAIR-RAG pipeline is implemented as a compiled LangGraph sub-graph invoked by the main ChatAgent when a query is classified as fiqh
+- [x] **INTG-01**: FAIR-RAG pipeline is implemented as a compiled LangGraph sub-graph invoked by the main ChatAgent when a query is classified as fiqh
 - [ ] **INTG-02**: The existing `fiqh_classification` node routes to the fiqh sub-graph instead of the current early-exit behavior
 - [ ] **INTG-03**: SSE status events are emitted for each fiqh pipeline stage: classifying, decomposing, retrieving, filtering, assessing, refining, generating
 - [ ] **INTG-04**: The final answer is streamed token-by-token via the existing SSE `response_chunk` protocol
-- [ ] **INTG-05**: Fiqh references (citations with source metadata) are emitted as a new SSE event type alongside the existing hadith/quran reference events
+- [x] **INTG-05**: Fiqh references (citations with source metadata) are emitted as a new SSE event type alongside the existing hadith/quran reference events
 
 ## v2 Requirements
 
@@ -129,7 +129,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EVID-04 | Phase 3 | Complete |
 | EVID-05 | Phase 3 | Complete |
 | EVID-06 | Phase 3 | Complete |
-| EVID-07 | Phase 3 | Pending |
+| EVID-07 | Phase 3 | Complete |
 | EVID-08 | Phase 3 | Complete |
 | AGEN-01 | Phase 3 | Complete |
 | AGEN-02 | Phase 3 | Complete |
@@ -139,11 +139,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AGEN-06 | Phase 3 | Complete |
 | AGEN-07 | Phase 3 | Complete |
 | AGEN-08 | Phase 3 | Complete |
-| INTG-01 | Phase 4 | Pending |
+| INTG-01 | Phase 4 | Complete |
 | INTG-02 | Phase 4 | Pending |
 | INTG-03 | Phase 4 | Pending |
 | INTG-04 | Phase 4 | Pending |
-| INTG-05 | Phase 4 | Pending |
+| INTG-05 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 39 total
