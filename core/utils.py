@@ -197,6 +197,57 @@ def format_references_as_json(retrieved_docs: list):
     
     return result
 
+def format_quran_references_as_json(quran_docs: list) -> list:
+    """
+    Formats Quran/Tafsir documents into JSON with their native fields.
+    Used to produce the separate quran_references SSE event.
+    """
+    result = []
+    try:
+        for doc in quran_docs:
+            md = doc.get("metadata", {}) or {}
+            result.append({
+                "surah_name": md.get("surah_name", "N/A"),
+                "title": md.get("title", "N/A"),
+                "chapter_number": md.get("chapter_number", "N/A"),
+                "verses_covered": md.get("verses_covered", "N/A"),
+                "starting_verse": md.get("starting_verse", "N/A"),
+                "ending_verse": md.get("ending_verse", "N/A"),
+                "author": md.get("author", "N/A"),
+                "collection": md.get("collection", "N/A"),
+                "volume": md.get("volume", "N/A"),
+                "sect": md.get("sect", "N/A"),
+                "quran_translation": doc.get("quran_translation", ""),
+                "tafsir_text": doc.get("page_content_en", ""),
+            })
+    except Exception as e:
+        print(f"Error formatting Quran references: {e}")
+        traceback.print_exc()
+    return result
+
+
+def format_fiqh_references_as_json(fiqh_docs: list) -> list:
+    """
+    Formats fiqh documents into citation JSON for the fiqh_references SSE event.
+    Each entry carries book, chapter, section, and ruling_number from chunk metadata.
+    Used by pipeline_langgraph.py after streaming a fiqh answer.
+    """
+    result = []
+    try:
+        for doc in fiqh_docs:
+            md = doc.get("metadata", {}) or {}
+            result.append({
+                "book": md.get("source_book", "Islamic Laws"),
+                "chapter": md.get("chapter", ""),
+                "section": md.get("section", ""),
+                "ruling_number": md.get("ruling_number", ""),
+            })
+    except Exception as e:
+        print(f"Error formatting fiqh references: {e}")
+        traceback.print_exc()
+    return result
+
+
 def stream_message(message: str):
     """
     A simple generator that yields the given message.
