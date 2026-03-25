@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Data Foundation** - Ingest Sistani's "Islamic Laws" into dedicated Pinecone fiqh indexes (completed 2026-03-24)
 - [ ] **Phase 2: Routing and Retrieval** - Upgrade query classifier and build hybrid fiqh retrieval
 - [ ] **Phase 3: FAIR-RAG Core Modules** - Build evidence filtering, SEA, query refinement, and answer generation
-- [ ] **Phase 4: Assembly and Integration** - Wire sub-graph into the main agent and SSE streaming layer
+- [x] **Phase 4: Assembly and Integration** - Wire sub-graph into the main agent and SSE streaming layer (completed 2026-03-25)
 
 ## Phase Details
 
@@ -85,7 +85,7 @@ Plans:
 Plans:
 - [x] 04-01-PLAN.md — State foundations: FiqhState TypedDict, ChatState fiqh fields, format_fiqh_references_as_json
 - [x] 04-02-PLAN.md — FiqhAgent sub-graph + updated ChatAgent routing and generation nodes
-- [ ] 04-03-PLAN.md — SSE streaming integration: fiqh path detection, token streaming, fiqh_references event + tests
+- [x] 04-03-PLAN.md — SSE streaming integration: fiqh path detection, token streaming, fiqh_references event + tests
 
 ## Progress
 
@@ -99,4 +99,4 @@ Note: Phase 3 depends only on Phase 1 (data), so it can begin in parallel with P
 | 1. Data Foundation | 3/3 | Complete   | 2026-03-24 |
 | 2. Routing and Retrieval | 0/3 | Not started | - |
 | 3. FAIR-RAG Core Modules | 2/3 | In Progress|  |
-| 4. Assembly and Integration | 2/3 | In Progress|  |
+| 4. Assembly and Integration | 3/3 | Complete   | 2026-03-25 |
