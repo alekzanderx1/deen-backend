@@ -62,8 +62,8 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Integration
 
 - [x] **INTG-01**: FAIR-RAG pipeline is implemented as a compiled LangGraph sub-graph invoked by the main ChatAgent when a query is classified as fiqh
-- [ ] **INTG-02**: The existing `fiqh_classification` node routes to the fiqh sub-graph instead of the current early-exit behavior
-- [ ] **INTG-03**: SSE status events are emitted for each fiqh pipeline stage: classifying, decomposing, retrieving, filtering, assessing, refining, generating
+- [x] **INTG-02**: The existing `fiqh_classification` node routes to the fiqh sub-graph instead of the current early-exit behavior
+- [x] **INTG-03**: SSE status events are emitted for each fiqh pipeline stage: classifying, decomposing, retrieving, filtering, assessing, refining, generating
 - [ ] **INTG-04**: The final answer is streamed token-by-token via the existing SSE `response_chunk` protocol
 - [x] **INTG-05**: Fiqh references (citations with source metadata) are emitted as a new SSE event type alongside the existing hadith/quran reference events
 
@@ -140,8 +140,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AGEN-07 | Phase 3 | Complete |
 | AGEN-08 | Phase 3 | Complete |
 | INTG-01 | Phase 4 | Complete |
-| INTG-02 | Phase 4 | Pending |
-| INTG-03 | Phase 4 | Pending |
+| INTG-02 | Phase 4 | Complete |
+| INTG-03 | Phase 4 | Complete |
 | INTG-04 | Phase 4 | Pending |
 | INTG-05 | Phase 4 | Complete |
 

@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: "Completed 04-01-PLAN.md: State foundations and reference formatter"
-last_updated: "2026-03-25T01:15:10.481Z"
+stopped_at: "Completed 04-02-PLAN.md: FiqhAgent sub-graph and ChatAgent integration"
+last_updated: "2026-03-25T02:08:20.160Z"
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 12
-  completed_plans: 10
+  completed_plans: 11
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 04 (assembly-and-integration) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -56,6 +56,7 @@ Plan: 2 of 3
 | Phase 03-fair-rag-core-modules P02 | 2 | 2 tasks | 4 files |
 | Phase 03-fair-rag-core-modules P03 | 3 | 1 tasks | 2 files |
 | Phase 04-assembly-and-integration P01 | 3 | 3 tasks | 4 files |
+| Phase 04-assembly-and-integration P02 | 4 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -94,6 +95,9 @@ Recent decisions affecting current work:
 - [Phase 03-fair-rag-core-modules]: No LangGraph imports in fair_rag.py: pure Python module per D-02; Phase 4 wraps into graph node
 - [Phase 04-assembly-and-integration]: FiqhState.sea_result typed as Optional[object] to prevent circular import from agents -> modules packages
 - [Phase 04-assembly-and-integration]: agents/state package created fresh in worktree from shawn-dev Phase 2 baseline: worktree was on older commit missing the state package
+- [Phase 04-assembly-and-integration]: checkpointer=False on fiqh_subgraph: stateless per-invocation; prevents cross-session state leakage
+- [Phase 04-assembly-and-integration]: Wrapper node pattern: _call_fiqh_subgraph_node projects ChatState to fresh FiqhState and maps results back
+- [Phase 04-assembly-and-integration]: 3-path routing from fiqh_classification: VALID_* to fiqh_subgraph, OUT_OF_SCOPE/UNETHICAL to check_early_exit with LLM rejection, else to agent
 
 ### Pending Todos
 
@@ -108,6 +112,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T01:15:10.470Z
-Stopped at: Completed 04-01-PLAN.md: State foundations and reference formatter
+Last session: 2026-03-25T02:08:20.150Z
+Stopped at: Completed 04-02-PLAN.md: FiqhAgent sub-graph and ChatAgent integration
 Resume file: None
