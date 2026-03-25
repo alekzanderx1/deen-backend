@@ -45,11 +45,16 @@ Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah
 - ✓ Insufficient evidence handling — partial answers with redirect to official sources — Validated in Phase 3: FAIR-RAG Core Modules
 - ✓ FAIR-RAG coordinator: max-3-iteration retrieve→filter→assess→refine loop, doc accumulation, early exit — Validated in Phase 3: FAIR-RAG Core Modules
 
-### Active
+### Validated
 
-- [ ] FAIR-RAG iterative loop wired as a LangGraph node (Phase 4 integration — calls run_fair_rag from fiqh LangGraph node)
-- [ ] SSE streaming of intermediate pipeline status (decomposing, retrieving, assessing, refining)
-- [ ] Negative rejection — refuse to answer when evidence is insufficient or question is out of scope
+- ✓ FAIR-RAG iterative sub-graph wired as a LangGraph sub-graph invoked by the main ChatAgent — Validated in Phase 4: Assembly and Integration
+- ✓ SSE streaming of intermediate fiqh pipeline status (classifying, decomposing, retrieving, filtering, assessing, refining, generating) — Validated in Phase 4: Assembly and Integration
+- ✓ `fiqh_references` SSE event emitted after streaming with book/chapter/section/ruling_number per source — Validated in Phase 4: Assembly and Integration
+- ✓ Negative rejection — OUT_OF_SCOPE_FIQH and UNETHICAL categories exit early with LLM-generated personalized rejection messages — Validated in Phase 4: Assembly and Integration
+- ✓ Session isolation — `checkpointer=False` on compiled sub-graph guarantees fresh FiqhState per invocation — Validated in Phase 4: Assembly and Integration
+- ✓ Non-fiqh path preserved unchanged — existing hadith/Quran pipeline unaffected — Validated in Phase 4: Assembly and Integration
+
+### Active
 
 ### Out of Scope
 
@@ -84,11 +89,11 @@ Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | Separate Pinecone index for fiqh | Keep fiqh corpus isolated from hadith/Quran for precision | deen-fiqh-dense + deen-fiqh-sparse, 3000 chunks in ns1 |
-| FAIR-RAG as LangGraph sub-graph | Integrates cleanly with existing agent architecture; main agent routes to fiqh sub-graph | — Pending |
-| Dynamic LLM allocation | 13% cheaper than static large with better negative rejection (97% vs 94%) per FARSIQA research | — Pending |
-| Max 3 iterations | Both FAIR-RAG and FARSIQA papers show iteration 4 gives negligible or negative improvement | — Pending |
-| Start with single book only | Bounded corpus makes data quality controllable; expand later | — Pending |
-| Improved classifier over existing | Current classifier doesn't route fiqh queries accurately enough | — Pending |
+| FAIR-RAG as LangGraph sub-graph | Integrates cleanly with existing agent architecture; main agent routes to fiqh sub-graph | Implemented in Phase 4: `agents/fiqh/fiqh_graph.py` compiled with `checkpointer=False` |
+| Dynamic LLM allocation | 13% cheaper than static large with better negative rejection (97% vs 94%) per FARSIQA research | Implemented in Phase 3: gpt-4o-mini for SEA/decompose/filter, gpt-4.1 for generation/refinement |
+| Max 3 iterations | Both FAIR-RAG and FARSIQA papers show iteration 4 gives negligible or negative improvement | Implemented in Phase 3/4: iteration counter in FiqhState, `_route_after_assess` exits at iteration >= 3 |
+| Start with single book only | Bounded corpus makes data quality controllable; expand later | Implemented in Phase 1: Sistani "Islamic Laws" 4th ed., ~3000 chunks in Pinecone ns1 |
+| Improved classifier over existing | Current classifier doesn't route fiqh queries accurately enough | Implemented in Phase 2/4: 6-category classifier (VALID_OBVIOUS/SMALL/LARGE/REASONER/OUT_OF_SCOPE_FIQH/UNETHICAL) |
 
 ## Evolution
 
@@ -108,4 +113,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-24 — Phase 2 complete*
+*Last updated: 2026-03-25 — Phase 4 complete — all milestone phases complete*
