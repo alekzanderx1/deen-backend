@@ -126,9 +126,11 @@ class ChatAgent:
         if category in {"VALID_OBVIOUS", "VALID_SMALL", "VALID_LARGE", "VALID_REASONER"}:
             print(f"[ROUTING] Valid fiqh category ({category}) — routing to fiqh sub-graph")
             return "fiqh"
-        if category in {"OUT_OF_SCOPE_FIQH", "UNETHICAL"}:
-            print(f"[ROUTING] Rejected fiqh category ({category}) — routing to early exit")
+        if category == "UNETHICAL":
+            print(f"[ROUTING] Unethical query — routing to early exit")
             return "exit"
+        # OUT_OF_SCOPE_FIQH = general Islamic question (history, theology, etc.)
+        # — let the regular hadith/Quran agent handle it
         print("[ROUTING] Not a fiqh query — routing to agent")
         return "continue"
 
@@ -264,35 +266,25 @@ Generate a comprehensive, accurate response that directly addresses the user's q
             }
 
         category = state.get("fiqh_category", "")
-        if category in {"OUT_OF_SCOPE_FIQH", "UNETHICAL"}:
+        if category == "UNETHICAL":
             # LLM-generated personalized rejection message (D-12)
             try:
                 from core.chat_models import get_classifier_model
 
                 model = get_classifier_model()
-                if category == "UNETHICAL":
-                    prompt_text = (
-                        f"A user asked: '{state['user_query']}'\n\n"
-                        "This question asks for a ruling on something harmful or unethical. "
-                        "Politely decline to answer in 1-2 sentences, without judging the user. "
-                        "Do not provide any ruling."
-                    )
-                else:
-                    prompt_text = (
-                        f"A user asked: '{state['user_query']}'\n\n"
-                        "This question is outside the scope of Ayatollah Sistani's fiqh rulings "
-                        "(e.g., it is a general Islamic question, history, theology, or asks about another marja). "
-                        "In 1-2 sentences, politely explain that you specialize in Sistani's fiqh rulings "
-                        "and suggest they consult appropriate resources."
-                    )
+                prompt_text = (
+                    f"A user asked: '{state['user_query']}'\n\n"
+                    "This question asks for a ruling on something harmful or unethical. "
+                    "Politely decline to answer in 1-2 sentences, without judging the user. "
+                    "Do not provide any ruling."
+                )
                 from langchain_core.messages import HumanMessage
                 response = model.invoke([HumanMessage(content=prompt_text)])
                 msg = response.content.strip()
             except Exception as exc:
                 print(f"[CHECK EARLY EXIT NODE] LLM rejection error: {exc}")
                 msg = (
-                    "I'm unable to answer this question. "
-                    "For fiqh rulings on Sistani's jurisprudence, please consult a qualified scholar."
+                    "I'm unable to answer this question as it involves something harmful or unethical."
                 )
             return {"final_response": msg, "early_exit_message": msg}
 
