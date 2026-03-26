@@ -11,15 +11,15 @@ from langchain_core.messages import BaseMessage
 class ChatState(TypedDict):
     """
     State for the agentic chat pipeline.
-    
+
     This state is passed between nodes in the LangGraph and tracks
     all relevant information throughout the conversation flow.
     """
-    
+
     # Core conversation data
     messages: Annotated[List[BaseMessage], add_messages]
     """Message history for the agent (uses add_messages reducer)"""
-    
+
     user_query: str
     """Original user query"""
 
@@ -31,44 +31,48 @@ class ChatState(TypedDict):
 
     runtime_session_id: str
     """Runtime history key used for transcript memory"""
-    
+
     target_language: str
     """User's preferred language (default: "english")"""
-    
+
     # Translation tracking
     is_translated: bool
     """Whether the query has been translated to English"""
-    
+
     original_language: Optional[str]
     """Original language of the query if translated"""
-    
+
     # Classification results
     is_non_islamic: Optional[bool]
     """True if query is not about Islamic education"""
-    
+
     is_fiqh: Optional[bool]
     """True if query asks for a fiqh ruling"""
-    
+
+    fiqh_category: str
+    """6-category fiqh classification result. One of: VALID_OBVIOUS, VALID_SMALL,
+    VALID_LARGE, VALID_REASONER, OUT_OF_SCOPE_FIQH, UNETHICAL, or '' (not yet classified)"""
+
     classification_checked: bool
     """Whether classification has been performed"""
-    
+
     # Query enhancement
     enhanced_query: Optional[str]
     """Enhanced version of the query for better retrieval"""
-    
+
     query_enhanced: bool
     """Whether query enhancement has been performed"""
-    
+
     # Document retrieval
     retrieved_docs: List[Dict[str, Any]]
     """Retrieved documents from knowledge base"""
-    
+
     shia_docs_count: int
     """Number of Shia documents retrieved"""
-    
+
     sunni_docs_count: int
     """Number of Sunni documents retrieved"""
-    
+
     quran_docs_count: int
     """Number of Quran/Tafsir documents retrieved"""
 
@@ -89,32 +93,40 @@ class ChatState(TypedDict):
 
     ready_to_answer: bool
     """Whether the agent has decided it has enough evidence to answer"""
-    
+
     # Response generation
     final_response: Optional[str]
     """Final generated response to the user"""
-    
+
     response_generated: bool
     """Whether final response has been generated"""
-    
+
     # Configuration
     config: Dict[str, Any]
     """Configuration parameters (retrieval settings, model params, etc.)"""
-    
+
     # Flow control
     should_end: bool
     """Whether the agent should stop (e.g., after classification rejection)"""
-    
+
     early_exit_message: Optional[str]
     """Message to send if exiting early (e.g., non-Islamic or fiqh query)"""
-    
+
     # Error tracking
     errors: List[str]
     """List of errors encountered during processing"""
-    
+
     # Metadata
     iterations: int
     """Number of agent iterations (for debugging and limits)"""
+
+    # Fiqh FAIR-RAG pipeline results
+    fiqh_filtered_docs: List[Dict[str, Any]]
+    """Final filtered fiqh documents from sub-graph exit. Empty list if fiqh path not taken."""
+
+    fiqh_sea_result: Optional[Any]
+    """SEAResult from final sub-graph iteration. None if fiqh path not taken.
+    Typed as Any to avoid circular import; actual type is modules.fiqh.sea.SEAResult."""
 
 
 def create_initial_state(
@@ -127,7 +139,7 @@ def create_initial_state(
 ) -> ChatState:
     """
     Create initial state for a new chat interaction.
-    
+
     Args:
         user_query: The user's question
         session_id: Session identifier
@@ -135,7 +147,7 @@ def create_initial_state(
         config: Optional configuration overrides
         initial_messages: Optional existing conversation history
         streaming_mode: Whether the graph should stop before response generation
-        
+
     Returns:
         ChatState with initial values
     """
@@ -150,6 +162,7 @@ def create_initial_state(
         original_language=None,
         is_non_islamic=None,
         is_fiqh=None,
+        fiqh_category="",
         classification_checked=False,
         enhanced_query=None,
         query_enhanced=False,
@@ -173,7 +186,7 @@ def create_initial_state(
         should_end=False,
         early_exit_message=None,
         errors=[],
-        iterations=0
+        iterations=0,
+        fiqh_filtered_docs=[],
+        fiqh_sea_result=None,
     )
-
-

@@ -1,0 +1,213 @@
+"""
+agents/fiqh/fiqh_graph.py
+
+Compiled FiqhAgent LangGraph sub-graph for the FAIR-RAG pipeline.
+Runs the iterative retrieve -> filter -> assess -> [refine -> repeat] loop.
+Max 3 iterations enforced via FiqhState.iteration counter.
+
+Public interface: fiqh_subgraph (compiled CompiledGraph)
+Call pattern: fiqh_subgraph.invoke({...FiqhState initial dict...})
+"""
+from __future__ import annotations
+import logging
+from typing import Literal
+
+from langgraph.graph import END, StateGraph
+
+from agents.state.fiqh_state import FiqhState
+
+logger = logging.getLogger(__name__)
+
+# --------------------------------------------------------------------------- #
+# Node functions
+# --------------------------------------------------------------------------- #
+
+def _decompose_node(state: FiqhState) -> dict:
+    """Decompose original query into 1-4 keyword-rich sub-queries for retrieval."""
+    from modules.fiqh.decomposer import decompose_query
+
+    state["status_events"].append({
+        "step": "fiqh_decompose",
+        "message": "Decomposing fiqh query...",
+    })
+    try:
+        sub_queries = decompose_query(state["query"])
+        logger.info("[FIQH_GRAPH] Decomposed into %d sub-queries", len(sub_queries))
+    except Exception as exc:
+        logger.error("[FIQH_GRAPH] decompose_node error: %s", exc)
+        sub_queries = [state["query"]]
+
+    # prior_queries starts empty; seed with original query on first decompose
+    prior = list(state["prior_queries"])
+    for sq in sub_queries:
+        if sq not in prior:
+            prior.append(sq)
+
+    return {
+        "prior_queries": prior,
+        "status_events": list(state["status_events"]),
+    }
+
+
+def _retrieve_node(state: FiqhState) -> dict:
+    """Retrieve fiqh documents for the latest query in prior_queries."""
+    from modules.fiqh.retriever import retrieve_fiqh_documents
+
+    iteration = state["iteration"] + 1
+    state["status_events"].append({
+        "step": "fiqh_retrieve",
+        "message": f"Retrieving fiqh documents (iteration {iteration})...",
+    })
+
+    # Use the last query in prior_queries for this retrieval
+    current_query = state["prior_queries"][-1] if state["prior_queries"] else state["query"]
+
+    try:
+        new_docs = retrieve_fiqh_documents(current_query)
+        logger.info("[FIQH_GRAPH] Retrieved %d docs for query: %s", len(new_docs), current_query[:60])
+    except Exception as exc:
+        logger.error("[FIQH_GRAPH] retrieve_node error: %s", exc)
+        new_docs = []
+
+    # Accumulate unique docs by chunk_id (D-03 pattern)
+    existing = list(state["accumulated_docs"])
+    seen_ids = {d["chunk_id"] for d in existing}
+    for doc in new_docs:
+        if doc.get("chunk_id") not in seen_ids:
+            existing.append(doc)
+            seen_ids.add(doc["chunk_id"])
+
+    return {
+        "iteration": iteration,
+        "accumulated_docs": existing,
+        "status_events": list(state["status_events"]),
+    }
+
+
+def _filter_node(state: FiqhState) -> dict:
+    """Filter accumulated docs to keep relevant evidence (inclusive bias)."""
+    from modules.fiqh.filter import filter_evidence
+
+    state["status_events"].append({
+        "step": "fiqh_filter",
+        "message": "Filtering fiqh evidence...",
+    })
+    try:
+        filtered = filter_evidence(state["query"], state["accumulated_docs"])
+        logger.info(
+            "[FIQH_GRAPH] Filtered: %d -> %d docs",
+            len(state["accumulated_docs"]),
+            len(filtered),
+        )
+    except Exception as exc:
+        logger.error("[FIQH_GRAPH] filter_node error: %s", exc)
+        filtered = list(state["accumulated_docs"])  # fail open
+
+    return {
+        "accumulated_docs": filtered,
+        "status_events": list(state["status_events"]),
+    }
+
+
+def _assess_node(state: FiqhState) -> dict:
+    """Run Structured Evidence Assessment (SEA) against accumulated docs."""
+    from modules.fiqh.sea import assess_evidence, SEAResult
+
+    state["status_events"].append({
+        "step": "fiqh_assess",
+        "message": "Assessing evidence sufficiency...",
+    })
+    try:
+        sea_result = assess_evidence(state["query"], state["accumulated_docs"])
+        verdict = sea_result.verdict
+        logger.info("[FIQH_GRAPH] SEA verdict: %s (iteration %d)", verdict, state["iteration"])
+    except Exception as exc:
+        logger.error("[FIQH_GRAPH] assess_node error: %s", exc)
+        sea_result = SEAResult(
+            findings=[],
+            verdict="INSUFFICIENT",
+            confirmed_facts=[],
+            gaps=[state["query"]],
+        )
+        verdict = "INSUFFICIENT"
+
+    return {
+        "sea_result": sea_result,
+        "verdict": verdict,
+        "status_events": list(state["status_events"]),
+    }
+
+
+def _refine_node(state: FiqhState) -> dict:
+    """Generate targeted refinement queries from confirmed facts and gaps."""
+    from modules.fiqh.refiner import refine_query
+
+    state["status_events"].append({
+        "step": "fiqh_refine",
+        "message": "Refining query for next retrieval iteration...",
+    })
+    try:
+        refinements = refine_query(
+            original_query=state["query"],
+            sea_result=state["sea_result"],
+            prior_queries=state["prior_queries"],
+        )
+        logger.info("[FIQH_GRAPH] Refined into %d queries", len(refinements))
+    except Exception as exc:
+        logger.error("[FIQH_GRAPH] refine_node error: %s", exc)
+        refinements = [state["query"]]
+
+    prior = list(state["prior_queries"])
+    for q in refinements:
+        if q not in prior:
+            prior.append(q)
+
+    return {
+        "prior_queries": prior,
+        "status_events": list(state["status_events"]),
+    }
+
+
+# --------------------------------------------------------------------------- #
+# Routing function
+# --------------------------------------------------------------------------- #
+
+def _route_after_assess(state: FiqhState) -> Literal["exit", "refine"]:
+    """
+    Exit if SEA is SUFFICIENT or max iterations (3) reached.
+    Otherwise route to refine -> retrieve for another iteration.
+    """
+    if state["verdict"] == "SUFFICIENT" or state["iteration"] >= 3:
+        logger.info(
+            "[FIQH_GRAPH] Exiting after iteration %d (verdict=%s)",
+            state["iteration"],
+            state["verdict"],
+        )
+        return "exit"
+    return "refine"
+
+
+# --------------------------------------------------------------------------- #
+# Build and compile sub-graph
+# --------------------------------------------------------------------------- #
+
+_fiqh_builder = StateGraph(FiqhState)
+_fiqh_builder.add_node("decompose", _decompose_node)
+_fiqh_builder.add_node("retrieve", _retrieve_node)
+_fiqh_builder.add_node("filter", _filter_node)
+_fiqh_builder.add_node("assess", _assess_node)
+_fiqh_builder.add_node("refine", _refine_node)
+
+_fiqh_builder.set_entry_point("decompose")
+_fiqh_builder.add_edge("decompose", "retrieve")
+_fiqh_builder.add_edge("retrieve", "filter")
+_fiqh_builder.add_edge("filter", "assess")
+_fiqh_builder.add_conditional_edges(
+    "assess",
+    _route_after_assess,
+    {"exit": END, "refine": "refine"},
+)
+_fiqh_builder.add_edge("refine", "retrieve")
+
+# checkpointer=False: stateless per-invocation; no cross-session leakage (per Pitfall 2)
+fiqh_subgraph = _fiqh_builder.compile(checkpointer=False)
