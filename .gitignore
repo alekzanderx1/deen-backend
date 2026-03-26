@@ -55,3 +55,6 @@ temps/
 examples/
 docs/
 
+# Fiqh ingestion artifacts (generated, not committed)
+data/*.json
+

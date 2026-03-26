@@ -22,6 +22,15 @@ NODE_STATUS_MESSAGES = {
     "tools": "Looking for information...",
     "generate_response": "Generating response...",
     "check_early_exit": "Processing...",
+    # Fiqh FAIR-RAG pipeline nodes
+    "fiqh_subgraph": "Processing fiqh query...",
+    "generate_fiqh_response": "Generating fiqh answer...",
+    # Fiqh sub-graph stage status (emitted explicitly after fiqh_subgraph event)
+    "fiqh_decompose": "Decomposing fiqh query...",
+    "fiqh_retrieve": "Retrieving fiqh documents...",
+    "fiqh_filter": "Filtering evidence...",
+    "fiqh_assess": "Assessing evidence sufficiency...",
+    "fiqh_refine": "Refining query...",
 }
 
 # Human-readable status messages for each tool call
@@ -33,6 +42,10 @@ TOOL_STATUS_MESSAGES = {
     "retrieve_sunni_documents_tool": "Retrieving Sunni documents...",
     "retrieve_quran_tafsir_tool": "Retrieving Quran & Tafsir...",
 }
+
+
+# Categories that trigger the FAIR-RAG fiqh path
+VALID_FIQH_CATEGORIES = {"VALID_OBVIOUS", "VALID_SMALL", "VALID_LARGE", "VALID_REASONER"}
 
 
 def sse_event(event_type: str, data: dict) -> str:
@@ -129,76 +142,160 @@ async def chat_pipeline_streaming_agentic(
                 yield sse_event("done", {})
                 return
 
-            # --- Stream LLM response token-by-token ---
-            hadith_docs = final_state.get("retrieved_docs", [])
-            quran_docs = final_state.get("quran_docs", [])
-            all_docs = hadith_docs + quran_docs
+            # --- Fiqh FAIR-RAG streaming path ---
+            if final_state.get("fiqh_category") in VALID_FIQH_CATEGORIES:
+                from modules.fiqh.generator import (
+                    _prompt as fiqh_prompt,
+                    _format_evidence,
+                    _build_references_section,
+                    INSUFFICIENT_WARNING,
+                    FATWA_DISCLAIMER,
+                )
+                from core import chat_models
+                from core.utils import format_fiqh_references_as_json
 
-            if all_docs or final_state.get("final_response"):
-                if final_state.get("final_response"):
-                    # Non-streaming path returned a pre-built response (shouldn't happen
-                    # with streaming_mode=True, but handle gracefully)
-                    assistant_text = final_state["final_response"]
-                    yield sse_event("response_chunk", {"token": assistant_text})
+                # Emit per-stage status events for the fiqh pipeline stages
+                # (sub-graph runs as a black box; we emit pre-canned stage messages)
+                fiqh_stages = [
+                    ("fiqh_decompose", "Decomposing fiqh query..."),
+                    ("fiqh_retrieve", "Retrieving fiqh documents..."),
+                    ("fiqh_filter", "Filtering evidence..."),
+                    ("fiqh_assess", "Assessing evidence sufficiency..."),
+                ]
+                for stage_step, stage_msg in fiqh_stages:
+                    yield sse_event("status", {"step": stage_step, "message": stage_msg})
+
+                yield sse_event("status", {"step": "generate_fiqh_response", "message": "Generating fiqh answer..."})
+
+                fiqh_docs = final_state.get("fiqh_filtered_docs", [])
+                sea_result = final_state.get("fiqh_sea_result")
+                is_sufficient = getattr(sea_result, "verdict", "INSUFFICIENT") == "SUFFICIENT"
+
+                if not fiqh_docs:
+                    # No evidence retrieved — emit fallback message
+                    fallback = (
+                        "I was unable to retrieve relevant rulings for this question. "
+                        "Please consult Sistani's official resources at sistani.org "
+                        "or contact his office directly." + FATWA_DISCLAIMER
+                    )
+                    assistant_text = fallback
+                    yield sse_event("response_chunk", {"token": fallback})
                     yield sse_event("response_end", {})
                 else:
-                    # Stream the response token-by-token
-                    from core import chat_models, prompt_templates
-                    from core.memory import make_history
-
-                    yield sse_event("status", {"step": "generate_response", "message": "Generating response..."})
-
-                    references = utils.compact_format_references(all_docs)
-                    chat_model = chat_models.get_generator_model()
-                    prompt = prompt_templates.generator_prompt_template
-                    chain = prompt | chat_model
-                    history_messages = make_history(runtime_session_id).messages
-
+                    # Stream fiqh answer token-by-token using fiqh-specific prompt (D-06)
+                    model = chat_models.get_generator_model()
+                    chain = fiqh_prompt | model
                     response_tokens = []
-                    for chunk in chain.stream(
-                        {
-                            "target_language": target_language,
-                            "query": user_query,
-                            "references": references,
-                            "chat_history": history_messages,
-                        },
-                    ):
+                    for chunk in chain.stream({
+                        "query": user_query,
+                        "evidence": _format_evidence(fiqh_docs),
+                    }):
                         token = getattr(chunk, "content", str(chunk) if chunk is not None else "")
                         if token:
                             response_tokens.append(token)
                             yield sse_event("response_chunk", {"token": token})
 
-                    assistant_text = "".join(response_tokens).strip()
+                    answer_text = "".join(response_tokens).strip()
+
+                    # Post-process: append ## Sources, optional insufficient warning, fatwa disclaimer
+                    references_section = _build_references_section(answer_text, fiqh_docs)
+                    if references_section:
+                        yield sse_event("response_chunk", {"token": references_section})
+
+                    if not is_sufficient:
+                        yield sse_event("response_chunk", {"token": INSUFFICIENT_WARNING})
+                        answer_text += INSUFFICIENT_WARNING
+
+                    yield sse_event("response_chunk", {"token": FATWA_DISCLAIMER})
+                    answer_text += FATWA_DISCLAIMER
+                    if references_section:
+                        answer_text += references_section
+
+                    assistant_text = answer_text
                     yield sse_event("response_end", {})
+
+                # Persist fiqh answer to conversation history
+                if assistant_text and not history_written:
+                    from services import chat_persistence_service
+                    chat_persistence_service.append_turn_to_runtime_history(
+                        runtime_session_id=runtime_session_id,
+                        user_query=user_query,
+                        assistant_text=assistant_text,
+                    )
+                    history_written = True
+
+                # Emit fiqh_references SSE event (D-14, INTG-05)
+                if fiqh_docs:
+                    fiqh_json = format_fiqh_references_as_json(fiqh_docs)
+                    yield sse_event("fiqh_references", {"references": fiqh_json})
+
+            # --- Existing hadith/non-fiqh streaming path ---
             else:
-                errors = final_state.get("errors", []) if isinstance(final_state, dict) else []
-                if any("quran_tafsir retrieval error" in error for error in errors):
-                    assistant_text = "I couldn't access the Quran and Tafsir sources I needed just now, so I can't answer this reliably."
-                elif any("retrieval error" in error for error in errors):
-                    assistant_text = "I couldn't access enough source material to answer this reliably right now."
+                hadith_docs = final_state.get("retrieved_docs", [])
+                quran_docs = final_state.get("quran_docs", [])
+                all_docs = hadith_docs + quran_docs
+
+                if all_docs or final_state.get("final_response"):
+                    if final_state.get("final_response"):
+                        assistant_text = final_state["final_response"]
+                        yield sse_event("response_chunk", {"token": assistant_text})
+                        yield sse_event("response_end", {})
+                    else:
+                        from core import chat_models, prompt_templates
+                        from core.memory import make_history
+
+                        yield sse_event("status", {"step": "generate_response", "message": "Generating response..."})
+
+                        references = utils.compact_format_references(all_docs)
+                        chat_model = chat_models.get_generator_model()
+                        prompt = prompt_templates.generator_prompt_template
+                        chain = prompt | chat_model
+                        history_messages = make_history(runtime_session_id).messages
+
+                        response_tokens = []
+                        for chunk in chain.stream(
+                            {
+                                "target_language": target_language,
+                                "query": user_query,
+                                "references": references,
+                                "chat_history": history_messages,
+                            },
+                        ):
+                            token = getattr(chunk, "content", str(chunk) if chunk is not None else "")
+                            if token:
+                                response_tokens.append(token)
+                                yield sse_event("response_chunk", {"token": token})
+
+                        assistant_text = "".join(response_tokens).strip()
+                        yield sse_event("response_end", {})
                 else:
-                    assistant_text = "I apologize, but I couldn't retrieve enough information to answer your question."
-                yield sse_event("response_chunk", {"token": assistant_text})
-                yield sse_event("response_end", {})
+                    errors = final_state.get("errors", []) if isinstance(final_state, dict) else []
+                    if any("quran_tafsir retrieval error" in error for error in errors):
+                        assistant_text = "I couldn't access the Quran and Tafsir sources I needed just now, so I can't answer this reliably."
+                    elif any("retrieval error" in error for error in errors):
+                        assistant_text = "I couldn't access enough source material to answer this reliably right now."
+                    else:
+                        assistant_text = "I apologize, but I couldn't retrieve enough information to answer your question."
+                    yield sse_event("response_chunk", {"token": assistant_text})
+                    yield sse_event("response_end", {})
 
-            if assistant_text and not history_written:
-                from services import chat_persistence_service
+                if assistant_text and not history_written:
+                    from services import chat_persistence_service
 
-                chat_persistence_service.append_turn_to_runtime_history(
-                    runtime_session_id=runtime_session_id,
-                    user_query=user_query,
-                    assistant_text=assistant_text,
-                )
-                history_written = True
+                    chat_persistence_service.append_turn_to_runtime_history(
+                        runtime_session_id=runtime_session_id,
+                        user_query=user_query,
+                        assistant_text=assistant_text,
+                    )
+                    history_written = True
 
-            # --- Separate reference events ---
-            if hadith_docs:
-                hadith_json = utils.format_references_as_json(hadith_docs)
-                yield sse_event("hadith_references", {"references": hadith_json})
+                if hadith_docs:
+                    hadith_json = utils.format_references_as_json(hadith_docs)
+                    yield sse_event("hadith_references", {"references": hadith_json})
 
-            if quran_docs:
-                quran_json = utils.format_quran_references_as_json(quran_docs)
-                yield sse_event("quran_references", {"references": quran_json})
+                if quran_docs:
+                    quran_json = utils.format_quran_references_as_json(quran_docs)
+                    yield sse_event("quran_references", {"references": quran_json})
 
             yield sse_event("done", {})
 

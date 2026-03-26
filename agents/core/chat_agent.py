@@ -18,7 +18,6 @@ from agents.config.agent_config import AgentConfig, DEFAULT_AGENT_CONFIG
 from agents.prompts.agent_prompts import (
     AGENT_SYSTEM_PROMPT,
     EARLY_EXIT_FIQH,
-    EARLY_EXIT_NON_ISLAMIC,
 )
 from agents.state.chat_state import ChatState
 from agents.tools import (
@@ -69,12 +68,15 @@ class ChatAgent:
         workflow.add_node("tools", self._tool_node)
         workflow.add_node("generate_response", self._generate_response_node)
         workflow.add_node("check_early_exit", self._check_early_exit_node)
+        workflow.add_node("fiqh_subgraph", self._call_fiqh_subgraph_node)
+        workflow.add_node("generate_fiqh_response", self._generate_fiqh_response_node)
 
         workflow.set_entry_point("fiqh_classification")
         workflow.add_conditional_edges(
             "fiqh_classification",
             self._route_after_fiqh_check,
             {
+                "fiqh": "fiqh_subgraph",
                 "exit": "check_early_exit",
                 "continue": "agent",
             },
@@ -92,36 +94,44 @@ class ChatAgent:
         workflow.add_edge("tools", "agent")
         workflow.add_edge("generate_response", END)
         workflow.add_edge("check_early_exit", END)
+        workflow.add_edge("fiqh_subgraph", "generate_fiqh_response")
+        workflow.add_edge("generate_fiqh_response", END)
         return workflow
 
-    def _fiqh_classification_node(self, state: ChatState) -> ChatState:
-        print("[FIQH CLASSIFICATION NODE] Checking if query is fiqh-related")
-
+    def _fiqh_classification_node(self, state: ChatState) -> dict:
+        print("[FIQH CLASSIFICATION NODE] Classifying query with 6-category classifier")
         try:
-            from modules.classification.classifier import classify_fiqh_query
+            from modules.fiqh.classifier import classify_fiqh_query
 
-            is_fiqh = classify_fiqh_query(state["user_query"], state["runtime_session_id"])
-            state["is_fiqh"] = is_fiqh
-            state["classification_checked"] = True
-
-            if is_fiqh:
-                print("[FIQH CLASSIFICATION NODE] Query is fiqh-related - will exit early")
-            else:
-                print("[FIQH CLASSIFICATION NODE] Query is not fiqh-related - continuing to agent")
+            # Note: new classifier takes only query (not session_id) — Pitfall 3
+            category = classify_fiqh_query(state["user_query"])
+            is_fiqh = category.startswith("VALID_")
+            print(f"[FIQH CLASSIFICATION NODE] Category: {category}, is_fiqh: {is_fiqh}")
+            return {
+                "fiqh_category": category,
+                "is_fiqh": is_fiqh,
+                "classification_checked": True,
+            }
         except Exception as exc:
             print(f"[FIQH CLASSIFICATION NODE] Error: {exc}")
-            state["is_fiqh"] = False
-            state["classification_checked"] = True
-            state["errors"].append(f"Fiqh classification error: {str(exc)}")
+            return {
+                "fiqh_category": "",
+                "is_fiqh": False,
+                "classification_checked": True,
+                "errors": state.get("errors", []) + [f"Fiqh classification error: {str(exc)}"],
+            }
 
-        return state
-
-    def _route_after_fiqh_check(self, state: ChatState) -> Literal["exit", "continue"]:
-        if state.get("is_fiqh"):
-            print("[ROUTING] Fiqh query detected - routing to early exit")
+    def _route_after_fiqh_check(self, state: ChatState) -> Literal["fiqh", "exit", "continue"]:
+        category = state.get("fiqh_category", "")
+        if category in {"VALID_OBVIOUS", "VALID_SMALL", "VALID_LARGE", "VALID_REASONER"}:
+            print(f"[ROUTING] Valid fiqh category ({category}) — routing to fiqh sub-graph")
+            return "fiqh"
+        if category == "UNETHICAL":
+            print(f"[ROUTING] Unethical query — routing to early exit")
             return "exit"
-
-        print("[ROUTING] Not a fiqh query - continuing to agent")
+        # OUT_OF_SCOPE_FIQH = general Islamic question (history, theology, etc.)
+        # — let the regular hadith/Quran agent handle it
+        print("[ROUTING] Not a fiqh query — routing to agent")
         return "continue"
 
     def _agent_node(self, state: ChatState) -> ChatState:
@@ -245,19 +255,133 @@ Generate a comprehensive, accurate response that directly addresses the user's q
 
         return state
 
-    def _check_early_exit_node(self, state: ChatState) -> ChatState:
+    def _check_early_exit_node(self, state: ChatState) -> dict:
         print("[CHECK EARLY EXIT NODE]")
+        from agents.prompts.agent_prompts import EARLY_EXIT_NON_ISLAMIC
 
         if state.get("is_non_islamic"):
-            state["final_response"] = EARLY_EXIT_NON_ISLAMIC
-            state["early_exit_message"] = EARLY_EXIT_NON_ISLAMIC
-        elif state.get("is_fiqh"):
-            state["final_response"] = EARLY_EXIT_FIQH
-            state["early_exit_message"] = EARLY_EXIT_FIQH
-        else:
-            state["final_response"] = "Unable to process the query."
+            return {
+                "final_response": EARLY_EXIT_NON_ISLAMIC,
+                "early_exit_message": EARLY_EXIT_NON_ISLAMIC,
+            }
 
-        return state
+        category = state.get("fiqh_category", "")
+        if category == "UNETHICAL":
+            # LLM-generated personalized rejection message (D-12)
+            try:
+                from core.chat_models import get_classifier_model
+
+                model = get_classifier_model()
+                prompt_text = (
+                    f"A user asked: '{state['user_query']}'\n\n"
+                    "This question asks for a ruling on something harmful or unethical. "
+                    "Politely decline to answer in 1-2 sentences, without judging the user. "
+                    "Do not provide any ruling."
+                )
+                from langchain_core.messages import HumanMessage
+                response = model.invoke([HumanMessage(content=prompt_text)])
+                msg = response.content.strip()
+            except Exception as exc:
+                print(f"[CHECK EARLY EXIT NODE] LLM rejection error: {exc}")
+                msg = (
+                    "I'm unable to answer this question as it involves something harmful or unethical."
+                )
+            return {"final_response": msg, "early_exit_message": msg}
+
+        return {"final_response": "Unable to process the query."}
+
+    def _call_fiqh_subgraph_node(self, state: ChatState) -> dict:
+        """
+        Wrapper node that invokes the FiqhAgent sub-graph.
+        Projects ChatState -> FiqhState input, invokes sub-graph, maps output -> ChatState delta.
+        Uses Pattern 1 (node wrapper) because ChatState and FiqhState share no keys.
+        """
+        print(f"[FIQH SUBGRAPH NODE] Invoking FAIR-RAG sub-graph for: {state['user_query'][:80]}")
+        from agents.fiqh.fiqh_graph import fiqh_subgraph
+
+        try:
+            result = fiqh_subgraph.invoke({
+                "query": state["user_query"],
+                "iteration": 0,
+                "accumulated_docs": [],
+                "prior_queries": [],
+                "sea_result": None,
+                "verdict": "INSUFFICIENT",
+                "status_events": [],
+            })
+            fiqh_filtered_docs = result.get("accumulated_docs", [])
+            fiqh_sea_result = result.get("sea_result")
+            status_events = result.get("status_events", [])
+
+            print(
+                f"[FIQH SUBGRAPH NODE] Sub-graph complete: "
+                f"{len(fiqh_filtered_docs)} docs, verdict={result.get('verdict')}, "
+                f"{len(status_events)} status events"
+            )
+            return {
+                "fiqh_filtered_docs": fiqh_filtered_docs,
+                "fiqh_sea_result": fiqh_sea_result,
+                # Store status_events in errors as metadata for pipeline_langgraph.py
+                # to read — using a special sentinel key in early_exit_message is too fragile.
+                # Instead store in a dedicated field: we'll pass via fiqh_sea_result metadata.
+                # The status_events are re-read by pipeline_langgraph.py from the node event dict.
+            }
+        except Exception as exc:
+            print(f"[FIQH SUBGRAPH NODE] Error: {exc}")
+            return {
+                "fiqh_filtered_docs": [],
+                "fiqh_sea_result": None,
+                "errors": state.get("errors", []) + [f"Fiqh sub-graph error: {str(exc)}"],
+            }
+
+    def _generate_fiqh_response_node(self, state: ChatState) -> dict:
+        """
+        Non-streaming generation node for the fiqh path.
+        Uses fiqh-specific system prompt and formats filtered docs as numbered evidence.
+        The streaming path in pipeline_langgraph.py bypasses this node and streams
+        tokens directly — this node serves the non-streaming (invoke) path only.
+        """
+        print("[GENERATE FIQH RESPONSE NODE] Generating fiqh answer (non-streaming path)")
+        from modules.fiqh.generator import (
+            _prompt,
+            _format_evidence,
+            _build_references_section,
+            INSUFFICIENT_WARNING,
+            FATWA_DISCLAIMER,
+        )
+        from core.chat_models import get_generator_model
+
+        docs = state.get("fiqh_filtered_docs", [])
+        sea_result = state.get("fiqh_sea_result")
+        is_sufficient = getattr(sea_result, "verdict", "INSUFFICIENT") == "SUFFICIENT"
+
+        if not docs:
+            fallback = (
+                "I was unable to retrieve relevant rulings for this question. "
+                "Please consult Sistani's official resources at sistani.org "
+                "or contact his office directly." + FATWA_DISCLAIMER
+            )
+            return {"final_response": fallback, "response_generated": True}
+
+        try:
+            model = get_generator_model()
+            response = model.invoke(_prompt.format_messages(
+                query=state["user_query"],
+                evidence=_format_evidence(docs),
+            ))
+            answer = response.content.strip()
+            answer += _build_references_section(answer, docs)
+            if not is_sufficient:
+                answer += INSUFFICIENT_WARNING
+            answer += FATWA_DISCLAIMER
+            return {"final_response": answer, "response_generated": True}
+        except Exception as exc:
+            print(f"[GENERATE FIQH RESPONSE NODE] Error: {exc}")
+            return {
+                "errors": state.get("errors", []) + [f"Fiqh generation error: {str(exc)}"],
+                "final_response": "Unable to generate fiqh answer." + FATWA_DISCLAIMER,
+                "response_generated": True,
+            }
 
     def _should_continue(self, state: ChatState) -> Literal["continue", "generate", "exit", "end"]:
         if state.get("is_non_islamic") or state.get("is_fiqh"):
