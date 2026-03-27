@@ -16,6 +16,9 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 # Copy the actual app
 COPY . /app
 
+# Generate BM25 encoder for fiqh retrieval (dry-run: no Pinecone upload)
+RUN python scripts/ingest_fiqh.py --dry-run
+
 # Switch to non-root
 USER appuser
 
