@@ -5,12 +5,14 @@ This replaces the hardcoded pipeline with an intelligent agent
 that decides which tools to use and when.
 """
 
-from typing import Optional, AsyncGenerator
-from fastapi.responses import StreamingResponse
-from agents.core.chat_agent import ChatAgent
-from agents.config.agent_config import AgentConfig, DEFAULT_AGENT_CONFIG
-from core import utils
 import json
+from typing import AsyncGenerator, Optional
+
+from fastapi.responses import StreamingResponse
+
+from agents.config.agent_config import AgentConfig, DEFAULT_AGENT_CONFIG
+from agents.core.chat_agent import ChatAgent
+from core import utils
 
 
 # Human-readable status messages for each agent node
@@ -20,19 +22,30 @@ NODE_STATUS_MESSAGES = {
     "tools": "Looking for information...",
     "generate_response": "Generating response...",
     "check_early_exit": "Processing...",
+    # Fiqh FAIR-RAG pipeline nodes
+    "fiqh_subgraph": "Processing fiqh query...",
+    "generate_fiqh_response": "Generating fiqh answer...",
+    # Fiqh sub-graph stage status (emitted explicitly after fiqh_subgraph event)
+    "fiqh_decompose": "Decomposing fiqh query...",
+    "fiqh_retrieve": "Retrieving fiqh documents...",
+    "fiqh_filter": "Filtering evidence...",
+    "fiqh_assess": "Assessing evidence sufficiency...",
+    "fiqh_refine": "Refining query...",
 }
 
 # Human-readable status messages for each tool call
 TOOL_STATUS_MESSAGES = {
     "check_if_non_islamic_tool": "Checking if query is within scope...",
-    "check_if_fiqh_tool": "Checking query classification...",
     "translate_to_english_tool": "Translating query...",
     "enhance_query_tool": "Enhancing query for better results...",
     "retrieve_shia_documents_tool": "Retrieving Shia documents...",
     "retrieve_sunni_documents_tool": "Retrieving Sunni documents...",
-    "retrieve_combined_documents_tool": "Retrieving documents from all sources...",
     "retrieve_quran_tafsir_tool": "Retrieving Quran & Tafsir...",
 }
+
+
+# Categories that trigger the FAIR-RAG fiqh path
+VALID_FIQH_CATEGORIES = {"VALID_OBVIOUS", "VALID_SMALL", "VALID_LARGE", "VALID_REASONER"}
 
 
 def sse_event(event_type: str, data: dict) -> str:
@@ -64,9 +77,12 @@ async def chat_pipeline_streaming_agentic(
     agent = ChatAgent(agent_config)
 
     async def response_generator() -> AsyncGenerator[str, None]:
+        assistant_text = ""
+        history_written = False
+
         try:
             final_state = None
-            emitted_tool_statuses = set()
+            emitted_tool_call_ids = set()
 
             async for event in agent.astream(
                 user_query=user_query,
@@ -88,10 +104,18 @@ async def chat_pipeline_streaming_agentic(
                     messages = node_state.get("messages", []) if isinstance(node_state, dict) else []
                     for msg in messages:
                         if hasattr(msg, "tool_calls") and msg.tool_calls:
-                            for tc in msg.tool_calls:
+                            for index, tc in enumerate(msg.tool_calls):
                                 tool_name = tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", None)
-                                if tool_name and tool_name not in emitted_tool_statuses:
-                                    emitted_tool_statuses.add(tool_name)
+                                tool_call_id = None
+                                if isinstance(tc, dict):
+                                    tool_call_id = tc.get("id")
+                                else:
+                                    tool_call_id = getattr(tc, "id", None)
+                                if not tool_call_id:
+                                    tool_call_id = f"{node_name}:{index}:{tool_name}"
+
+                                if tool_name and tool_call_id not in emitted_tool_call_ids:
+                                    emitted_tool_call_ids.add(tool_call_id)
                                     tool_msg = TOOL_STATUS_MESSAGES.get(tool_name, f"Running {tool_name}...")
                                     yield sse_event("status", {"step": tool_name, "message": tool_msg})
 
@@ -100,66 +124,178 @@ async def chat_pipeline_streaming_agentic(
                 yield sse_event("done", {})
                 return
 
+            runtime_session_id = final_state.get("runtime_session_id", session_id)
+
             # --- Early exit (fiqh / non-Islamic) ---
             if final_state.get("early_exit_message"):
-                yield sse_event("response_chunk", {"token": final_state["early_exit_message"]})
+                assistant_text = final_state["early_exit_message"]
+                yield sse_event("response_chunk", {"token": assistant_text})
                 yield sse_event("response_end", {})
+                from services import chat_persistence_service
+
+                chat_persistence_service.append_turn_to_runtime_history(
+                    runtime_session_id=runtime_session_id,
+                    user_query=user_query,
+                    assistant_text=assistant_text,
+                )
+                history_written = True
                 yield sse_event("done", {})
                 return
 
-            # --- Stream LLM response token-by-token ---
-            hadith_docs = final_state.get("retrieved_docs", [])
-            quran_docs = final_state.get("quran_docs", [])
-            all_docs = hadith_docs + quran_docs
+            # --- Fiqh FAIR-RAG streaming path ---
+            if final_state.get("fiqh_category") in VALID_FIQH_CATEGORIES:
+                from modules.fiqh.generator import (
+                    _prompt as fiqh_prompt,
+                    _format_evidence,
+                    _build_references_section,
+                    INSUFFICIENT_WARNING,
+                    FATWA_DISCLAIMER,
+                )
+                from core import chat_models
+                from core.utils import format_fiqh_references_as_json
 
-            if all_docs or final_state.get("final_response"):
-                if final_state.get("final_response"):
-                    # Non-streaming path returned a pre-built response (shouldn't happen
-                    # with streaming_mode=True, but handle gracefully)
-                    yield sse_event("response_chunk", {"token": final_state["final_response"]})
+                # Emit per-stage status events for the fiqh pipeline stages
+                # (sub-graph runs as a black box; we emit pre-canned stage messages)
+                fiqh_stages = [
+                    ("fiqh_decompose", "Decomposing fiqh query..."),
+                    ("fiqh_retrieve", "Retrieving fiqh documents..."),
+                    ("fiqh_filter", "Filtering evidence..."),
+                    ("fiqh_assess", "Assessing evidence sufficiency..."),
+                ]
+                for stage_step, stage_msg in fiqh_stages:
+                    yield sse_event("status", {"step": stage_step, "message": stage_msg})
+
+                yield sse_event("status", {"step": "generate_fiqh_response", "message": "Generating fiqh answer..."})
+
+                fiqh_docs = final_state.get("fiqh_filtered_docs", [])
+                sea_result = final_state.get("fiqh_sea_result")
+                is_sufficient = getattr(sea_result, "verdict", "INSUFFICIENT") == "SUFFICIENT"
+
+                if not fiqh_docs:
+                    # No evidence retrieved — emit fallback message
+                    fallback = (
+                        "I was unable to retrieve relevant rulings for this question. "
+                        "Please consult Sistani's official resources at sistani.org "
+                        "or contact his office directly." + FATWA_DISCLAIMER
+                    )
+                    assistant_text = fallback
+                    yield sse_event("response_chunk", {"token": fallback})
                     yield sse_event("response_end", {})
                 else:
-                    # Stream the response token-by-token
-                    from core.memory import with_redis_history, make_history, trim_history
-                    from core import chat_models, prompt_templates
-
-                    yield sse_event("status", {"step": "generate_response", "message": "Generating response..."})
-
-                    references = utils.compact_format_references(all_docs)
-                    chat_model = chat_models.get_generator_model()
-                    prompt = prompt_templates.generator_prompt_template
-                    chain = prompt | chat_model
-                    chain_with_history = with_redis_history(chain)
-
-                    for chunk in chain_with_history.stream(
-                        {
-                            "target_language": target_language,
-                            "query": user_query,
-                            "references": references,
-                        },
-                        config={"configurable": {"session_id": session_id}},
-                    ):
+                    # Stream fiqh answer token-by-token using fiqh-specific prompt (D-06)
+                    model = chat_models.get_generator_model()
+                    chain = fiqh_prompt | model
+                    response_tokens = []
+                    for chunk in chain.stream({
+                        "query": user_query,
+                        "evidence": _format_evidence(fiqh_docs),
+                    }):
                         token = getattr(chunk, "content", str(chunk) if chunk is not None else "")
                         if token:
+                            response_tokens.append(token)
                             yield sse_event("response_chunk", {"token": token})
 
-                    hist = make_history(session_id)
-                    trim_history(hist)
+                    answer_text = "".join(response_tokens).strip()
 
+                    # Post-process: append ## Sources, optional insufficient warning, fatwa disclaimer
+                    references_section = _build_references_section(answer_text, fiqh_docs)
+                    if references_section:
+                        yield sse_event("response_chunk", {"token": references_section})
+
+                    if not is_sufficient:
+                        yield sse_event("response_chunk", {"token": INSUFFICIENT_WARNING})
+                        answer_text += INSUFFICIENT_WARNING
+
+                    yield sse_event("response_chunk", {"token": FATWA_DISCLAIMER})
+                    answer_text += FATWA_DISCLAIMER
+                    if references_section:
+                        answer_text += references_section
+
+                    assistant_text = answer_text
                     yield sse_event("response_end", {})
+
+                # Persist fiqh answer to conversation history
+                if assistant_text and not history_written:
+                    from services import chat_persistence_service
+                    chat_persistence_service.append_turn_to_runtime_history(
+                        runtime_session_id=runtime_session_id,
+                        user_query=user_query,
+                        assistant_text=assistant_text,
+                    )
+                    history_written = True
+
+                # Emit fiqh_references SSE event (D-14, INTG-05)
+                if fiqh_docs:
+                    fiqh_json = format_fiqh_references_as_json(fiqh_docs)
+                    yield sse_event("fiqh_references", {"references": fiqh_json})
+
+            # --- Existing hadith/non-fiqh streaming path ---
             else:
-                fallback = "I apologize, but I couldn't retrieve enough information to answer your question."
-                yield sse_event("response_chunk", {"token": fallback})
-                yield sse_event("response_end", {})
+                hadith_docs = final_state.get("retrieved_docs", [])
+                quran_docs = final_state.get("quran_docs", [])
+                all_docs = hadith_docs + quran_docs
 
-            # --- Separate reference events ---
-            if hadith_docs:
-                hadith_json = utils.format_references_as_json(hadith_docs)
-                yield sse_event("hadith_references", {"references": hadith_json})
+                if all_docs or final_state.get("final_response"):
+                    if final_state.get("final_response"):
+                        assistant_text = final_state["final_response"]
+                        yield sse_event("response_chunk", {"token": assistant_text})
+                        yield sse_event("response_end", {})
+                    else:
+                        from core import chat_models, prompt_templates
+                        from core.memory import make_history
 
-            if quran_docs:
-                quran_json = utils.format_quran_references_as_json(quran_docs)
-                yield sse_event("quran_references", {"references": quran_json})
+                        yield sse_event("status", {"step": "generate_response", "message": "Generating response..."})
+
+                        references = utils.compact_format_references(all_docs)
+                        chat_model = chat_models.get_generator_model()
+                        prompt = prompt_templates.generator_prompt_template
+                        chain = prompt | chat_model
+                        history_messages = make_history(runtime_session_id).messages
+
+                        response_tokens = []
+                        for chunk in chain.stream(
+                            {
+                                "target_language": target_language,
+                                "query": user_query,
+                                "references": references,
+                                "chat_history": history_messages,
+                            },
+                        ):
+                            token = getattr(chunk, "content", str(chunk) if chunk is not None else "")
+                            if token:
+                                response_tokens.append(token)
+                                yield sse_event("response_chunk", {"token": token})
+
+                        assistant_text = "".join(response_tokens).strip()
+                        yield sse_event("response_end", {})
+                else:
+                    errors = final_state.get("errors", []) if isinstance(final_state, dict) else []
+                    if any("quran_tafsir retrieval error" in error for error in errors):
+                        assistant_text = "I couldn't access the Quran and Tafsir sources I needed just now, so I can't answer this reliably."
+                    elif any("retrieval error" in error for error in errors):
+                        assistant_text = "I couldn't access enough source material to answer this reliably right now."
+                    else:
+                        assistant_text = "I apologize, but I couldn't retrieve enough information to answer your question."
+                    yield sse_event("response_chunk", {"token": assistant_text})
+                    yield sse_event("response_end", {})
+
+                if assistant_text and not history_written:
+                    from services import chat_persistence_service
+
+                    chat_persistence_service.append_turn_to_runtime_history(
+                        runtime_session_id=runtime_session_id,
+                        user_query=user_query,
+                        assistant_text=assistant_text,
+                    )
+                    history_written = True
+
+                if hadith_docs:
+                    hadith_json = utils.format_references_as_json(hadith_docs)
+                    yield sse_event("hadith_references", {"references": hadith_json})
+
+                if quran_docs:
+                    quran_json = utils.format_quran_references_as_json(quran_docs)
+                    yield sse_event("quran_references", {"references": quran_json})
 
             yield sse_event("done", {})
 
@@ -167,6 +303,17 @@ async def chat_pipeline_streaming_agentic(
             print(f"[AGENTIC PIPELINE] Error: {e}")
             import traceback
             traceback.print_exc()
+            if assistant_text and not history_written:
+                try:
+                    from services import chat_persistence_service
+
+                    chat_persistence_service.append_turn_to_runtime_history(
+                        runtime_session_id=final_state.get("runtime_session_id", session_id) if final_state else session_id,
+                        user_query=user_query,
+                        assistant_text=assistant_text,
+                    )
+                except Exception as memory_exc:
+                    print(f"[AGENTIC PIPELINE] Failed to append runtime history after error: {memory_exc}")
             yield sse_event("error", {"message": str(e)})
             yield sse_event("done", {})
 

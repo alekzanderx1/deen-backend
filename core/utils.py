@@ -6,7 +6,7 @@ import gzip
 def compact_format_references(retrieved_docs: list, max_chars: int = 1500) -> str:
     """
     Formats retrieved hadiths and Quranic references for LLM-friendly Markdown output,
-    aligned with the updated JSON structure used in `format_references_as_json`, 
+    aligned with the updated JSON structure used in `format_references_as_json`,
     in a short compact form to reduce LLM token usage.
     """
     print("INSIDE format_references")
@@ -16,33 +16,58 @@ def compact_format_references(retrieved_docs: list, max_chars: int = 1500) -> st
 
     lines = [header]
 
-    for idx, doc in enumerate(retrieved_docs, start=1):
-        try:
-            # Accept either plain dicts or LangChain Documents
-            if isinstance(doc, dict):
-                metadata = doc.get("metadata", {}) or {}
-                page_content_en = doc.get("page_content_en", "") or ""
-                quran_translation = doc.get("quran_translation", "") or ""
-            else:
-                metadata = getattr(doc, "metadata", {}) or {}
-                page_content_en = getattr(doc, "page_content_en", "") or getattr(doc, "page_content", "") or ""
-                quran_translation = getattr(doc, "quran_translation", "") or ""
+    grouped_docs = {
+        "Shia Hadith Sources": [],
+        "Sunni Hadith Sources": [],
+        "Quran and Tafsir Sources": [],
+    }
 
-            is_quran_doc = metadata.get("Type") == "Tafsir" or "surah_name" in metadata
+    for doc in retrieved_docs:
+        metadata = doc.get("metadata", {}) if isinstance(doc, dict) else getattr(doc, "metadata", {}) or {}
+        if _is_quran_doc(metadata):
+            grouped_docs["Quran and Tafsir Sources"].append(doc)
+            continue
 
-            if is_quran_doc:
-                block = _format_quran_reference(idx, metadata, page_content_en, quran_translation, max_chars)
-            else:
-                block = _format_hadith_reference(idx, metadata, page_content_en, max_chars)
+        sect = str(metadata.get("sect", "")).strip().lower()
+        if sect == "sunni":
+            grouped_docs["Sunni Hadith Sources"].append(doc)
+        else:
+            grouped_docs["Shia Hadith Sources"].append(doc)
 
-            lines.append("\n".join([ln for ln in block if ln is not None]))
+    reference_idx = 1
+    for section_title, docs in grouped_docs.items():
+        if not docs:
+            continue
 
-        except Exception as e:
-            print(f"Error formatting a reference: {e}")
-            traceback.print_exc()
-            lines.append("**Error formatting a reference. Skipping this item.**")
+        lines.append(f"\n**{section_title}:**")
+        for doc in docs:
+            try:
+                if isinstance(doc, dict):
+                    metadata = doc.get("metadata", {}) or {}
+                    page_content_en = doc.get("page_content_en", "") or ""
+                    quran_translation = doc.get("quran_translation", "") or ""
+                else:
+                    metadata = getattr(doc, "metadata", {}) or {}
+                    page_content_en = getattr(doc, "page_content_en", "") or getattr(doc, "page_content", "") or ""
+                    quran_translation = getattr(doc, "quran_translation", "") or ""
+
+                if _is_quran_doc(metadata):
+                    block = _format_quran_reference(reference_idx, metadata, page_content_en, quran_translation, max_chars)
+                else:
+                    block = _format_hadith_reference(reference_idx, metadata, page_content_en, max_chars)
+
+                lines.append("\n".join([ln for ln in block if ln is not None]))
+                reference_idx += 1
+            except Exception as e:
+                print(f"Error formatting a reference: {e}")
+                traceback.print_exc()
+                lines.append("**Error formatting a reference. Skipping this item.**")
 
     return "\n".join(lines)
+
+
+def _is_quran_doc(metadata):
+    return metadata.get("Type") == "Tafsir" or "surah_name" in metadata
 
 
 def _format_hadith_reference(idx, metadata, page_content_en, max_chars):
@@ -220,7 +245,7 @@ def format_references_as_json(retrieved_docs: list):
                 "chapter_title": doc['metadata'].get("chapter_title", "N/A"),
                 "collection": doc['metadata'].get("collection", "N/A"),
                 "grade_ar": doc['metadata'].get("grade_ar", "N/A"),
-                "grade_en": doc['metadata'].get("grade_en", "N/A"),                
+                "grade_en": doc['metadata'].get("grade_en", "N/A"),
                 "hadith_id": doc['metadata'].get("hadith_id", "N/A"),
                 "hadith_no": doc['metadata'].get("hadith_no", "N/A"),
                 "hadith_url": doc['metadata'].get("hadith_url", "N/A"),
@@ -235,9 +260,9 @@ def format_references_as_json(retrieved_docs: list):
         print(f"Error formatting references: {e}")
         traceback.print_exc()
         return result
-    
+
     result = formatted_references
-    
+
     return result
 
 def format_quran_references_as_json(quran_docs: list) -> list:
@@ -265,6 +290,28 @@ def format_quran_references_as_json(quran_docs: list) -> list:
             })
     except Exception as e:
         print(f"Error formatting Quran references: {e}")
+        traceback.print_exc()
+    return result
+
+
+def format_fiqh_references_as_json(fiqh_docs: list) -> list:
+    """
+    Formats fiqh documents into citation JSON for the fiqh_references SSE event.
+    Each entry carries book, chapter, section, and ruling_number from chunk metadata.
+    Used by pipeline_langgraph.py after streaming a fiqh answer.
+    """
+    result = []
+    try:
+        for doc in fiqh_docs:
+            md = doc.get("metadata", {}) or {}
+            result.append({
+                "book": md.get("source_book", "Islamic Laws"),
+                "chapter": md.get("chapter", ""),
+                "section": md.get("section", ""),
+                "ruling_number": md.get("ruling_number", ""),
+            })
+    except Exception as e:
+        print(f"Error formatting fiqh references: {e}")
         traceback.print_exc()
     return result
 

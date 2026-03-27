@@ -92,16 +92,16 @@ alembic upgrade head
 ### 5. Start the Development Server
 
 ```bash
-uvicorn main:app --reload
+uvicorn main:app --port 8080 --reload --host 0.0.0.0
 ```
 
-The server will start at `http://127.0.0.1:8000`
+The server will start at `http://127.0.0.1:8080`
 
 ### 6. Access API Documentation
 
-- **Swagger UI**: `http://127.0.0.1:8000/docs`
-- **ReDoc**: `http://127.0.0.1:8000/redoc`
-- **Memory Admin Dashboard**: `http://127.0.0.1:8000/admin/memory/dashboard`
+- **Swagger UI**: `http://127.0.0.1:8080/docs`
+- **ReDoc**: `http://127.0.0.1:8080/redoc`
+- **Memory Admin Dashboard**: `http://127.0.0.1:8080/admin/memory/dashboard`
 
 ## Architecture Overview
 
@@ -123,15 +123,18 @@ For detailed architecture information, see [Architecture Documentation](document
 ## Core Features Documentation
 
 ### AI & RAG Pipeline
+
 - [**Chatbot**](documentation/CHATBOT.md) - RAG-powered conversational AI with query classification and context-aware responses
 - [**Reference Lookup**](documentation/REFERENCE_LOOKUP.md) - Semantic search across Islamic texts with sect filtering
 - [**AI Pipeline**](documentation/AI_PIPELINE.md) - Detailed breakdown of classification, embedding, retrieval, and generation modules
 
 ### Learning Platform
+
 - [**Hikmah Trees**](documentation/HIKMAH_TREES.md) - AI-powered courses and lessons with interactive elaboration
 - [**Memory Agent**](documentation/MEMORY_AGENT.md) - Universal memory system that learns from user interactions
 
 ### Technical Documentation
+
 - [**Database**](documentation/DATABASE.md) - PostgreSQL schema, models, and migrations
 - [**API Reference**](documentation/API_REFERENCE.md) - Complete API endpoint documentation
 - [**Authentication**](documentation/AUTHENTICATION.md) - AWS Cognito JWT authentication setup
@@ -155,10 +158,11 @@ For detailed architecture information, see [Architecture Documentation](document
 Access the interactive developer dashboard to inspect and debug the memory agent:
 
 ```
-http://localhost:8000/admin/memory/dashboard
+http://localhost:8080/admin/memory/dashboard
 ```
 
 Features:
+
 - View user memory profiles
 - Browse notes by category (learning, knowledge, interest, behavior, preference)
 - Inspect memory events and processing status
@@ -170,13 +174,13 @@ See [Memory Agent Documentation](documentation/MEMORY_AGENT.md) for details.
 
 ```bash
 # General health check
-curl http://localhost:8000/health
+curl http://localhost:8080/health
 
 # Database connection check
-curl http://localhost:8000/_debug/db
+curl http://localhost:8080/_debug/db
 
 # List all routes
-curl http://localhost:8000/_routes
+curl http://localhost:8080/_routes
 ```
 
 ## Docker Deployment
@@ -251,7 +255,7 @@ With pytest installed: `python -m pytest tests/test_agentic_streaming_sse.py -v 
 ### Chat with the AI
 
 ```bash
-curl -X POST "http://localhost:8000/chat/stream" \
+curl -X POST "http://localhost:8080/chat/stream" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
@@ -264,7 +268,7 @@ curl -X POST "http://localhost:8000/chat/stream" \
 ### Look Up References
 
 ```bash
-curl -X POST "http://localhost:8000/references?sect=shia&limit=5" \
+curl -X POST "http://localhost:8080/references?sect=shia&limit=5" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
@@ -275,7 +279,7 @@ curl -X POST "http://localhost:8000/references?sect=shia&limit=5" \
 ### Request Elaboration on a Lesson
 
 ```bash
-curl -X POST "http://localhost:8000/hikmah/elaborate/stream" \
+curl -X POST "http://localhost:8080/hikmah/elaborate/stream" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
@@ -340,19 +344,23 @@ When contributing to this project:
 ### Common Issues
 
 **Database Connection Errors**
+
 - Verify `.env` file has correct database credentials
 - Ensure PostgreSQL is running
 - Check database exists: `psql -l`
 
 **Redis Connection Errors**
+
 - Verify Redis is running: `redis-cli ping`
 - Check `REDIS_URL` in `.env`
 
 **Authentication Errors**
+
 - Verify JWT token is valid
 - Check Cognito configuration in `.env`
 
 **Memory Agent Not Working**
+
 - Check database consolidation: See `updates_documentation/DATABASE_CONFIG_CONSOLIDATION.md`
 - Verify background thread logs in console
 
