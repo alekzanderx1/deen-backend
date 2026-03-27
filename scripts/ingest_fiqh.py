@@ -419,6 +419,11 @@ def main() -> None:
         action="store_true",
         help="Parse only; do not embed or upload",
     )
+    parser.add_argument(
+        "--encoder-only",
+        action="store_true",
+        help="Fit and save the BM25 encoder only; skip Pinecone indexing",
+    )
     args = parser.parse_args()
 
     logger.info("Loading PDF from %s", args.pdf_path)
@@ -440,6 +445,21 @@ def main() -> None:
                 len(ENCODING.encode(chunk["text"])),
             )
         logger.info("Dry run complete. No data uploaded.")
+        return
+
+    if args.encoder_only:
+        import ssl as _ssl
+        import nltk
+        _ssl._create_default_https_context = _ssl._create_unverified_context
+        nltk.download("stopwords", quiet=True)
+        nltk.download("punkt_tab", quiet=True)
+        chunk_texts = [c["text"] for c in chunks]
+        logger.info("Fitting BM25 encoder on %d chunks...", len(chunk_texts))
+        encoder = BM25Encoder()
+        encoder.fit(chunk_texts)
+        Path(BM25_ENCODER_PATH).parent.mkdir(parents=True, exist_ok=True)
+        encoder.dump(BM25_ENCODER_PATH)
+        logger.info("BM25 encoder saved to %s", BM25_ENCODER_PATH)
         return
 
     # Embedding and upsert (implemented in plan 03)
