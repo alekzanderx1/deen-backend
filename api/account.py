@@ -7,8 +7,6 @@ including account deletion.
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-import boto3
-from botocore.exceptions import ClientError
 import httpx
 import logging
 
