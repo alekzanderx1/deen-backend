@@ -5,11 +5,11 @@ from sqlalchemy.orm import Session
 
 from db.schemas.chat_history import SavedChatDetailResponse, SavedChatListResponse
 from db.session import get_db
-from models.JWTBearer import JWTAuthorizationCredentials, JWTBearer
+from models.JWTBearer import JWTAuthorizationCredentials
 from models.schemas import ChatRequest
 from core import pipeline
 from core import pipeline_langgraph
-from core.auth import auth, jwks
+from core.auth import auth
 from core.memory import make_history
 from agents.config.agent_config import AgentConfig
 from services import chat_persistence_service
@@ -19,9 +19,6 @@ chat_router = APIRouter(
     prefix="/chat",
     tags=["chat"]
 )
-optional_auth = JWTBearer(jwks, auto_error=False)
-
-
 def _extract_user_id(credentials: Optional[JWTAuthorizationCredentials]) -> Optional[str]:
     if not credentials:
         return None
@@ -35,7 +32,10 @@ def _require_user_id(credentials: JWTAuthorizationCredentials) -> str:
     return user_id
 
 @chat_router.post("/")
-async def chat_pipeline_ep(request: ChatRequest):
+async def chat_pipeline_ep(
+    request: ChatRequest,
+    credentials: JWTAuthorizationCredentials = Depends(auth),
+):
     """
     Non-streaming chat endpoint with Redis-backed memory.
     Expects:
@@ -63,7 +63,7 @@ async def chat_pipeline_ep(request: ChatRequest):
 @chat_router.post("/stream")
 async def chat_pipeline_stream_ep(
     request: ChatRequest,
-    credentials: Optional[JWTAuthorizationCredentials] = Depends(optional_auth),
+    credentials: JWTAuthorizationCredentials = Depends(auth),
     db: Session = Depends(get_db),
 ):
     """
@@ -122,7 +122,7 @@ async def chat_pipeline_stream_ep(
 @chat_router.post("/stream/agentic")
 async def chat_pipeline_agentic_ep(
     request: ChatRequest,
-    credentials: Optional[JWTAuthorizationCredentials] = Depends(optional_auth),
+    credentials: JWTAuthorizationCredentials = Depends(auth),
     db: Session = Depends(get_db),
 ):
     """
@@ -211,7 +211,10 @@ async def chat_pipeline_agentic_ep(
 
 
 @chat_router.post("/agentic")
-async def chat_pipeline_agentic_non_stream_ep(request: ChatRequest):
+async def chat_pipeline_agentic_non_stream_ep(
+    request: ChatRequest,
+    credentials: JWTAuthorizationCredentials = Depends(auth),
+):
     """
     Agentic non-streaming chat endpoint using LangGraph.
     
@@ -257,7 +260,7 @@ async def chat_pipeline_agentic_non_stream_ep(request: ChatRequest):
 @chat_router.delete("/session/{session_id}")
 async def clear_session(
     session_id: str,
-    credentials: Optional[JWTAuthorizationCredentials] = Depends(optional_auth),
+    credentials: JWTAuthorizationCredentials = Depends(auth),
 ):
     try:
         history = make_history(session_id)
