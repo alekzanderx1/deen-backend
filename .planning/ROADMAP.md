@@ -50,7 +50,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
   3. `COGNITO_REGION` and `COGNITO_POOL_ID` are absent from `.env` and `core/config.py`; `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are present and loaded
   4. `DELETE /account/me` deletes the user via the Supabase Admin API (`httpx` call to `<SUPABASE_URL>/auth/v1/admin/users/{uid}`) and returns 204 (boto3 import remains in `api/account.py` until Phase 7 cleanup per D-03a)
 **Plans**: 3 plans
-- [ ] 06-P01-PLAN.md — Replace COGNITO_* env vars with SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in core/config.py, add startup guard (AUTH-03)
+- [x] 06-P01-PLAN.md — Replace COGNITO_* env vars with SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in core/config.py, add startup guard (AUTH-03)
 - [ ] 06-P02-PLAN.md — Update core/auth.py JWKS fetch URL from Cognito to Supabase /auth/v1/keys (AUTH-01, AUTH-02)
 - [ ] 06-P03-PLAN.md — Replace boto3 AdminDeleteUser with httpx Supabase Admin API call; remove username field from /account/me (AUTH-04)
 
@@ -73,5 +73,5 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 | 3. FAIR-RAG Core Modules | v1.0 | 3/3 | Complete | 2026-03-25 |
 | 4. Assembly and Integration | v1.0 | 3/3 | Complete | 2026-03-25 |
 | 5. Database Migration | v1.1 | 0/2 | Not started | - |
-| 6. Auth Migration | v1.1 | 0/3 | Not started | - |
+| 6. Auth Migration | v1.1 | 1/3 | In Progress|  |
 | 7. Cleanup | v1.1 | 0/? | Not started | - |

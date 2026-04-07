@@ -17,7 +17,7 @@ Requirements for the Supabase migration milestone. Each maps to roadmap phases.
 
 - [ ] **AUTH-01**: Supabase Auth is configured with asymmetric JWT signing (RS256/ES256) — JWKS endpoint returns non-empty keys array
 - [ ] **AUTH-02**: JWTBearer middleware verifies Supabase Auth JWTs (`core/auth.py` JWKS URL updated to Supabase)
-- [ ] **AUTH-03**: COGNITO_REGION and COGNITO_POOL_ID env vars removed; SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY added
+- [x] **AUTH-03**: COGNITO_REGION and COGNITO_POOL_ID env vars removed; SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY added
 - [ ] **AUTH-04**: Account deletion in `api/account.py` uses Supabase Admin API (httpx call) instead of boto3 `admin_delete_user`
 
 ### Cleanup
@@ -58,7 +58,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DB-03 | Phase 5 | Pending |
 | AUTH-01 | Phase 6 | Pending |
 | AUTH-02 | Phase 6 | Pending |
-| AUTH-03 | Phase 6 | Pending |
+| AUTH-03 | Phase 6 | Complete |
 | AUTH-04 | Phase 6 | Pending |
 | CLEAN-01 | Phase 7 | Pending |
 | CLEAN-02 | Phase 7 | Pending |

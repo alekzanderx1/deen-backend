@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Supabase Migration
 status: executing
-stopped_at: Phase 6 plans verified — 3 plans, 2 waves, all 4 AUTH requirements covered
-last_updated: "2026-04-07T04:30:00.000Z"
+stopped_at: Completed 06-auth-migration-P01-PLAN.md
+last_updated: "2026-04-07T04:20:41.661Z"
 last_activity: 2026-04-07
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 5
-  completed_plans: 2
+  completed_plans: 3
 ---
 
 # Project State
@@ -20,13 +20,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-06 after v1.1 milestone start)
 
 **Core value:** Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah Sistani's published rulings — the system refuses to answer rather than hallucinate or speculate.
-**Current focus:** Phase 05 — database-migration
+**Current focus:** Phase 06 — auth-migration
 
 ## Current Position
 
-Phase: 6
-Plan: Not started
-Status: Executing Phase 05
+Phase: 06 (auth-migration) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
 Last activity: 2026-04-07
 
 ## v1.1 Phase Overview
@@ -74,6 +74,7 @@ Last activity: 2026-04-07
 | Phase 04-assembly-and-integration P01 | 3 | 3 tasks | 4 files |
 | Phase 04-assembly-and-integration P02 | 4 | 2 tasks | 3 files |
 | Phase 04-assembly-and-integration P03 | 4 | 2 tasks | 2 files |
+| Phase 06-auth-migration PP01 | 1 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -117,6 +118,7 @@ Recent decisions affecting current work:
 - [Phase 04-assembly-and-integration]: 3-path routing from fiqh_classification: VALID_* to fiqh_subgraph, OUT_OF_SCOPE/UNETHICAL to check_early_exit with LLM rejection, else to agent
 - [Phase 04-assembly-and-integration]: Pre-canned fiqh stage SSE status events: sub-graph runs as black box; pipeline emits pre-canned messages rather than reading FiqhState.status_events
 - [Phase 04-assembly-and-integration]: VALID_FIQH_CATEGORIES constant at module level in pipeline_langgraph.py: mirrors chat_agent routing set for consistent fiqh path detection
+- [Phase 06-auth-migration]: Supabase vars placed adjacent to Redis/LLM vars in core/config.py; ValueError guard added as standalone block below existing OPENAI/PINECONE guard; COGNITO vars fully deleted per D-03
 
 ### v1.1 Decisions
 
@@ -136,7 +138,7 @@ None. v1.0 shipped clean. v1.1 requirements and roadmap defined.
 
 ## Session Continuity
 
-Last session: 2026-04-07T03:56:09.335Z
-Stopped at: Phase 6 context captured — 3 decisions locked (startup guard, deletion semantics, /account/me field)
+Last session: 2026-04-07T04:20:41.650Z
+Stopped at: Completed 06-auth-migration-P01-PLAN.md
 Resume file: None
 Next action: `/gsd:plan-phase 5`
