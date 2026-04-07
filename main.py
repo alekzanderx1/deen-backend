@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from api import chat
@@ -7,6 +9,7 @@ from api import account
 from api import primers
 from models.JWTBearer import JWTBearer
 from core.auth import jwks
+from core.config import validate_supabase_config
 import os
 
 from db.session import engine, Base          # for optional table bootstrap
@@ -21,7 +24,12 @@ from api import memory_admin
 
 
 # RUN USING: uvicorn main:app --reload
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    validate_supabase_config()
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 auth = JWTBearer(jwks)
 

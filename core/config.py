@@ -42,8 +42,10 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 if not OPENAI_API_KEY or not PINECONE_API_KEY:
     raise ValueError("Missing API keys! Ensure they are set in the .env file.")
 
-if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
-    raise ValueError("Missing Supabase config! Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.")
+def validate_supabase_config() -> None:
+    """Call from app startup to fail-fast if Supabase vars are absent."""
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        raise ValueError("Missing Supabase config! Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.")
 
 # Check if keys are loaded (optional)
 if not DEEN_DENSE_INDEX_NAME or not DEEN_SPARSE_INDEX_NAME:
