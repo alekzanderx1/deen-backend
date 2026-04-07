@@ -54,12 +54,12 @@ async def delete_my_account(
             status_code=403,
             detail="Invalid token: missing user identifier"
         )
-    
+
     logger.info(f"Account deletion requested for user: {user_id}")
-    
+
     # Debug: Log all JWT claims to identify available fields
     logger.info(f"JWT Claims for user {user_id}: {credentials.claims}")
-    
+
     # Step 1: Delete all user data from database
     try:
         deleted_counts = delete_user_data(user_id, db)
@@ -70,7 +70,7 @@ async def delete_my_account(
             status_code=500,
             detail="Failed to delete user data from database"
         )
-    
+
     # Step 2: Clear Redis sessions (best effort)
     try:
         sessions_cleared = clear_user_redis_sessions(user_id)
@@ -79,7 +79,7 @@ async def delete_my_account(
     except Exception as e:
         # Log but don't fail - this is not critical
         logger.warning(f"Redis cleanup failed for user {user_id}: {str(e)}")
-    
+
     # Step 3: Delete user from Supabase Auth using Admin API
     try:
         response = httpx.delete(
@@ -99,7 +99,7 @@ async def delete_my_account(
     except Exception as e:
         # Log unexpected errors but don't fail — DB data is already deleted
         logger.error(f"Unexpected error during Supabase Auth deletion for user {user_id}: {str(e)}")
-    
+
     logger.info(f"Account deletion completed for user {user_id}")
     return None  # 204 No Content
 

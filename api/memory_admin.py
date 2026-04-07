@@ -5,6 +5,8 @@ from sqlalchemy.sql import nullslast
 from typing import Optional
 import json
 
+from core.auth import auth
+from models.JWTBearer import JWTAuthorizationCredentials
 from db.session import get_db
 from db.repositories.memory_profile_repository import MemoryProfileRepository
 from db.repositories.memory_event_repository import MemoryEventRepository
@@ -35,7 +37,7 @@ def _serialize_notes(notes):
 
 
 @router.get("/dashboard", response_class=HTMLResponse)
-def dashboard():
+def dashboard(credentials: JWTAuthorizationCredentials = Depends(auth)):
     """
     Lightweight dev dashboard for inspecting memory data by user.
     Uses HTMX-style fetches against JSON endpoints below.
@@ -280,7 +282,7 @@ async function refreshAll() {
 
 
 @router.get("/{user_id}/profile")
-def profile(user_id: str, db: Session = Depends(get_db)):
+def profile(user_id: str, credentials: JWTAuthorizationCredentials = Depends(auth), db: Session = Depends(get_db)):
     profile: Optional[UserMemoryProfile] = profile_repo.get_by_user_id(db, user_id)
     if not profile:
         raise HTTPException(status_code=404, detail="User not found")
@@ -314,7 +316,7 @@ def profile(user_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{user_id}/notes")
-def notes(user_id: str, db: Session = Depends(get_db)):
+def notes(user_id: str, credentials: JWTAuthorizationCredentials = Depends(auth), db: Session = Depends(get_db)):
     profile: Optional[UserMemoryProfile] = profile_repo.get_by_user_id(db, user_id)
     if not profile:
         raise HTTPException(status_code=404, detail="User not found")
@@ -328,7 +330,7 @@ def notes(user_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{user_id}/events")
-def events(user_id: str, limit: int = 50, db: Session = Depends(get_db)):
+def events(user_id: str, credentials: JWTAuthorizationCredentials = Depends(auth), limit: int = 50, db: Session = Depends(get_db)):
     profile: Optional[UserMemoryProfile] = profile_repo.get_by_user_id(db, user_id)
     if not profile:
         raise HTTPException(status_code=404, detail="User not found")
@@ -354,7 +356,7 @@ def events(user_id: str, limit: int = 50, db: Session = Depends(get_db)):
 
 
 @router.get("/{user_id}/consolidations")
-def consolidations(user_id: str, limit: int = 20, db: Session = Depends(get_db)):
+def consolidations(user_id: str, credentials: JWTAuthorizationCredentials = Depends(auth), limit: int = 20, db: Session = Depends(get_db)):
     profile: Optional[UserMemoryProfile] = profile_repo.get_by_user_id(db, user_id)
     if not profile:
         raise HTTPException(status_code=404, detail="User not found")

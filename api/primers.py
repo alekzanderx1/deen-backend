@@ -8,6 +8,8 @@ import json
 from db.session import get_db
 from db.crud.lessons import lesson_crud
 from services.primer_service import PrimerService
+from core.auth import auth
+from models.JWTBearer import JWTAuthorizationCredentials
 from models.schemas import (
     PersonalizedPrimerRequest,
     PersonalizedPrimerResponse,
@@ -25,7 +27,8 @@ primers_router = APIRouter(
 @primers_router.get("/{lesson_id}/baseline", response_model=BaselinePrimerResponse)
 async def get_baseline_primer(
     lesson_id: int,
-    db: Session = Depends(get_db)
+    credentials: JWTAuthorizationCredentials = Depends(auth),
+    db: Session = Depends(get_db),
 ):
     """
     Get baseline primer for a lesson.
@@ -59,7 +62,8 @@ async def get_baseline_primer(
 @primers_router.post("/personalized", response_model=PersonalizedPrimerResponse)
 async def get_personalized_primer(
     request: PersonalizedPrimerRequest,
-    db: Session = Depends(get_db)
+    credentials: JWTAuthorizationCredentials = Depends(auth),
+    db: Session = Depends(get_db),
 ):
     """
     Get personalized "For You" primer section.
@@ -127,7 +131,8 @@ async def get_personalized_primer(
 @primers_router.post("/personalized/stream")
 async def stream_personalized_primer(
     request: PersonalizedPrimerRequest,
-    db: Session = Depends(get_db)
+    credentials: JWTAuthorizationCredentials = Depends(auth),
+    db: Session = Depends(get_db),
 ):
     """
     Stream personalized primer generation in real-time.
