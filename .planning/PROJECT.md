@@ -56,12 +56,15 @@ Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah
 - ✓ Database connection switched from AWS RDS to Supabase Postgres — Validated in Phase 5: Database Migration
 - ✓ All 13 SQLAlchemy tables and alembic migrations applied on Supabase (via genesis + 7 original migrations) — Validated in Phase 5: Database Migration
 - ✓ `.env` DB_* vars + ASYNC_DATABASE_URL pointing at Supabase direct connection (port 5432) — Validated in Phase 5: Database Migration
+- ✓ JWTBearer middleware verifies Supabase Auth JWTs (ES256, well-known JWKS endpoint) — Validated in Phase 6: Auth Migration
+- ✓ Cognito env vars (COGNITO_REGION, COGNITO_POOL_ID) replaced with SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY — Validated in Phase 6: Auth Migration
+- ✓ boto3 AdminDeleteUser replaced with httpx Supabase Admin API delete — Validated in Phase 6: Auth Migration
+- ✓ All routes protected with strict auth; ENV=development bypass for local testing — Validated in Phase 6: Auth Migration
 
 ### Active
 
-- [ ] JWTBearer middleware verifies Supabase Auth JWTs instead of Cognito tokens
-- [ ] Environment variables updated and documented for Supabase targets
-- [ ] Existing API behavior unchanged (all endpoints function identically)
+- [ ] boto3 dependency removed from requirements.txt
+- [ ] Env var changes documented for deployment
 
 ### Out of Scope
 
@@ -123,4 +126,4 @@ This document evolves at phase transitions and milestone boundaries.
 **After each milestone** (via `/gsd:complete-milestone`): full review of all sections.
 
 ---
-*Last updated: 2026-04-06 after Phase 5 complete — Supabase database migration done; DB connection live on Supabase Postgres (PostgreSQL 17.6)*
+*Last updated: 2026-04-07 after Phase 6 complete — Supabase Auth migration done; all routes protected, Cognito fully replaced*
