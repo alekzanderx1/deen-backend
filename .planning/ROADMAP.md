@@ -26,3 +26,5 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 | 2. Routing and Retrieval | v1.0 | 3/3 | Complete | 2026-03-25 |
 | 3. FAIR-RAG Core Modules | v1.0 | 3/3 | Complete | 2026-03-25 |
 | 4. Assembly and Integration | v1.0 | 3/3 | Complete | 2026-03-25 |
+| 5. Database Migration | v1.1 | 1/1 | Complete | 2026-04-07 |
+| 6. Auth Migration | v1.1 | 2/3 | In Progress | — |

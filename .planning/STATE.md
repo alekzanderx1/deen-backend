@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: v1.0 milestone complete
-stopped_at: "Completed 04-03-PLAN.md: SSE Streaming Integration for Fiqh Path"
-last_updated: "2026-03-25T23:54:54.494Z"
+milestone: v1.1
+milestone_name: Supabase Migration
+status: in-progress
+stopped_at: "Completed 06-P02-PLAN.md: core/auth.py JWKS migration to Supabase"
+last_updated: "2026-04-07T04:23:30Z"
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 12
-  completed_plans: 12
+  total_phases: 6
+  completed_phases: 5
+  total_plans: 3
+  completed_plans: 2
 ---
 
 # Project State
@@ -23,7 +23,7 @@ See: .planning/PROJECT.md (updated 2026-03-25 after v1.0 milestone)
 
 ## Current Position
 
-Milestone v1.0 shipped. No active phase.
+Milestone v1.1 (Supabase Migration) — Phase 06-auth-migration active. P01 and P02 complete. P03 (api/account.py) remaining.
 
 ## Performance Metrics
 
@@ -111,6 +111,6 @@ None. v1.0 shipped clean. 6 tech debt items tracked in `.planning/milestones/v1.
 
 ## Session Continuity
 
-Last session: 2026-03-25
-Stopped at: Milestone v1.0 archived and tagged
+Last session: 2026-04-07
+Stopped at: Completed 06-P02-PLAN.md — core/auth.py JWKS fetch migrated to Supabase
 Resume file: None
