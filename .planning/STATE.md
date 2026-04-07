@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Supabase Migration
 status: executing
-stopped_at: Completed 06-auth-migration-P01-PLAN.md
-last_updated: "2026-04-07T04:20:41.661Z"
+stopped_at: Completed 06-auth-migration-P03-PLAN.md
+last_updated: "2026-04-07T04:24:26.043Z"
 last_activity: 2026-04-07
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 5
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-04-06 after v1.1 milestone start)
 ## Current Position
 
 Phase: 06 (auth-migration) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-04-07
 
@@ -75,6 +75,7 @@ Last activity: 2026-04-07
 | Phase 04-assembly-and-integration P02 | 4 | 2 tasks | 3 files |
 | Phase 04-assembly-and-integration P03 | 4 | 2 tasks | 2 files |
 | Phase 06-auth-migration PP01 | 1 | 1 tasks | 1 files |
+| Phase 06-auth-migration PP03 | 5 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -119,6 +120,9 @@ Recent decisions affecting current work:
 - [Phase 04-assembly-and-integration]: Pre-canned fiqh stage SSE status events: sub-graph runs as black box; pipeline emits pre-canned messages rather than reading FiqhState.status_events
 - [Phase 04-assembly-and-integration]: VALID_FIQH_CATEGORIES constant at module level in pipeline_langgraph.py: mirrors chat_agent routing set for consistent fiqh path detection
 - [Phase 06-auth-migration]: Supabase vars placed adjacent to Redis/LLM vars in core/config.py; ValueError guard added as standalone block below existing OPENAI/PINECONE guard; COGNITO vars fully deleted per D-03
+- [Phase 06-auth-migration]: boto3 import retained in api/account.py through Phase 6 per D-03a — physical removal is Phase 7 CLEAN-01
+- [Phase 06-auth-migration]: httpx.delete() used synchronously in account deletion per D-04 — consistent with existing sync-inside-async pattern
+- [Phase 06-auth-migration]: 404 from Supabase Admin API treated as success-equivalent per D-05 — user already deleted, log warning and return 204
 
 ### v1.1 Decisions
 
@@ -138,7 +142,7 @@ None. v1.0 shipped clean. v1.1 requirements and roadmap defined.
 
 ## Session Continuity
 
-Last session: 2026-04-07T04:20:41.650Z
-Stopped at: Completed 06-auth-migration-P01-PLAN.md
+Last session: 2026-04-07T04:24:26.032Z
+Stopped at: Completed 06-auth-migration-P03-PLAN.md
 Resume file: None
 Next action: `/gsd:plan-phase 5`
