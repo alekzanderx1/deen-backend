@@ -1,132 +1,269 @@
-# Feature Landscape
+# Features: Supabase Migration
 
-**Domain:** Fiqh Agentic RAG — Twelver Shia Islamic legal Q&A grounded in Ayatollah Sistani's published rulings
-**Researched:** 2026-03-23
-**Sources:** FAIR-RAG paper, FARSIQA paper (Islamic domain evaluation), existing Deen backend codebase
-
----
-
-## Table Stakes
-
-Features users expect. Missing = product feels incomplete or untrustworthy. In a religious legal domain, "incomplete" means dangerous.
-
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| **Query validation & scope routing** | Users will ask off-topic questions. Without gating, the system generates confidently wrong Islamic rulings. | Medium | Router must classify: VALID_OBVIOUS / VALID_SMALL / VALID_LARGE / OUT_OF_SCOPE / UNETHICAL. Existing fiqh classifier in `check_early_exit` node is present but performs poorly — must be replaced with explicit category routing. |
-| **Negative rejection** | FARSIQA achieved 97% rejection accuracy vs 57% for naive RAG. The most critical metric for religious content — wrong answer is always worse than no answer. | Medium | Two-layer defense: (1) router rejects out-of-scope at the front, (2) generation prompt refuses when evidence is insufficient. Both are required. |
-| **Fatwa disclaimer on every ruling** | Any system answering fiqh questions without an explicit "I am not issuing a fatwa" disclaimer will be considered unacceptable by Shia Muslims. | Low | Non-negotiable. Must be hardcoded in the generation prompt, not optional. Applies to ALL ruling responses, not just edge cases. |
-| **Hybrid retrieval (dense + sparse + RRF)** | Fiqh texts use fixed Arabic/Persian terminology (najasah, wudu, tayammum). BM25 exact matching is required for these terms — dense-only retrieval will miss them. | Medium | Existing Pinecone dense + sparse infrastructure exists for hadith/Quran. A dedicated fiqh index using the same pattern is the path forward. |
-| **Inline citations linking to source passages** | Without citations, users cannot verify answers. In a legal context this is a trust-breaker. | Medium | Every factual claim needs a `[n]` token in the generated text plus a references block at the end of the response. Source metadata (book, chapter, ruling number) must be stored per Pinecone chunk. |
-| **Insufficient evidence partial answer + redirect** | When evidence is incomplete after 3 iterations, the system must not silently hallucinate. It must say what it found and where to get the rest. | Low | Standard generation fallback: "Here is what I found: [partial]. For a complete ruling, consult Sistani's official office." |
-| **SSE status streaming for pipeline stages** | The FAIR-RAG loop takes 3 iterations and ~22 seconds. Without intermediate status events, the UI appears frozen. | Low | Existing SSE protocol in `pipeline_langgraph.py` already emits `status` events. Extend to emit fiqh-specific stages: decomposing, retrieving, assessing, refining. |
-| **Fiqh corpus ingestion pipeline** | The system cannot answer anything without the data. PDF parsing, chunking, embedding, and Pinecone upload of Sistani's "Islamic Laws" is a prerequisite to all other features. | Medium-High | Chunking strategy from FARSIQA: ~300-400 tokens, paragraph-boundary-first, with chapter/section/topic metadata. Q&A chunks should prepend the question to the answer for retrieval matching. |
+**Domain:** Infrastructure migration — AWS RDS + Cognito → Supabase Postgres + Supabase Auth
+**Researched:** 2026-04-06
+**Overall confidence:** HIGH (verified against official Supabase docs + codebase inspection)
 
 ---
 
-## Differentiators
+## Database Migration (RDS → Supabase Postgres)
 
-Features that set this product apart. Not universally expected, but meaningfully raise quality and trust.
+### What This Actually Means
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| **Structured Evidence Assessment (SEA)** | The core innovation. Unlike abstractive summarization or direct QA, SEA explicitly enumerates required findings, checks each against evidence, and names gaps. This is what enables 97% negative rejection. Without it, the system either hallucinates or silently fails. | High | Three-step process: (1) mission deconstruction into required-findings checklist, (2) per-finding evidence synthesis with confirmed vs gaps, (3) sufficiency verdict. SEA is what turns the loop into a self-auditing process rather than blind retrieval. |
-| **Query decomposition into independent sub-queries** | Complex fiqh questions frequently require multi-hop retrieval: find the base principle, then find the exception. Decomposition targets both in the first pass. FAIR-RAG component scored 4.13/5.0 in quality evaluation. | Medium | Generate 1-4 keyword-rich, semantically independent sub-queries. Use fiqh terminology in sub-queries explicitly (tahara, wudu, etc.). Only generate as many as truly needed — artificial inflation hurts precision. |
-| **Iterative query refinement using confirmed facts** | Once SEA confirms partial facts, refinement generates laser-targeted queries using those confirmed facts rather than re-stating the original question. Query Refinement was the highest-scoring component in FARSIQA: 4.45-4.61/5.0 with zero failures. | Medium | Key principle: "Once confirmed the base ruling is X, the next query should use X directly, not re-derive it." Max 3 iterations, early exit when SEA declares sufficiency. |
-| **Dynamic LLM allocation (small for routing/SEA, large for filtering/refinement/generation)** | 13% cheaper than static large model while achieving better negative rejection (97% vs 94%). Static reasoner model is 11.8x more expensive with worse faithfulness — do not use. | Medium | gpt-4o-mini for routing, decomposition, SEA. gpt-4.1 for evidence filtering, query refinement, answer generation. This allocation is validated by FARSIQA Table 6. |
-| **Fiqh-specific ethical safeguards hardcoded in generation prompt** | Sensitive ruling categories (khums, inheritance, divorce, personal situation fatwas) need extra disclaimers beyond the standard fatwa disclaimer. This proactive layering is what separates a responsible Islamic platform from a generic chatbot. | Low | Extra disclaimer triggers for: personalized situation questions ("Should I specifically..."), khums calculations, inheritance shares, divorce questions. Always redirect these to Sistani's official office. |
-| **Topic-tagged metadata per chunk enabling sectional filtering** | Sistani's book covers tahara, salah, sawm, hajj, khums, transactions, family law. Metadata tags allow future scoped retrieval ("only retrieve from tahara section for purity questions"). | Medium | Requires tagging during ingestion. Not used in initial retrieval but enables future query-type-aware scope filtering and improves citation quality (showing chapter context). |
-| **Controversial/disputed ruling neutrality** | When retrieved evidence contains multiple scholarly positions or a ruling is contested, presenting views neutrally without endorsement is essential for religious credibility. | Low | Built into the generation prompt. When evidence contains "opinion A vs opinion B" patterns, output both without editorial stance. |
+The project uses SQLAlchemy (psycopg2 sync + asyncpg async) with 7 Alembic migration files. `db/session.py` builds the engine with `sslmode=require` and `pool_pre_ping=True`. `alembic/env.py` reads the DB URL from `db/config.py`'s `Settings` object, which constructs it from individual `DB_*` env vars. No data migration is needed — fresh Supabase project.
 
----
+### Table Stakes Steps
 
-## Anti-Features
+**1. Get the right connection string from the Supabase dashboard.**
 
-Features to explicitly NOT build in this milestone.
+Supabase provides two families of connection strings (Project Settings → Database → Connection string):
 
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| **Reasoning model routing (o1/o3 for complex inheritance)** | Static Reasoner in FARSIQA was 11.8x more expensive with worse faithfulness (57.7%) than Dynamic allocation (62.5%). The complexity tradeoff is bad, and the PROJECT.md explicitly defers this. | Use gpt-4.1 large for VALID_LARGE and VALID_REASONER queries in this milestone. Revisit after measuring real-world failure rates on complex queries. |
-| **Multi-marji support (Khamenei, Fadlallah, etc.)** | Each marja has a different corpus, different terminology, and different rulings. Multi-marja conflation is a major religious sensitivity risk — users asking about Sistani must get Sistani only. | Hard-scope the retrieval to the Sistani index. Route any comparative-marja questions as out-of-scope or note "this system is limited to Sistani's rulings." |
-| **Sistani.org Q&A scraping** | Web scraping introduces legal and maintenance risk. The book corpus is bounded, quality-controlled, and sufficient for MVP. Scraping should come after the book pipeline is validated. | Start with "Islamic Laws" 4th edition only. After the pipeline is proven, add official Q&A data as a second corpus phase. |
-| **Arabic/Persian query answering** | Multilingual support doubles the embedding model complexity and requires separate evaluation for retrieval quality in each language. | English-first. The translation tool already in the pipeline handles non-English input at the query level. Fiqh content and retrieval remain English. |
-| **LLM-as-Judge evaluation harness** | A systematic evaluation harness is valuable but should not block building the pipeline. Building it in this milestone conflates infrastructure and product. | Identify evaluation queries manually. Run spot-checks after each phase. Build a proper eval harness as a separate future milestone after the pipeline is stable. |
-| **Fine-tuning or model training** | Out of scope per PROJECT.md. The FAIR-RAG architecture achieves state-of-the-art results without training. | Agentic pipeline engineering only. |
-| **Frontend or UI changes** | This is a backend milestone. Frontend changes need product coordination. | Expose fiqh capability via the existing `/chat/stream/agentic` SSE endpoint. Frontend consumes the existing protocol. |
+| Type | Port | Use For |
+|------|------|---------|
+| Direct connection | 5432 | Alembic migrations, pg_dump, management tools |
+| Supavisor session mode | 5432 (pooler host) | Long-running app servers (IPv4 compatible) |
+| Supavisor transaction mode | 6543 | Serverless, short-lived connections only |
 
----
+Direct format: `postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres`
+Session pooler format: `postgres://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres`
 
-## Feature Dependencies
+For Alembic migrations: always use the direct connection (port 5432), not the pooler. The pooler's transaction mode drops session-level state that Alembic relies on.
 
+**2. Update env vars.**
+
+`db/config.py` already supports either individual `DB_*` vars or a combined `DATABASE_URL` via `AliasChoices`. The Supabase default DB user is `postgres`, default DB name is `postgres`.
+
+Minimum change is setting:
 ```
-Fiqh corpus ingestion
-    └── Pinecone fiqh index (dense + sparse)
-            └── Hybrid retrieval (RRF)
-                    └── Evidence filtering
-                            └── SEA (Structured Evidence Assessment)
-                                    ├── Iterative query refinement (when gaps found)
-                                    │       └── Hybrid retrieval (loop back, max 3x)
-                                    └── Faithful answer generation (when sufficient)
-                                            ├── Inline citations
-                                            ├── Fatwa disclaimer
-                                            └── Insufficient evidence partial answer
-
-Query validation & routing (must precede all above)
-    ├── Negative rejection (out-of-scope path)
-    └── VALID_OBVIOUS shortcut (bypass RAG entirely)
-
-Query decomposition (parallel to routing, feeds retrieval)
-
-Dynamic LLM allocation (cross-cutting, applies per pipeline stage)
-
-SSE status streaming (cross-cutting, wraps all stages)
+DB_HOST=db.[PROJECT-REF].supabase.co
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=[your-supabase-db-password]
+DB_NAME=postgres
 ```
 
-**Critical path:** Corpus ingestion → Pinecone index → Hybrid retrieval → SEA → Generation. Every other feature depends on this sequence being complete.
+**3. Run Alembic migrations against the fresh Supabase DB.**
 
-**Non-blocking in parallel:**
-- Query validation improvements can be built independently of corpus ingestion
-- SSE status events can be scaffolded before the RAG loop is wired
-- Dynamic LLM allocation is a configuration concern, not a blocker
+`alembic/env.py` already uses `pool.NullPool` in online mode — this is correct for migration runs and compatible with Supabase's direct connection. No changes needed to `env.py`.
+
+```bash
+alembic upgrade head
+```
+
+This applies all 7 migration files in sequence, creating the 13 tables in the `public` schema.
+
+**4. SSL is already handled.**
+
+`db/session.py` has `connect_args={"sslmode": "require"}` — Supabase requires SSL, so this is already correct. No change needed.
+
+### What to Watch For
+
+**Schema namespace collision.** Supabase pre-provisions several schemas (`auth`, `storage`, `realtime`, `extensions`). The app's tables all live in `public` — no collision. Do not name any table to match these reserved schemas.
+
+**`auth` schema foreign key error.** If any SQLAlchemy model references `auth.users` (e.g., via a foreign key), SQLAlchemy/Alembic throws `NoReferencedTableError` because it does not resolve cross-schema references by default. The current app's models do not reference `auth.users`, so this is not an issue for this migration.
+
+**asyncpg + transaction-mode pooler incompatibility (HIGH severity, confirmed 2024-2025).** `core/config.py` configures `ASYNC_DATABASE_URL` with `postgresql+asyncpg://...`. If this URL points to Supabase's transaction-mode pooler (port 6543), asyncpg will produce `PreparedStatementError` ("prepared statement does not exist") under any load. This is a confirmed, ongoing issue with multiple open GitHub reports as of 2025. Mitigation: point `ASYNC_DATABASE_URL` at the direct connection (port 5432) or the session-mode pooler. The workaround of setting `statement_cache_size=0` in `connect_args` has also been reported as unreliable.
+
+The async DB path is currently unused in routers (per CLAUDE.md). This means the asyncpg issue is low-risk — point `ASYNC_DATABASE_URL` at the direct connection and move on.
+
+### Dashboard Configuration Required
+
+- Copy the database password from Project Settings → Database. This is set at project creation and is distinct from the service role key.
+- SSL certificates are available in the dashboard but not required when using `sslmode=require` with the default cert store.
+- After running migrations, verify tables in the Supabase dashboard's Table Editor or SQL editor (`SELECT tablename FROM pg_tables WHERE schemaname = 'public';`).
 
 ---
 
-## MVP Recommendation
+## Auth Migration (Cognito → Supabase Auth)
 
-**Build in this order:**
+### Current Implementation (What Exists)
 
-1. **Corpus ingestion pipeline** — No other feature is testable without this. PDF parsing, chunking with metadata, embedding, Pinecone upload. Non-blocking for routing work but the critical path dependency.
+`core/auth.py` fetches Cognito's JWKS at startup:
+```python
+jwks = JWKS.model_validate(
+    requests.get(
+        f"https://cognito-idp.{COGNITO_REGION}.amazonaws.com/{COGNITO_POOL_ID}/.well-known/jwks.json"
+    ).json()
+)
+auth = JWTBearer(jwks)
+```
 
-2. **Improved query classifier + negative rejection** — Replace the underperforming fiqh early-exit with the 6-category router (VALID_OBVIOUS / VALID_SMALL / VALID_LARGE / OUT_OF_SCOPE / UNETHICAL). Wire negative rejection as the first defense layer.
+`models/JWTBearer.py` uses `python-jose` to verify asymmetric signatures via `kid`-based key lookup and `key.verify()`. This is already a JWKS-based asymmetric pattern — not HS256. The class itself does not need changes; only the JWKS URL source changes.
 
-3. **FAIR-RAG iterative loop as LangGraph sub-graph** — The core milestone deliverable. Decompose → Retrieve (hybrid RRF) → Filter → SEA → Refine → Repeat (max 3x) → Generate. This is a single sub-graph that the main agent routes to when the query is classified as fiqh.
+### Supabase Auth JWT Configuration (Critical Decision Point)
 
-4. **Faithful generation with citations + disclaimer** — Strictly evidence-grounded generation, inline `[n]` citations, fatwa disclaimer hardcoded, insufficient-evidence fallback.
+Supabase has two JWT signing modes:
 
-5. **SSE streaming of intermediate pipeline stages** — Extend existing status events to cover the fiqh sub-graph stages. Required before the feature is usable in the existing frontend.
+**Legacy (HS256, shared secret):** Default for most existing projects. A symmetric key visible in Settings → Auth → JWT Settings. The JWKS endpoint returns an empty key set for HS256 projects — the current `JWTBearer` startup code would fail with an empty `kid_to_jwk` dict.
 
-**Defer:**
-- Topic-tagged metadata filtering: ingestion can tag metadata, but retrieval-time scoping can be added post-launch once query patterns are understood
-- Khums/inheritance/divorce extra disclaimers: implement the core safeguards first, add category-specific extra warnings in the second iteration
-- Evaluation harness: manual spot-checks in this milestone, systematic eval in a future milestone
+**Asymmetric (ES256 / RS256, JWKS):** Recommended; becoming the new default. New projects created after May 2025 use asymmetric keys by default. JWKS endpoint: `https://[PROJECT-REF].supabase.co/auth/v1/.well-known/jwks.json`.
+
+Because the existing `JWTBearer` already does asymmetric JWKS-based verification, the cleanest path is to enable asymmetric signing on the Supabase project and point `core/auth.py` at Supabase's JWKS endpoint. This requires zero structural changes to `JWTBearer` — only the URL in `core/auth.py` changes.
+
+### Table Stakes Steps
+
+**1. Enable asymmetric JWT signing in the Supabase dashboard.**
+
+Settings → Auth → JWT Settings → "Migrate JWT secret" → follow prompts to rotate to an asymmetric key (ES256 is the Supabase recommendation). For new projects created after May 2025, asymmetric is already the default. Confirm by fetching the JWKS endpoint and checking the `keys` array is non-empty.
+
+**2. Update `core/auth.py` to fetch from Supabase's JWKS endpoint.**
+
+The change is minimal — replace the Cognito URL construction with the Supabase JWKS URL:
+
+```
+Old: https://cognito-idp.{REGION}.amazonaws.com/{POOL_ID}/.well-known/jwks.json
+New: https://[PROJECT-REF].supabase.co/auth/v1/.well-known/jwks.json
+```
+
+The `JWTBearer` class itself needs no changes.
+
+**3. Update `core/config.py` env var reads.**
+
+Remove reads of `COGNITO_REGION` and `COGNITO_POOL_ID`. Add `SUPABASE_URL` (the project's base URL, e.g. `https://abcdef.supabase.co`).
+
+**4. Audience claim behavior.**
+
+Supabase JWTs include `aud: "authenticated"` in the payload. The current `JWTBearer` does not check audience — it only verifies the signature. This is fine and matches Supabase's own guidance (their examples explicitly set `"verify_aud": False`). No change needed.
+
+**5. HS256 fallback consideration.**
+
+If asymmetric signing cannot be enabled (e.g., legacy project constraints), the JWKS endpoint returns an empty key set and startup will fail. Alternative for HS256 projects: verify using `jwt.decode(token, SUPABASE_JWT_SECRET, algorithms=["HS256"], options={"verify_aud": False})` using `python-jose`. This requires a different code path in `JWTBearer`. The simpler path is to just enable asymmetric signing — it is always available in the dashboard.
+
+### User Management Approach
+
+The migration is a fresh start — no user data from Cognito needs to be imported.
+
+Supabase Auth provides REST endpoints directly. No Python SDK required for a backend-only service:
+
+| Action | Endpoint |
+|--------|----------|
+| Sign up (email+password) | `POST https://[PROJECT].supabase.co/auth/v1/signup` |
+| Sign in (email+password) | `POST https://[PROJECT].supabase.co/auth/v1/token?grant_type=password` |
+| Get user info | `GET https://[PROJECT].supabase.co/auth/v1/user` with `Authorization: Bearer [access_token]` |
+| Admin: create user | `POST https://[PROJECT].supabase.co/auth/v1/admin/users` with service role key |
+
+All endpoints require `apikey: [SUPABASE_ANON_KEY]` in the request header. Sign-in returns `access_token` (a JWT) + `refresh_token`. The `access_token` is what gets passed to the FastAPI backend as a Bearer token — the same flow as Cognito.
+
+The frontend handles auth flows (signup, signin, token storage). The backend only verifies the incoming JWT.
+
+**Email confirmation:** Supabase requires email confirmation by default. Disable it in Settings → Auth → Email for development and testing. Configure SMTP in Settings → Auth → SMTP Settings for production.
+
+### Dashboard Configuration Required
+
+- Enable asymmetric JWT signing (Settings → Auth → JWT Settings → Migrate JWT secret)
+- Note down: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- Disable email confirmation for development (Settings → Auth → Email → "Confirm email")
+- Configure SMTP for production email delivery
 
 ---
 
-## Confidence Assessment
+## Supabase-Specific Features to Leverage
 
-| Feature Area | Confidence | Notes |
-|--------------|------------|-------|
-| Table stakes identification | HIGH | Directly from FAIR-RAG and FARSIQA papers, crosschecked with PROJECT.md requirements |
-| Differentiator ordering | HIGH | FARSIQA component-level scores (4.13, 4.61/5.0) provide empirical ranking |
-| Anti-feature justifications | HIGH | Cost/quality data from FARSIQA Table 6 supports dynamic-vs-reasoner decision; project constraints documented in PROJECT.md |
-| Feature dependencies | HIGH | Logical pipeline dependencies verified against existing LangGraph architecture |
-| Complexity estimates | MEDIUM | Based on integration with existing stack; actual complexity depends on Pinecone fiqh index configuration |
+### Connection Pooling (Supavisor) — LOW priority for this migration
+
+Supabase provides Supavisor automatically. For the current usage pattern (long-running FastAPI server, sync SQLAlchemy, low-to-medium traffic), the direct connection is simplest and sufficient. Supavisor session mode is a reasonable upgrade when connection count becomes a concern at scale.
+
+Key fact: the sync SQLAlchemy engine (psycopg2) works with all three connection types (direct, session pooler, transaction pooler) without issues. The asyncpg issue only affects the async path.
+
+### Row Level Security (RLS) — skip for this migration
+
+RLS is a Postgres-native feature Supabase surfaces prominently, but it is not relevant for this project:
+
+- Tables created via raw SQL (which Alembic does) do NOT have RLS enabled by default. Explicit `ALTER TABLE x ENABLE ROW LEVEL SECURITY;` is required.
+- The FastAPI backend connects as the `postgres` role (superuser), which has `BYPASSRLS` privilege — RLS policies have no effect on any SQLAlchemy queries.
+- RLS only matters for connections via Supabase's auto-generated REST API (PostgREST) using the `anon` or `authenticated` roles.
+- The app uses SQLAlchemy directly, not PostgREST. RLS is irrelevant for all 13 tables.
+
+Do not enable RLS on any table during this migration. It adds complexity without benefit given the current architecture.
+
+### Supabase Dashboard SQL Editor
+
+Useful for verifying Alembic migrations applied correctly. After `alembic upgrade head`, run:
+```sql
+SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;
+```
+This should return 13 tables plus `alembic_version`.
+
+### Postgres Extensions (pgvector)
+
+Supabase pre-installs `pgvector`. The project already has `pgvector==0.3.6` in requirements. If a future phase uses Postgres vector columns, the extension is already available — no manual installation needed.
+
+---
+
+## Not Needed for This Migration
+
+**Supabase Python SDK (`supabase-py`).** The backend verifies JWTs and queries Postgres via SQLAlchemy directly. The SDK wraps auth flows, storage, and PostgREST. None of those surfaces are used here.
+
+**PostgREST (Supabase auto-generated REST API).** The app exposes its own FastAPI REST API. The Supabase-generated API is a separate interface not consumed by anything in this project.
+
+**Supabase Storage.** The app does not store files.
+
+**Supabase Realtime.** The app uses SSE via FastAPI's `StreamingResponse`. Supabase Realtime is not applicable.
+
+**Supabase Edge Functions.** All compute runs in the FastAPI server.
+
+**Supabase CLI / local development stack.** The migration targets Supabase Cloud. The CLI is useful for local dev but not required for this migration.
+
+**Cognito as third-party JWT provider.** Supabase can accept Cognito JWTs alongside Supabase Auth via a third-party integration. This is for gradual dual-auth migrations. Since this is a fresh start, skip it entirely.
+
+**User import tooling.** No data migration means no need to export Cognito user records or import into `auth.users`. Users re-register on Supabase Auth.
+
+---
+
+## Dependency Map: DB Migration vs Auth Migration
+
+These two workstreams are independent and can proceed in parallel after the Supabase project is created:
+
+```
+Prerequisite: Create Supabase project
+    |
+    ├── DB migration path (independent)
+    |     Update DB_* env vars
+    |     → run alembic upgrade head
+    |     → verify 13 tables in dashboard
+    |
+    └── Auth migration path (independent)
+          Enable asymmetric signing in dashboard
+          → update SUPABASE_URL env var
+          → update core/auth.py fetch URL (3-line change)
+          → remove COGNITO_* vars from config
+
+Cutover gate (requires both complete):
+    Verify /chat/stream/agentic end-to-end with:
+    - Supabase-issued JWT (Bearer token from auth/v1/token)
+    - Supabase Postgres-backed DB session
+```
+
+---
+
+## Complexity Assessment
+
+| Step | Complexity | Notes |
+|------|------------|-------|
+| Create Supabase project | Low | Dashboard, ~2 minutes |
+| Update DB env vars | Low | Change 5 vars, zero code change |
+| Run alembic upgrade head | Low | Already works; direct connection avoids pooler issues |
+| Verify 13 tables applied | Low | SQL editor or psql |
+| Enable asymmetric JWT in dashboard | Low | 2-3 clicks |
+| Update JWKS fetch URL in core/auth.py | Low | 3-line change |
+| Remove COGNITO_* vars, add SUPABASE_URL | Low | Config cleanup |
+| Update ASYNC_DATABASE_URL | Low | Point at direct connection; async path currently unused |
+| Test JWT verification end-to-end | Medium | Need Supabase Auth user, access token, send to /chat endpoint |
+| RLS | None | Skip entirely for this migration |
+
+**Total estimated implementation work: 2-4 hours including end-to-end testing.**
 
 ---
 
 ## Sources
 
-- FAIR-RAG paper (via `documentation/fiqh_related_docs/FAIR-RAG.pdf`)
-- FARSIQA paper (via `documentation/fiqh_related_docs/FARSIQA.pdf`)
-- FAIR-RAG implementation guide: `/Users/shawn.n/Desktop/Deen/deen-backend/documentation/fiqh_related_docs/FAIR_RAG_Fiqh_Implementation_Guide.md`
-- Project requirements: `/Users/shawn.n/Desktop/Deen/deen-backend/.planning/PROJECT.md`
-- Existing agent architecture: `agents/core/chat_agent.py`, `core/pipeline_langgraph.py`
+- [Supabase: Connect to your database](https://supabase.com/docs/guides/database/connecting-to-postgres) — connection string formats, direct vs pooler guidance
+- [Supabase: JWT documentation](https://supabase.com/docs/guides/auth/jwts) — JWKS endpoint URL, algorithm notes
+- [Supabase: JWT Signing Keys](https://supabase.com/docs/guides/auth/signing-keys) — migration from HS256 to asymmetric
+- [Supabase: Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security) — RLS defaults, service role bypass
+- [Supabase: Password-based Auth](https://supabase.com/docs/guides/auth/passwords) — REST API endpoints for signup/signin
+- [Supabase: AWS Cognito third-party integration](https://supabase.com/docs/guides/auth/third-party/aws-cognito) — why to skip this approach
+- [objectgraph.com: Migrating Supabase JWT to JWKS](https://objectgraph.com/blog/migrating-supabase-jwt-jwks/) — Python HS256 vs JWKS verification code patterns
+- [GitHub: asyncpg + Supabase prepared statement errors](https://github.com/supabase/supabase/issues/39227) — confirmed 2024-2025 incompatibility
+- [GitHub Discussion: Asymmetric Keys default timeline 2025](https://github.com/orgs/supabase/discussions/29289) — May 2025 new project defaults
+- [dev.to: Integrating FastAPI with Supabase Auth](https://dev.to/j0/integrating-fastapi-with-supabase-auth-780) — python-jose + audience claim pattern
