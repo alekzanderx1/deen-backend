@@ -40,9 +40,24 @@ Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah
 - ✓ Session isolation via `checkpointer=False` on fiqh sub-graph — v1.0
 - ✓ Non-fiqh path preserved unchanged — v1.0
 
+## Current Milestone: v1.1 Supabase Migration
+
+**Goal:** Replace AWS RDS + Cognito with Supabase Postgres and Supabase Auth, keeping all existing schemas and Redis unchanged.
+
+**Target features:**
+- Supabase Postgres as the database backend (same SQLAlchemy schema, Alembic migrations applied fresh)
+- Supabase Auth replacing AWS Cognito — JWTBearer middleware updated to verify Supabase JWTs
+- Environment variable updates (DATABASE_URL, ASYNC_DATABASE_URL, Cognito vars → Supabase vars)
+- No data migration (fresh start on Supabase)
+- Redis conversation memory unchanged
+
 ### Active
 
-*(Next milestone requirements go here — run `/gsd:new-milestone` to define)*
+- [ ] Database connection switched from AWS RDS to Supabase Postgres
+- [ ] All 13 SQLAlchemy tables and 6 Alembic migrations applied successfully on Supabase
+- [ ] JWTBearer middleware verifies Supabase Auth JWTs instead of Cognito tokens
+- [ ] Environment variables updated and documented for Supabase targets
+- [ ] Existing API behavior unchanged (all endpoints function identically)
 
 ### Out of Scope
 
@@ -104,4 +119,4 @@ This document evolves at phase transitions and milestone boundaries.
 **After each milestone** (via `/gsd:complete-milestone`): full review of all sections.
 
 ---
-*Last updated: 2026-03-25 after v1.0 milestone — all 39 requirements validated and shipped*
+*Last updated: 2026-04-06 after v1.1 milestone start — Supabase migration milestone defined*

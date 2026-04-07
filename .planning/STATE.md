@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: v1.0 milestone complete
-stopped_at: "Completed 04-03-PLAN.md: SSE Streaming Integration for Fiqh Path"
-last_updated: "2026-03-25T23:54:54.494Z"
+milestone: v1.1
+milestone_name: supabase-migration
+status: defining requirements
+stopped_at: "Milestone v1.1 started — defining requirements"
+last_updated: "2026-04-06T00:00:00.000Z"
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 12
-  completed_plans: 12
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
@@ -19,11 +19,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25 after v1.0 milestone)
 
 **Core value:** Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah Sistani's published rulings — the system refuses to answer rather than hallucinate or speculate.
-**Current focus:** Planning next milestone — run `/gsd:new-milestone` to define v2.0 requirements
+**Current focus:** Milestone v1.1 — Supabase Migration (DB + Auth)
 
 ## Current Position
 
-Milestone v1.0 shipped. No active phase.
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-06 — Milestone v1.1 started
 
 ## Performance Metrics
 
