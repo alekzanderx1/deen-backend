@@ -51,6 +51,49 @@
 
 ---
 
+## Milestone: v1.1 — Supabase Migration
+
+**Shipped:** 2026-04-07
+**Phases:** 3 | **Plans:** 6 | **Commits:** ~30 (2026-04-06 → 2026-04-07)
+
+### What Was Built
+
+- **Database migration:** Supabase Postgres provisioned; genesis Alembic migration created to support fresh-DB provisioning; all 13 tables + pgvector HNSW index verified; app connects via SQLAlchemy with zero code changes
+- **Auth migration:** JWKS fetch URL updated from Cognito to `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`; Cognito env vars removed; account deletion replaced with httpx Supabase Admin API call; all routes protected with strict auth + ENV=development bypass
+- **Cleanup:** boto3 fully removed from requirements.txt and api/account.py; `.env.example` created with 28 vars grouped by service; README `## Environment Variables` section added with v1.0→v1.1 migration callout
+
+### What Worked
+
+- **Clear phase boundaries:** Keeping auth changes in Phase 6 and boto3 removal in Phase 7 prevented scope creep and made each phase independently verifiable
+- **Genesis migration pattern:** Creating `0000_initial_schema.py` as a separate foundational migration (rather than hacking existing migrations) kept the Alembic chain clean and idempotent — `alembic upgrade head` on any fresh DB now just works
+- **Research catching subtle issues:** Phase 7 researcher identified the botocore import line that CONTEXT.md missed — both lines got removed cleanly
+- **Plan checker catching gaps:** Checker caught 4 missing env vars in .env.example template before execution — saved a re-run
+
+### What Was Inefficient
+
+- **Requirements checkboxes not updated during execution:** DB-01, DB-02, DB-03, AUTH-01, AUTH-02 remained unchecked at milestone close despite the code being complete; checkbox maintenance needs to happen at plan completion, not retroactively
+- **Phase 5 was purely manual (infra provisioning):** The GSD execution flow doesn't map cleanly to "go click in a dashboard" tasks — Phase 5 plans were more of a checklist than executable code tasks
+
+### Patterns Established
+
+- **Genesis migration for legacy codebases:** When adopting Alembic on a codebase with pre-existing tables, always create a `0000_initial_schema.py` genesis migration before running against any fresh database
+- **Direct port 5432 over pooler:** asyncpg + Supabase transaction pooler (6543) are incompatible — always use direct connection for both sync and async SQLAlchemy engines
+- **.env.example as the deployment contract:** A well-structured `.env.example` grouped by service (OpenAI, Pinecone, Supabase, Redis, App) eliminates all "what env vars do I need?" onboarding friction
+
+### Key Lessons
+
+1. **Alembic chain must be validated on a fresh DB before any migration milestone ships** — testing only on existing databases hides genesis-migration gaps
+2. **Requirement checkboxes are a tracking artifact, not just a gate** — update them at plan completion so they reflect reality at archive time
+3. **Auth middleware migrations are less risky than they look** — changing a JWKS URL is a one-line diff with no schema or protocol impact; the testing surface is the JWKS fetch at startup
+
+### Cost Observations
+
+- Model mix: Sonnet 4.6 (all phases)
+- Sessions: ~2 sessions over 2 days
+- Notable: Phase 5 (infra provisioning) generated minimal commits — most of the work was manual Supabase dashboard interaction; GSD planning overhead was low relative to v1.0
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -58,14 +101,17 @@
 | Milestone | Phases | Plans | Key Change |
 |-----------|--------|-------|------------|
 | v1.0 | 4 | 12 | First milestone; established FAIR-RAG module isolation + sub-graph patterns |
+| v1.1 | 3 | 6 | Infrastructure migration; established genesis-migration + direct-connection patterns |
 
 ### Cumulative Quality
 
 | Milestone | Tests Added | Modules | Zero-Dep Additions |
 |-----------|-------------|---------|-------------------|
 | v1.0 | ~55 mock-based unit tests | 8 fiqh modules | modules/fiqh/ (fully isolated from agents layer) |
+| v1.1 | 0 new tests (infra migration) | 0 new modules | core/auth.py, api/account.py, .env.example |
 
 ### Top Lessons (Verified Across Milestones)
 
 1. Build and test modules in isolation before wiring into the graph — Phase 3 isolation caught interface bugs before Phase 4 integration
 2. Pre-canned workarounds for SSE/event propagation accrue UX debt — invest in proper event propagation at design time
+3. Always validate Alembic chain on a fresh database before any migration milestone — the genesis-migration gap in v1.1 was only discovered during Phase 5 execution
