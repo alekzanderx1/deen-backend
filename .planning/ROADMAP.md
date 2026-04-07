@@ -3,6 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0 Fiqh Agentic RAG MVP** — Phases 1-4 (shipped 2026-03-25)
+- [ ] **v1.1 Supabase Migration** — Phases 5-7 (in progress)
 
 ## Phases
 
@@ -18,6 +19,47 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 </details>
 
+### v1.1 Supabase Migration
+
+- [ ] **Phase 5: Database Migration** — Supabase Postgres provisioned with pgvector; all 13 tables present via alembic; DB env vars updated
+- [ ] **Phase 6: Auth Migration** — JWTBearer middleware verifies Supabase JWTs; account deletion uses Supabase Admin API; Cognito env vars removed
+- [ ] **Phase 7: Cleanup** — boto3 removed from all dependency files; environment variable changes documented
+
+## Phase Details
+
+### Phase 5: Database Migration
+**Goal**: The application connects to Supabase Postgres with all tables present and DB environment variables updated — no code changes required
+**Depends on**: Nothing (first phase of v1.1)
+**Requirements**: DB-01, DB-02, DB-03
+**Success Criteria** (what must be TRUE):
+  1. Supabase dashboard shows the project is active with pgvector enabled under Database Extensions
+  2. Running `alembic upgrade head` against the Supabase connection string completes without errors and alembic_version shows the latest revision
+  3. All 13 SQLAlchemy tables are visible in the Supabase Table Editor (or `\dt` in psql)
+  4. The running application connects successfully — `GET /_debug/db` returns 200 and no SQLAlchemy connection errors appear in logs
+**Plans**: TBD
+
+### Phase 6: Auth Migration
+**Goal**: The application verifies Supabase Auth JWTs and performs account deletion via the Supabase Admin API — Cognito is fully replaced
+**Depends on**: Phase 5
+**Requirements**: AUTH-01, AUTH-02, AUTH-03, AUTH-04
+**Success Criteria** (what must be TRUE):
+  1. `curl <SUPABASE_URL>/auth/v1/keys` returns a non-empty `keys` array confirming asymmetric JWT signing is active
+  2. A valid Supabase Auth JWT is accepted by a protected endpoint; an invalid or Cognito-issued JWT is rejected with 403
+  3. `COGNITO_REGION` and `COGNITO_POOL_ID` are absent from `.env` and `core/config.py`; `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are present and loaded
+  4. `DELETE /account` deletes the user via the Supabase Admin API (`httpx` call to `<SUPABASE_URL>/auth/v1/admin/users/{uid}`) and returns 200 with no boto3 import in `api/account.py`
+**Plans**: TBD
+**UI hint**: no
+
+### Phase 7: Cleanup
+**Goal**: The dependency tree and deployment configuration contain no AWS references — boto3 is removed and all environment variable changes are documented
+**Depends on**: Phase 6
+**Requirements**: CLEAN-01, CLEAN-02
+**Success Criteria** (what must be TRUE):
+  1. `pip install -r requirements.txt` and `docker compose build` succeed with boto3 absent from both `requirements.txt` and the Dockerfile
+  2. Running `grep -r boto3 .` (excluding `.git` and `venv`) returns no matches in application code or config files
+  3. A deployment runbook or updated `.env.example` lists all removed Cognito vars and all added Supabase vars with descriptions, so a fresh deploy can be completed without consulting git history
+**Plans**: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -26,3 +68,6 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 | 2. Routing and Retrieval | v1.0 | 3/3 | Complete | 2026-03-25 |
 | 3. FAIR-RAG Core Modules | v1.0 | 3/3 | Complete | 2026-03-25 |
 | 4. Assembly and Integration | v1.0 | 3/3 | Complete | 2026-03-25 |
+| 5. Database Migration | v1.1 | 0/? | Not started | - |
+| 6. Auth Migration | v1.1 | 0/? | Not started | - |
+| 7. Cleanup | v1.1 | 0/? | Not started | - |

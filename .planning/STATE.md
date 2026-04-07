@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: supabase-migration
-status: defining requirements
-stopped_at: "Milestone v1.1 started — defining requirements"
+status: roadmap ready
+stopped_at: "Roadmap created — Phase 5 (Database Migration) ready to plan"
 last_updated: "2026-04-06T00:00:00.000Z"
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -16,21 +16,29 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-25 after v1.0 milestone)
+See: .planning/PROJECT.md (updated 2026-04-06 after v1.1 milestone start)
 
 **Core value:** Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah Sistani's published rulings — the system refuses to answer rather than hallucinate or speculate.
 **Current focus:** Milestone v1.1 — Supabase Migration (DB + Auth)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 5 — Database Migration (not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-04-06 — Milestone v1.1 started
+Status: Roadmap created, ready to plan Phase 5
+Last activity: 2026-04-06 — v1.1 roadmap created (3 phases, 9 requirements mapped)
+
+## v1.1 Phase Overview
+
+| Phase | Goal | Requirements | Status |
+|-------|------|--------------|--------|
+| 5. Database Migration | Supabase Postgres provisioned, all tables present, DB env vars updated | DB-01, DB-02, DB-03 | Not started |
+| 6. Auth Migration | Supabase Auth JWTs verified, Cognito fully replaced | AUTH-01, AUTH-02, AUTH-03, AUTH-04 | Not started |
+| 7. Cleanup | boto3 removed, env var changes documented | CLEAN-01, CLEAN-02 | Not started |
 
 ## Performance Metrics
 
-**Velocity:**
+**Velocity (v1.1):**
 
 - Total plans completed: 0
 - Average duration: —
@@ -48,6 +56,11 @@ Last activity: 2026-04-06 — Milestone v1.1 started
 - Trend: —
 
 *Updated after each plan completion*
+
+**v1.0 velocity reference (for comparison):**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
 | Phase 01-data-foundation P01 | 2 | 3 tasks | 4 files |
 | Phase 01-data-foundation P02 | 6 | 1 tasks | 4 files |
 | Phase 01-data-foundation P03 | 2 | 1 tasks | 1 files |
@@ -104,16 +117,25 @@ Recent decisions affecting current work:
 - [Phase 04-assembly-and-integration]: Pre-canned fiqh stage SSE status events: sub-graph runs as black box; pipeline emits pre-canned messages rather than reading FiqhState.status_events
 - [Phase 04-assembly-and-integration]: VALID_FIQH_CATEGORIES constant at module level in pipeline_langgraph.py: mirrors chat_agent routing set for consistent fiqh path detection
 
+### v1.1 Decisions
+
+- No data migration: fresh start on Supabase; existing RDS data is abandoned
+- Direct connection (port 5432) for both sync and async DB: transaction pooler (6543) incompatible with asyncpg
+- supabase-py SDK not added: app uses SQLAlchemy directly; SDK wraps PostgREST/storage/realtime which are unused
+- Auth replacement is middleware-only: frontend handles Supabase Auth SDK; backend validates JWTs only
+- Phase 5 (DB) and Phase 6 (Auth) are logically sequential for end-to-end testing; Auth code changes can be written before DB is provisioned
+
 ### Pending Todos
 
 None yet.
 
 ### Blockers/Concerns
 
-None. v1.0 shipped clean. 6 tech debt items tracked in `.planning/milestones/v1.0-MILESTONE-AUDIT.md`.
+None. v1.0 shipped clean. v1.1 requirements and roadmap defined.
 
 ## Session Continuity
 
-Last session: 2026-03-25
-Stopped at: Milestone v1.0 archived and tagged
+Last session: 2026-04-06
+Stopped at: v1.1 roadmap created — 3 phases, 9 requirements mapped
 Resume file: None
+Next action: `/gsd:plan-phase 5`
