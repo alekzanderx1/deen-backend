@@ -88,13 +88,7 @@ class DevBypassBearer(HTTPBearer):
         if self._env != "development":
             return await self._strict(request)
 
-        # Development bypass: if no Authorization header, return mock credentials
-        authorization: str = request.headers.get("Authorization", "")
-        if authorization.lower().startswith("bearer "):
-            # Token provided — validate it properly even in dev
-            return await self._strict(request)
-
-        # No token in dev: return mock credentials
+        # Development bypass: always return mock credentials, regardless of token
         return JWTAuthorizationCredentials(
             jwt_token="dev-bypass",
             header={"alg": "HS256", "typ": "JWT"},
