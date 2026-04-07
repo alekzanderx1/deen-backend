@@ -16,7 +16,7 @@ This is the backend service for the **Deen AI platform**, built with **FastAPI**
 ### Prerequisites
 
 - Python 3.8+
-- PostgreSQL database
+- Supabase account (Postgres + Auth)
 - Redis server
 - Pinecone account (for vector search)
 - OpenAI API key
@@ -44,43 +44,12 @@ pip install -r requirements.txt
 
 ### 3. Configure Environment Variables
 
-Create a `.env` file in the root directory with the following variables:
+Create a `.env` file in the root directory by copying the template:
 
 ```bash
-# OpenAI Configuration
-OPENAI_API_KEY=your_openai_api_key
-LARGE_LLM=gpt-4o
-SMALL_LLM=gpt-4o-mini
-
-# Pinecone Configuration
-PINECONE_API_KEY=your_pinecone_api_key
-DEEN_DENSE_INDEX_NAME=your_dense_index_name
-DEEN_SPARSE_INDEX_NAME=your_sparse_index_name
-DENSE_RESULT_WEIGHT=0.8
-SPARSE_RESULT_WEIGHT=0.2
-REFERENCE_FETCH_COUNT=10
-
-# Redis Configuration
-REDIS_URL=redis://localhost:6379/0
-REDIS_KEY_PREFIX=dev:chat
-REDIS_TTL_SECONDS=12000
-REDIS_MAX_MESSAGES=30
-
-# Database Configuration
-DATABASE_URL=postgresql://user:password@localhost:5432/deen
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=deen
-DB_USER=your_db_user
-DB_PASSWORD=your_db_password
-
-# AWS Cognito (for authentication)
-COGNITO_REGION=us-east-1
-COGNITO_POOL_ID=your_pool_id
-
-# CORS Configuration
-CORS_ALLOW_ORIGINS=https://deen-frontend.vercel.app
-ENV=development
+cp .env.example .env
+# Edit .env and fill in your real values.
+# See the "Environment Variables" section below for descriptions of each variable.
 ```
 
 ### 4. Run Database Migrations
@@ -137,7 +106,7 @@ For detailed architecture information, see [Architecture Documentation](document
 
 - [**Database**](documentation/DATABASE.md) - PostgreSQL schema, models, and migrations
 - [**API Reference**](documentation/API_REFERENCE.md) - Complete API endpoint documentation
-- [**Authentication**](documentation/AUTHENTICATION.md) - AWS Cognito JWT authentication setup
+- [**Authentication**](documentation/AUTHENTICATION.md) - Supabase Auth JWT authentication setup (v1.1+)
 - [**Deployment**](documentation/DEPLOYMENT.md) - Docker and production deployment guide
 
 ## Key Technologies
@@ -150,6 +119,84 @@ For detailed architecture information, see [Architecture Documentation](document
 - **LangChain** - Framework for LLM application development
 - **SQLAlchemy** - ORM for database operations
 - **Alembic** - Database migration tool
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and fill in the real values. All variables are described below.
+
+> **Upgrading from v1.0?** Remove `COGNITO_REGION` and `COGNITO_POOL_ID` from your `.env` — these are no longer used. Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` instead.
+
+### OpenAI
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `OPENAI_API_KEY` | Yes | OpenAI API key. Get from [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
+| `LARGE_LLM` | Yes | Large model ID for generation, filtering, refinement. Default: `gpt-4.1-2025-04-14` |
+| `SMALL_LLM` | Yes | Small model ID for classification, routing, decomposition. Default: `gpt-4o-mini-2024-07-18` |
+
+### Pinecone
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `PINECONE_API_KEY` | Yes | Pinecone API key. Get from [app.pinecone.io](https://app.pinecone.io) |
+| `DEEN_DENSE_INDEX_NAME` | Yes | Dense vector index for hadith/Islamic content |
+| `DEEN_SPARSE_INDEX_NAME` | Yes | Sparse vector index for hadith/Islamic content |
+| `QURAN_DENSE_INDEX_NAME` | No | Dense vector index for Quran tafsir |
+| `DEEN_FIQH_DENSE_INDEX_NAME` | No* | Dense vector index for Sistani fiqh rulings. *Required for fiqh queries |
+| `DEEN_FIQH_SPARSE_INDEX_NAME` | No* | Sparse vector index for Sistani fiqh rulings. *Required for fiqh queries |
+| `DENSE_RESULT_WEIGHT` | No | Weight for dense retrieval results (default: `0.8`). Must sum to 1.0 with `SPARSE_RESULT_WEIGHT` |
+| `SPARSE_RESULT_WEIGHT` | No | Weight for sparse retrieval results (default: `0.2`) |
+| `REFERENCE_FETCH_COUNT` | No | Number of references to fetch per query (default: `10`) |
+
+### Supabase
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SUPABASE_URL` | Yes | Project URL. Supabase Dashboard → Project Settings → API |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Service role secret key. Supabase Dashboard → Project Settings → API → `service_role` |
+
+### Database
+
+Provide either `DATABASE_URL` / `ASYNC_DATABASE_URL` directly, or provide all `DB_*` components and the app will build the URL.
+
+Use the **direct connection** (port 5432), not the transaction pooler (port 6543 is incompatible with asyncpg).
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | Yes* | Sync PostgreSQL connection string (`postgresql://...`) |
+| `ASYNC_DATABASE_URL` | Yes* | Async PostgreSQL connection string (`postgresql+asyncpg://...`) |
+| `DB_HOST` | Yes* | Database host (alternative to `DATABASE_URL`) |
+| `DB_PORT` | No | Database port (default: `5432`) |
+| `DB_NAME` | Yes* | Database name (alternative to `DATABASE_URL`) |
+| `DB_USER` | Yes* | Database user (alternative to `DATABASE_URL`) |
+| `DB_PASSWORD` | Yes* | Database password (alternative to `DATABASE_URL`) |
+
+*Either `DATABASE_URL` + `ASYNC_DATABASE_URL`, or all `DB_*` components must be provided.
+
+### Redis
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `REDIS_URL` | No | Redis connection URL (default: `redis://localhost:6379/0`). Falls back to in-process ephemeral history if unreachable |
+| `REDIS_KEY_PREFIX` | No | Namespace prefix for Redis keys (default: `dev:chat`) |
+| `REDIS_TTL_SECONDS` | No | Conversation TTL in seconds (default: `12000` ~3.3 hours) |
+| `REDIS_MAX_MESSAGES` | No | Max messages kept per session (default: `30`) |
+
+### Memory / Personalization
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `EMBEDDING_MODEL` | No | OpenAI embedding model for user memory note vectors (default: `text-embedding-3-small`). Must match the dimension count of the Pinecone memory index |
+| `EMBEDDING_DIMENSIONS` | No | Vector dimension count matching `EMBEDDING_MODEL` (default: `1536`) |
+| `NOTE_FILTER_THRESHOLD` | No | Minimum cosine similarity score (0.0-1.0) for a memory note to be injected into context (default: `0.4`) |
+| `SIGNAL_QUALITY_THRESHOLD` | No | Minimum quality score (0.0-1.0) required before a memory signal is persisted (default: `0.5`) |
+
+### App
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ENV` | No | Runtime environment. `development` enables auth bypass for local testing (default: `development`) |
+| `CORS_ALLOW_ORIGINS` | No | Comma-separated list of allowed CORS origins (default: `*`) |
 
 ## Development Tools
 
@@ -357,7 +404,8 @@ When contributing to this project:
 **Authentication Errors**
 
 - Verify JWT token is valid
-- Check Cognito configuration in `.env`
+- Check `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set in `.env`
+- Verify the Supabase JWT signing key is asymmetric (RS256/ES256): `curl <SUPABASE_URL>/auth/v1/keys` should return a non-empty `keys` array
 
 **Memory Agent Not Working**
 
