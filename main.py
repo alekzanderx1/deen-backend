@@ -64,10 +64,7 @@ app.add_middleware(
 app.include_router(reference.ref_router)
 app.include_router(chat.chat_router)
 app.include_router(hikmah.hikmah_router)
-
-# app.include_router(reference.ref_router)
-# app.include_router(chat.chat_router)
-# app.include_router(hikmah.hikmah_router)
+app.include_router(account.router)                  # /account
 
 app.include_router(users_router.router)             # /users
 app.include_router(lessons_router.router)           # /lessons

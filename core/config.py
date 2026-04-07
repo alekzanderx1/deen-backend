@@ -43,7 +43,13 @@ if not OPENAI_API_KEY or not PINECONE_API_KEY:
     raise ValueError("Missing API keys! Ensure they are set in the .env file.")
 
 def validate_supabase_config() -> None:
-    """Call from app startup to fail-fast if Supabase vars are absent."""
+    """Call from app startup to fail-fast if Supabase vars are absent.
+
+    Intentionally deferred (not inline at module level) so that test imports
+    of core.config succeed without SUPABASE_URL set. Fires at server startup
+    via main.py lifespan, providing the same fail-fast guarantee as the inline
+    OPENAI_API_KEY/PINECONE_API_KEY guards without breaking the test suite.
+    """
     if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
         raise ValueError("Missing Supabase config! Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.")
 
