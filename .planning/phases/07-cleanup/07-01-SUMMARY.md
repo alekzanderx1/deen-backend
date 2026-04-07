@@ -105,3 +105,13 @@ v1.1 milestone is complete. No blockers.
 ---
 *Phase: 07-cleanup*
 *Completed: 2026-04-07*
+
+## Self-Check: PASSED
+
+- FOUND: .env.example
+- FOUND: requirements.txt
+- FOUND: api/account.py
+- FOUND: README.md
+- FOUND: .planning/phases/07-cleanup/07-01-SUMMARY.md
+- FOUND commit: 44e712e (Task 1)
+- FOUND commit: 2eae769 (Task 2)
