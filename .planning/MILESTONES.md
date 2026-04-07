@@ -1,5 +1,18 @@
 # Milestones
 
+## v1.1 Supabase Migration (Shipped: 2026-04-07)
+
+**Phases completed:** 3 phases, 6 plans, 6 tasks
+
+**Key accomplishments:**
+
+- Supabase env vars (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) replace Cognito constants in core/config.py with startup ValueError guard
+- JWKS fetch URL in core/auth.py changed from AWS Cognito to Supabase Auth endpoint; Cognito references fully removed
+- httpx DELETE to Supabase Admin API replaces boto3 AdminDeleteUser in account deletion; GET /account/me cleaned of Cognito username field
+- boto3 removed from requirements.txt and api/account.py; .env.example and README.md Environment Variables section added for operator onboarding
+
+---
+
 ## v1.0 Fiqh Agentic RAG MVP (Shipped: 2026-03-25)
 
 **Phases completed:** 4 phases, 12 plans, 17 tasks

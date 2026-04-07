@@ -72,6 +72,58 @@ The server will start at `http://127.0.0.1:8080`
 - **ReDoc**: `http://127.0.0.1:8080/redoc`
 - **Memory Admin Dashboard**: `http://127.0.0.1:8080/admin/memory/dashboard`
 
+## Setting Up a New Supabase Project
+
+Use this when provisioning a new environment (e.g. staging → prod). The steps below recreate the database schema and auth configuration from scratch.
+
+### 1. Create the Supabase project
+
+Create a new project in the [Supabase dashboard](https://supabase.com/dashboard). Once provisioned, collect the following from **Project Settings → API**:
+
+- **Project URL** → `SUPABASE_URL`
+- **`service_role` key** → `SUPABASE_SERVICE_ROLE_KEY`
+- **DB password** (set during project creation)
+- **Connection string** → Database → Connection string → URI (use port **5432**)
+
+### 2. Configure environment variables
+
+```bash
+cp .env.example .env
+# Fill in SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, DATABASE_URL, ASYNC_DATABASE_URL
+```
+
+Use the **direct connection** (port `5432`), not the transaction pooler (port `6543` is incompatible with asyncpg):
+
+```
+DATABASE_URL=postgresql://postgres.xxxx:password@aws-0-us-east-1.pooler.supabase.com:5432/postgres
+ASYNC_DATABASE_URL=postgresql+asyncpg://postgres.xxxx:password@aws-0-us-east-1.pooler.supabase.com:5432/postgres
+```
+
+### 3. Run database migrations
+
+```bash
+source venv/bin/activate
+alembic upgrade head
+```
+
+This runs all migrations in order and creates all 13 tables. The command is idempotent — safe to re-run.
+
+### 4. Configure Supabase Auth
+
+The backend validates JWTs only — no manual key configuration is needed. The JWKS endpoint is fetched automatically at startup from `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`.
+
+In the Supabase dashboard → **Authentication → Providers**:
+- Enable **Email** (or whichever providers the frontend uses)
+- Set redirect URLs and JWT expiry to match your environment
+
+### Full sequence
+
+```bash
+cp .env.example .env          # fill in prod values
+alembic upgrade head           # create all tables
+docker compose up -d           # or: uvicorn main:app --reload
+```
+
 ## Architecture Overview
 
 The Deen backend follows a modular architecture with clear separation of concerns:

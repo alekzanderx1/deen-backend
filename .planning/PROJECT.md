@@ -4,7 +4,7 @@
 
 An enhancement to the Deen Islamic education platform's chatbot agent that enables it to answer Twelver Shia fiqh questions grounded in Ayatollah Sistani's published rulings. The system implements a FAIR-RAG (Faithful Agentic Iterative Retrieval-Augmented Generation) pipeline that iteratively retrieves, verifies, and synthesizes evidence from Sistani's "Islamic Laws" (4th edition) before generating any answer — ensuring the chatbot never derives its own conclusions or issues fatwas.
 
-**Shipped:** v1.0 — 4 phases, 12 plans, 39 requirements satisfied (2026-03-25)
+**Shipped:** v1.0 — 4 phases, 12 plans, 39 requirements satisfied (2026-03-25) | v1.1 — 3 phases, 6 plans, AWS-free Supabase migration (2026-04-07)
 
 ## Core Value
 
@@ -21,7 +21,7 @@ Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah
 - ✓ Query classification and routing (non-Islamic, fiqh early exit) — existing
 - ✓ Translation and query enhancement tools — existing
 - ✓ PostgreSQL persistence with Alembic migrations — existing
-- ✓ AWS Cognito JWT authentication — existing
+- ✓ AWS Cognito JWT authentication — existing (replaced by Supabase Auth in v1.1)
 - ✓ Fiqh book data ingestion pipeline (PDF parsing, chunking, embedding, Pinecone upload) — v1.0
 - ✓ Dedicated Pinecone indexes for fiqh content (deen-fiqh-dense + deen-fiqh-sparse) — v1.0
 - ✓ 6-category fiqh classifier (VALID_OBVIOUS/SMALL/LARGE/REASONER/OUT_OF_SCOPE_FIQH/UNETHICAL, gpt-4o-mini) — v1.0
@@ -40,31 +40,21 @@ Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah
 - ✓ Session isolation via `checkpointer=False` on fiqh sub-graph — v1.0
 - ✓ Non-fiqh path preserved unchanged — v1.0
 
-## Current Milestone: v1.1 Supabase Migration
+## Shipped: v1.1 Supabase Migration ✅
 
-**Goal:** Replace AWS RDS + Cognito with Supabase Postgres and Supabase Auth, keeping all existing schemas and Redis unchanged.
-
-**Target features:**
-- Supabase Postgres as the database backend (same SQLAlchemy schema, Alembic migrations applied fresh)
-- Supabase Auth replacing AWS Cognito — JWTBearer middleware updated to verify Supabase JWTs
-- Environment variable updates (DATABASE_URL, ASYNC_DATABASE_URL, Cognito vars → Supabase vars)
-- No data migration (fresh start on Supabase)
-- Redis conversation memory unchanged
+**Shipped:** 2026-04-07 — 3 phases, 6 plans
 
 ### Validated in v1.1
 
-- ✓ Database connection switched from AWS RDS to Supabase Postgres — Validated in Phase 5: Database Migration
-- ✓ All 13 SQLAlchemy tables and alembic migrations applied on Supabase (via genesis + 7 original migrations) — Validated in Phase 5: Database Migration
-- ✓ `.env` DB_* vars + ASYNC_DATABASE_URL pointing at Supabase direct connection (port 5432) — Validated in Phase 5: Database Migration
-- ✓ JWTBearer middleware verifies Supabase Auth JWTs (ES256, well-known JWKS endpoint) — Validated in Phase 6: Auth Migration
-- ✓ Cognito env vars (COGNITO_REGION, COGNITO_POOL_ID) replaced with SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY — Validated in Phase 6: Auth Migration
-- ✓ boto3 AdminDeleteUser replaced with httpx Supabase Admin API delete — Validated in Phase 6: Auth Migration
-- ✓ All routes protected with strict auth; ENV=development bypass for local testing — Validated in Phase 6: Auth Migration
-
-### Active
-
-- [ ] boto3 dependency removed from requirements.txt
-- [ ] Env var changes documented for deployment
+- ✓ Database connection switched from AWS RDS to Supabase Postgres — v1.1
+- ✓ All 13 SQLAlchemy tables + alembic_version created via genesis migration + 7 original migrations — v1.1
+- ✓ DB_* vars + ASYNC_DATABASE_URL pointing at Supabase direct connection (port 5432) — v1.1
+- ✓ JWTBearer middleware verifies Supabase Auth JWTs (ES256, JWKS from `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`) — v1.1
+- ✓ Cognito env vars (COGNITO_REGION, COGNITO_POOL_ID) removed; SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY added — v1.1
+- ✓ Account deletion uses Supabase Admin API (httpx DELETE) instead of boto3 AdminDeleteUser — v1.1
+- ✓ All routes protected with strict auth; ENV=development bypass for local testing — v1.1
+- ✓ boto3 removed from requirements.txt and api/account.py — v1.1
+- ✓ .env.example created with all 28 env vars; README updated with full env var docs — v1.1
 
 ### Out of Scope
 
@@ -76,6 +66,11 @@ Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah
 - Reasoner model routing (e.g., o1 for complex inheritance) — defer to future iteration
 
 ## Context
+
+**Shipped v1.1 (2026-04-07):**
+- 3 phases, 6 plans — AWS fully removed, Supabase Postgres + Auth in place
+- Key fix: genesis Alembic migration created to support fresh-DB provisioning (pre-alembic tables were missing from chain)
+- Operator onboarding: .env.example (28 vars) + README env section — no git-history archaeology needed
 
 **Shipped v1.0 (2026-03-25):**
 - 4 phases, 12 plans, 39 requirements satisfied
@@ -116,6 +111,11 @@ Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah
 | 6-category classifier over binary | Current binary classifier did not route fiqh queries accurately | ✓ VALID_OBVIOUS/SMALL/LARGE/REASONER/OUT_OF_SCOPE_FIQH/UNETHICAL in Phase 2/4 |
 | Pre-canned SSE stage events | Fiqh sub-graph runs as black box; FiqhState.status_events not propagated back | ⚠ UX inaccuracy: `fiqh_refine` always emits regardless of actual iterations |
 | No module-level fiqh env var guard | Guard in ingestion script only — avoids breaking server startup for devs without fiqh indexes | ✓ Works correctly in all environments |
+| Genesis Alembic migration (0000_initial_schema.py) | Pre-alembic RDS tables had no migration; fresh DB would fail at step 2 of chain | ✓ All 8 migrations run cleanly on fresh Supabase DB; down_revision chain fixed |
+| Direct connection port 5432 (not pooler 6543) | asyncpg incompatible with transaction pooler | ✓ Both DATABASE_URL and ASYNC_DATABASE_URL use port 5432 |
+| supabase-py SDK not added | App uses SQLAlchemy directly; SDK wraps PostgREST/storage/realtime which are unused | ✓ Zero new dependencies for DB layer |
+| Auth replacement is middleware-only | Frontend handles Supabase Auth SDK; backend validates JWTs only | ✓ JWKS fetched at startup from `{SUPABASE_URL}/auth/v1/.well-known/jwks.json` |
+| boto3 retained through Phase 6 (removed in Phase 7) | Explicit phase boundary kept scope clean — auth and cleanup are separate concerns | ✓ Clean separation; no lingering partial state |
 
 ## Evolution
 
@@ -126,4 +126,4 @@ This document evolves at phase transitions and milestone boundaries.
 **After each milestone** (via `/gsd:complete-milestone`): full review of all sections.
 
 ---
-*Last updated: 2026-04-07 after Phase 6 complete — Supabase Auth migration done; all routes protected, Cognito fully replaced*
+*Last updated: 2026-04-07 after v1.1 milestone complete — Supabase Postgres + Auth migration shipped; AWS-free*
