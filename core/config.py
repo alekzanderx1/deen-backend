@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+ENV = os.getenv("ENV", "development")
+
 # Retrieve API Keys
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
@@ -22,8 +24,8 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 KEY_PREFIX = os.getenv("REDIS_KEY_PREFIX", "dev:chat")
 TTL_SECONDS = int(os.getenv("REDIS_TTL_SECONDS", "12000"))  # default 30d
 MAX_MESSAGES = int(os.getenv("REDIS_MAX_MESSAGES", "30"))
-COGNITO_REGION = os.getenv("COGNITO_REGION")
-COGNITO_POOL_ID = os.getenv("COGNITO_POOL_ID")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 LARGE_LLM = os.getenv("LARGE_LLM")
 SMALL_LLM = os.getenv("SMALL_LLM")
 
