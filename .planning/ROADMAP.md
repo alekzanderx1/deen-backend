@@ -49,8 +49,10 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
   2. A valid Supabase Auth JWT is accepted by a protected endpoint; an invalid or Cognito-issued JWT is rejected with 403
   3. `COGNITO_REGION` and `COGNITO_POOL_ID` are absent from `.env` and `core/config.py`; `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are present and loaded
   4. `DELETE /account` deletes the user via the Supabase Admin API (`httpx` call to `<SUPABASE_URL>/auth/v1/admin/users/{uid}`) and returns 200 with no boto3 import in `api/account.py`
-**Plans**: TBD
-**UI hint**: no
+**Plans**: 3 plans
+- [ ] 06-P01-PLAN.md — Replace COGNITO_* env vars with SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in core/config.py, add startup guard (AUTH-03)
+- [ ] 06-P02-PLAN.md — Update core/auth.py JWKS fetch URL from Cognito to Supabase /auth/v1/keys (AUTH-01, AUTH-02)
+- [ ] 06-P03-PLAN.md — Replace boto3 AdminDeleteUser with httpx Supabase Admin API call; remove username field from /account/me (AUTH-04)
 
 ### Phase 7: Cleanup
 **Goal**: The dependency tree and deployment configuration contain no AWS references — boto3 is removed and all environment variable changes are documented
@@ -70,6 +72,6 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 | 2. Routing and Retrieval | v1.0 | 3/3 | Complete | 2026-03-25 |
 | 3. FAIR-RAG Core Modules | v1.0 | 3/3 | Complete | 2026-03-25 |
 | 4. Assembly and Integration | v1.0 | 3/3 | Complete | 2026-03-25 |
-| 5. Database Migration | v1.1 | 0/? | Not started | - |
-| 6. Auth Migration | v1.1 | 0/? | Not started | - |
+| 5. Database Migration | v1.1 | 0/2 | Not started | - |
+| 6. Auth Migration | v1.1 | 0/3 | Not started | - |
 | 7. Cleanup | v1.1 | 0/? | Not started | - |
