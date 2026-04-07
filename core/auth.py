@@ -5,7 +5,7 @@ from models.JWTBearer import JWKS, JWTBearer
 
 jwks = JWKS.model_validate(
     requests.get(
-        f"{SUPABASE_URL}/auth/v1/keys"
+        f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json"
     ).json()
 )
 
