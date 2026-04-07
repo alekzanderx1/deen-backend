@@ -140,6 +140,12 @@ None yet.
 
 None. v1.0 shipped clean. v1.1 requirements and roadmap defined.
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260407-d24 | protect all API routes with strict auth and add ENV=development bypass | 2026-04-07 | 417f2f3 | [260407-d24-protect-all-api-routes-with-strict-auth-](./quick/260407-d24-protect-all-api-routes-with-strict-auth-/) |
+
 ## Session Continuity
 
 Last session: 2026-04-07T04:24:26.032Z
