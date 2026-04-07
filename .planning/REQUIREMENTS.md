@@ -22,8 +22,8 @@ Requirements for the Supabase migration milestone. Each maps to roadmap phases.
 
 ### Cleanup
 
-- [ ] **CLEAN-01**: boto3 removed from requirements.txt and all deployment configs (Dockerfile, CI)
-- [ ] **CLEAN-02**: Environment variable changes documented in .env.example or deployment runbook
+- [x] **CLEAN-01**: boto3 removed from requirements.txt and all deployment configs (Dockerfile, CI)
+- [x] **CLEAN-02**: Environment variable changes documented in .env.example or deployment runbook
 
 ## Future Requirements
 
@@ -60,8 +60,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-02 | Phase 6 | Pending |
 | AUTH-03 | Phase 6 | Complete |
 | AUTH-04 | Phase 6 | Complete |
-| CLEAN-01 | Phase 7 | Pending |
-| CLEAN-02 | Phase 7 | Pending |
+| CLEAN-01 | Phase 7 | Complete |
+| CLEAN-02 | Phase 7 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 9 total

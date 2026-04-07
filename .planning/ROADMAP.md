@@ -23,7 +23,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 
 - [ ] **Phase 5: Database Migration** — Supabase Postgres provisioned with pgvector; all 13 tables present via alembic; DB env vars updated
 - [ ] **Phase 6: Auth Migration** — JWTBearer middleware verifies Supabase JWTs; account deletion uses Supabase Admin API; Cognito env vars removed
-- [ ] **Phase 7: Cleanup** — boto3 removed from all dependency files; environment variable changes documented
+- [x] **Phase 7: Cleanup** — boto3 removed from all dependency files; environment variable changes documented (completed 2026-04-07)
 
 ## Phase Details
 
@@ -63,7 +63,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
   2. Running `grep -r boto3 .` (excluding `.git` and `venv`) returns no matches in application code or config files
   3. A deployment runbook or updated `.env.example` lists all removed Cognito vars and all added Supabase vars with descriptions, so a fresh deploy can be completed without consulting git history
 **Plans**: 1 plan
-- [ ] 07-01-PLAN.md — Remove boto3 from requirements.txt and api/account.py; create .env.example; update README.md env documentation (CLEAN-01, CLEAN-02)
+- [x] 07-01-PLAN.md — Remove boto3 from requirements.txt and api/account.py; create .env.example; update README.md env documentation (CLEAN-01, CLEAN-02)
 
 ## Progress
 
@@ -75,4 +75,4 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 | 4. Assembly and Integration | v1.0 | 3/3 | Complete | 2026-03-25 |
 | 5. Database Migration | v1.1 | 0/2 | Not started | - |
 | 6. Auth Migration | v1.1 | 2/3 | In Progress|  |
-| 7. Cleanup | v1.1 | 0/1 | Not started | - |
+| 7. Cleanup | v1.1 | 1/1 | Complete   | 2026-04-07 |
