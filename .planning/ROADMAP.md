@@ -48,7 +48,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
   1. `curl <SUPABASE_URL>/auth/v1/keys` returns a non-empty `keys` array confirming asymmetric JWT signing is active
   2. A valid Supabase Auth JWT is accepted by a protected endpoint; an invalid or Cognito-issued JWT is rejected with 403
   3. `COGNITO_REGION` and `COGNITO_POOL_ID` are absent from `.env` and `core/config.py`; `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are present and loaded
-  4. `DELETE /account` deletes the user via the Supabase Admin API (`httpx` call to `<SUPABASE_URL>/auth/v1/admin/users/{uid}`) and returns 200 with no boto3 import in `api/account.py`
+  4. `DELETE /account/me` deletes the user via the Supabase Admin API (`httpx` call to `<SUPABASE_URL>/auth/v1/admin/users/{uid}`) and returns 204 (boto3 import remains in `api/account.py` until Phase 7 cleanup per D-03a)
 **Plans**: 3 plans
 - [ ] 06-P01-PLAN.md — Replace COGNITO_* env vars with SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in core/config.py, add startup guard (AUTH-03)
 - [ ] 06-P02-PLAN.md — Update core/auth.py JWKS fetch URL from Cognito to Supabase /auth/v1/keys (AUTH-01, AUTH-02)

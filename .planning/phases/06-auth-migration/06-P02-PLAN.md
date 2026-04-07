@@ -74,7 +74,59 @@ SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 <tasks>
 
 <task type="auto">
-  <name>Task 1: Update JWKS fetch URL from Cognito to Supabase in core/auth.py</name>
+  <name>Task 1: Verify Supabase JWKS endpoint returns asymmetric keys (AUTH-01 pre-check)</name>
+  <files></files>
+
+  <action>
+Before modifying any code, confirm that the Supabase project is configured with asymmetric signing enabled.
+
+Run the following command (requires SUPABASE_URL to be set in .env):
+
+```bash
+python -c "
+import os
+from dotenv import load_dotenv
+import requests
+load_dotenv()
+url = os.environ['SUPABASE_URL'] + '/auth/v1/keys'
+r = requests.get(url)
+data = r.json()
+keys = data.get('keys', [])
+assert keys, f'No JWKS keys found at {url} — response: {data}'
+assert any(k.get('kty') for k in keys), f'Keys present but missing kty field: {keys}'
+print(f'AUTH-01 confirmed: {len(keys)} key(s) with kty={[k.get(\"kty\") for k in keys]}')
+"
+```
+
+If this assertion fails, asymmetric signing is NOT active on the Supabase project. Do NOT proceed with code changes until the Supabase dashboard is updated to enable asymmetric JWT signing under Authentication > Settings.
+
+Per AUTH-01: the JWKS endpoint must return a non-empty keys array before the code change is committed.
+  </action>
+
+  <verify>
+    <automated>cd /Users/shawn.n/Desktop/Deen/deen-backend && python -c "
+import os, sys
+from dotenv import load_dotenv
+import requests
+load_dotenv()
+url = os.environ.get('SUPABASE_URL', '')
+if not url:
+    print('SKIP: SUPABASE_URL not set — run with real credentials to verify AUTH-01')
+    sys.exit(0)
+r = requests.get(url + '/auth/v1/keys')
+data = r.json()
+keys = data.get('keys', [])
+assert keys, f'No JWKS keys found — AUTH-01 FAILED. Response: {data}'
+assert any(k.get('kty') for k in keys), f'Keys missing kty field — AUTH-01 FAILED: {keys}'
+print(f'AUTH-01 PASS: {len(keys)} key(s) returned with kty={[k.get(\"kty\") for k in keys]}')
+"</automated>
+  </verify>
+
+  <done>The Supabase JWKS endpoint returns at least one key with a kty field, confirming asymmetric signing is active (AUTH-01).</done>
+</task>
+
+<task type="auto">
+  <name>Task 2: Update JWKS fetch URL from Cognito to Supabase in core/auth.py</name>
   <files>core/auth.py</files>
 
   <read_first>
@@ -106,6 +158,9 @@ Key changes per D-02:
 - Import changed from `COGNITO_POOL_ID, COGNITO_REGION` to `SUPABASE_URL`
 - JWKS URL changed from `https://cognito-idp.{COGNITO_REGION}.amazonaws.com/{COGNITO_POOL_ID}/.well-known/jwks.json` to `{SUPABASE_URL}/auth/v1/keys`
 - `optional_auth = JWTBearer(jwks, auto_error=False)` added — currently missing from core/auth.py but used in main.py; add it here so both instances come from the same JWKS
+
+**Note on main.py duplicate instance (main.py is untouched per CONTEXT.md):**
+main.py currently creates its own `auth = JWTBearer(jwks)` at line 26, using the same `jwks` object imported from core/auth.py. This is intentional and functionally equivalent — both the `auth` in core/auth.py and the one in main.py are constructed from the same `jwks` object fetched at startup. The core/auth.py `auth` and `optional_auth` exports are used by the API route dependencies; main.py's local instance is used in its own middleware. No conflict exists. main.py remains untouched per CONTEXT.md code_context.
 
 Note: The `JWTBearer` class in `models/JWTBearer.py` is NOT modified — it is already provider-agnostic and handles RS256 keys from any JWKS endpoint.
   </action>
@@ -145,15 +200,15 @@ print('All checks passed')
 </tasks>
 
 <verification>
-After completing Task 1:
+After completing both tasks:
 - `grep "COGNITO" core/auth.py` → zero matches
 - `grep "auth/v1/keys" core/auth.py` → one match
 - With SUPABASE_URL set to a real Supabase project URL: `python -c "from core.auth import auth"` loads without error
-- curl {SUPABASE_URL}/auth/v1/keys should return `{"keys":[...]}` with at least one key (AUTH-01 verification — confirm asymmetric signing is active before running this plan)
+- AUTH-01 pre-check passed: `curl {SUPABASE_URL}/auth/v1/keys` returned a non-empty keys array with at least one kty field
 </verification>
 
 <success_criteria>
-core/auth.py fetches JWKS from Supabase at module import time. The JWTBearer instances (auth and optional_auth) verify RS256 tokens issued by Supabase Auth. Cognito references are fully removed.
+core/auth.py fetches JWKS from Supabase at module import time. The JWTBearer instances (auth and optional_auth) verify RS256 tokens issued by Supabase Auth. Cognito references are fully removed. The Supabase JWKS endpoint was verified to return asymmetric keys before code was committed.
 </success_criteria>
 
 <output>

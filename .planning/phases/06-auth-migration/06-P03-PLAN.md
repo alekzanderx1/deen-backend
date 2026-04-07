@@ -16,7 +16,7 @@ must_haves:
     - "DELETE /account/me deletes the Supabase Auth user via httpx and returns 204"
     - "GET /account/me response does not contain a username field"
     - "api/account.py imports SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY from core.config, not COGNITO_*"
-    - "api/account.py makes no boto3 client calls (boto3 import may remain for Phase 7 cleanup)"
+    - "api/account.py makes no boto3 client calls (boto3 import remains until Phase 7 cleanup per D-03a)"
   artifacts:
     - path: "api/account.py"
       provides: "Account deletion via Supabase Admin API, cleaned-up /account/me response"
@@ -89,14 +89,12 @@ Make the following changes to api/account.py:
 
 **1. Update imports block (top of file):**
 
-REMOVE:
-```python
-import boto3
-from botocore.exceptions import ClientError
-```
+REMOVE only:
 ```python
 from core.config import COGNITO_REGION, COGNITO_POOL_ID
 ```
+
+DO NOT remove `import boto3` or `from botocore.exceptions import ClientError` — per D-03a, the boto3 import stays in api/account.py through Phase 6. The import is harmless with the call removed. Physical removal of boto3 from requirements.txt and Dockerfile is Phase 7 (CLEAN-01).
 
 ADD (keep httpx import near the top with other third-party imports):
 ```python
@@ -107,8 +105,6 @@ ADD to config import:
 ```python
 from core.config import SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 ```
-
-Per D-03a: boto3 import removed here because we also remove the boto3 call. Phase 7 (CLEAN-01) removes boto3 from requirements.txt and Dockerfile — that is separate work. The import here is safe to remove since no boto3 call remains.
 
 **2. Replace the entire "Step 3: Delete user from AWS Cognito" block** in `delete_my_account` (currently lines 82-121 — the try/except that creates a boto3 client and calls `admin_delete_user`).
 
@@ -179,7 +175,7 @@ checks = [
     ('/auth/v1/admin/users/' in content, 'Supabase Admin API endpoint present'),
     ('httpx.delete' in content, 'httpx.delete call present'),
     ('cognito:username' not in content, 'cognito:username claim reference removed'),
-    ('\"username\"' not in content, 'username field removed from /account/me response'),
+    ('\"username\": username' not in content, 'username return dict entry removed from /account/me response'),
 ]
 failed = [msg for ok, msg in checks if not ok]
 if failed:
@@ -189,25 +185,27 @@ print('All checks passed')
   </verify>
 
   <acceptance_criteria>
-    - `grep "boto3.client" api/account.py` returns zero matches
+    - `grep "boto3.client" api/account.py` returns zero matches (the boto3 *call* is removed)
+    - `grep "import boto3" api/account.py` returns one match (the boto3 *import* remains until Phase 7 per D-03a)
     - `grep "admin_delete_user" api/account.py` returns zero matches
     - `grep "COGNITO" api/account.py` returns zero matches
     - `grep "httpx.delete" api/account.py` returns one match with `f"{SUPABASE_URL}/auth/v1/admin/users/{user_id}"`
     - `grep "Authorization" api/account.py` returns a line with `f"Bearer {SUPABASE_SERVICE_ROLE_KEY}"`
     - `grep "cognito:username" api/account.py` returns zero matches
-    - `grep '"username"' api/account.py` returns zero matches (field removed from return dict)
+    - `grep '"username": username' api/account.py` returns zero matches (return dict entry removed)
     - `python -c "from api.account import router"` imports without error (syntax check passes)
     - The httpx call is wrapped in `try/except Exception` that logs but does not re-raise (preserving "log but don't fail" per D-05)
   </acceptance_criteria>
 
-  <done>api/account.py deletes users via httpx to Supabase Admin API with service role auth, preserves "log but don't fail" semantics, returns 204. GET /account/me returns {user_id, email, claims} with no username field. All COGNITO_* and boto3 references are removed from the file.</done>
+  <done>api/account.py deletes users via httpx to Supabase Admin API with service role auth, preserves "log but don't fail" semantics, returns 204. GET /account/me returns {user_id, email, claims} with no username field. The boto3 *call* is removed; the boto3 *import* remains until Phase 7 (D-03a). All COGNITO_* references are removed.</done>
 </task>
 
 </tasks>
 
 <verification>
 After completing Task 1:
-- `grep "boto3" api/account.py` → zero matches (import and call both gone)
+- `grep "boto3.client" api/account.py` → zero matches (call removed)
+- `grep "import boto3" api/account.py` → one match (import intentionally kept for Phase 7)
 - `grep "COGNITO" api/account.py` → zero matches
 - `grep "auth/v1/admin/users" api/account.py` → one match in the httpx.delete call
 - `python -c "from api.account import router"` → exits 0
@@ -219,7 +217,7 @@ End-to-end verification (requires running server with valid Supabase creds):
 </verification>
 
 <success_criteria>
-api/account.py makes a synchronous httpx DELETE to {SUPABASE_URL}/auth/v1/admin/users/{user_id} with Authorization: Bearer {SUPABASE_SERVICE_ROLE_KEY} header. Errors are logged but don't fail the request. GET /account/me returns user_id, email, and claims — no username field.
+api/account.py makes a synchronous httpx DELETE to {SUPABASE_URL}/auth/v1/admin/users/{user_id} with Authorization: Bearer {SUPABASE_SERVICE_ROLE_KEY} header. Errors are logged but don't fail the request. GET /account/me returns user_id, email, and claims — no username field. boto3 import is preserved; boto3 call is removed.
 </success_criteria>
 
 <output>
