@@ -36,7 +36,9 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
   2. Running `alembic upgrade head` against the Supabase connection string completes without errors and alembic_version shows the latest revision
   3. All 13 SQLAlchemy tables are visible in the Supabase Table Editor (or `\dt` in psql)
   4. The running application connects successfully — `GET /_debug/db` returns 200 and no SQLAlchemy connection errors appear in logs
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 05-01-PLAN.md — Provision Supabase project and populate .env with DB_* vars + ASYNC_DATABASE_URL (DB-01, DB-03)
+- [ ] 05-02-PLAN.md — Run alembic upgrade head, verify 13 tables + pgvector HNSW, confirm /_debug/db returns 200 (DB-02)
 
 ### Phase 6: Auth Migration
 **Goal**: The application verifies Supabase Auth JWTs and performs account deletion via the Supabase Admin API — Cognito is fully replaced

@@ -51,10 +51,14 @@ Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah
 - No data migration (fresh start on Supabase)
 - Redis conversation memory unchanged
 
+### Validated in v1.1
+
+- ✓ Database connection switched from AWS RDS to Supabase Postgres — Validated in Phase 5: Database Migration
+- ✓ All 13 SQLAlchemy tables and alembic migrations applied on Supabase (via genesis + 7 original migrations) — Validated in Phase 5: Database Migration
+- ✓ `.env` DB_* vars + ASYNC_DATABASE_URL pointing at Supabase direct connection (port 5432) — Validated in Phase 5: Database Migration
+
 ### Active
 
-- [ ] Database connection switched from AWS RDS to Supabase Postgres
-- [ ] All 13 SQLAlchemy tables and 6 Alembic migrations applied successfully on Supabase
 - [ ] JWTBearer middleware verifies Supabase Auth JWTs instead of Cognito tokens
 - [ ] Environment variables updated and documented for Supabase targets
 - [ ] Existing API behavior unchanged (all endpoints function identically)
@@ -119,4 +123,4 @@ This document evolves at phase transitions and milestone boundaries.
 **After each milestone** (via `/gsd:complete-milestone`): full review of all sections.
 
 ---
-*Last updated: 2026-04-06 after v1.1 milestone start — Supabase migration milestone defined*
+*Last updated: 2026-04-06 after Phase 5 complete — Supabase database migration done; DB connection live on Supabase Postgres (PostgreSQL 17.6)*
