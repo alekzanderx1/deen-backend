@@ -82,7 +82,10 @@ async def delete_my_account(
     try:
         response = httpx.delete(
             f"{SUPABASE_URL}/auth/v1/admin/users/{user_id}",
-            headers={"Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}"},
+            headers={
+                "apikey": SUPABASE_SERVICE_ROLE_KEY,
+                "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+            },
         )
         if response.status_code == 404:
             # User not found in Supabase Auth — treat as success (already deleted)
