@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-06 after v1.1 milestone start)
 Phase: 07 (cleanup) — EXECUTING
 Plan: 1 of 1
 Status: Phase complete — ready for verification
-Last activity: 2026-04-08 - Completed quick task 260407-w1l: Migrate hikmah tree and memory agent tables to Supabase DB
+Last activity: 2026-04-08 - Completed quick task 260408-m7e: Fix Supabase Admin API 401 in account deletion
 
 ## v1.1 Phase Overview
 
@@ -149,6 +149,7 @@ None. v1.0 shipped clean. v1.1 requirements and roadmap defined.
 |---|-------------|------|--------|-----------|
 | 260407-d24 | protect all API routes with strict auth and add ENV=development bypass | 2026-04-07 | 417f2f3 | [260407-d24-protect-all-api-routes-with-strict-auth-](./quick/260407-d24-protect-all-api-routes-with-strict-auth-/) |
 | 260407-w1l | Migrate hikmah tree and memory agent tables to Supabase DB | 2026-04-08 | 2ba818a | [260407-w1l-migrate-hikmah-tree-and-memory-agent-tab](./quick/260407-w1l-migrate-hikmah-tree-and-memory-agent-tab/) |
+| 260408-m7e | Fix Supabase Admin API 401 in account deletion | 2026-04-08 | 1fb9a2b | [260408-m7e-fix-supabase-admin-api-401-in-account-de](./quick/260408-m7e-fix-supabase-admin-api-401-in-account-de/) |
 
 ## Session Continuity
 
