@@ -57,7 +57,24 @@ Replace all OpenAI model usage with Anthropic Claude (LLM) and Voyage AI (embedd
 
 | REQ-ID | Phase | Plan |
 |--------|-------|------|
-| CONF-01 to CONF-07 | — | — |
-| LLM-01 to LLM-07 | — | — |
-| EMBED-01 to EMBED-05 | — | — |
-| CLEAN-03 to CLEAN-04 | — | — |
+| CONF-01 | Phase 8 | — |
+| CONF-02 | Phase 8 | — |
+| CONF-03 | Phase 8 | — |
+| CONF-04 | Phase 8 | — |
+| CONF-05 | Phase 8 | — |
+| CONF-06 | Phase 8 | — |
+| CONF-07 | Phase 8 | — |
+| LLM-01 | Phase 9 | — |
+| LLM-02 | Phase 9 | — |
+| LLM-03 | Phase 9 | — |
+| LLM-04 | Phase 9 | — |
+| LLM-05 | Phase 9 | — |
+| LLM-06 | Phase 9 | — |
+| LLM-07 | Phase 9 | — |
+| EMBED-01 | Phase 10 | — |
+| EMBED-02 | Phase 10 | — |
+| EMBED-03 | Phase 10 | — |
+| EMBED-04 | Phase 10 | — |
+| EMBED-05 | Phase 10 | — |
+| CLEAN-03 | Phase 11 | — |
+| CLEAN-04 | Phase 11 | — |
