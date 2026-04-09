@@ -4,7 +4,7 @@
 
 An enhancement to the Deen Islamic education platform's chatbot agent that enables it to answer Twelver Shia fiqh questions grounded in Ayatollah Sistani's published rulings. The system implements a FAIR-RAG (Faithful Agentic Iterative Retrieval-Augmented Generation) pipeline that iteratively retrieves, verifies, and synthesizes evidence from Sistani's "Islamic Laws" (4th edition) before generating any answer — ensuring the chatbot never derives its own conclusions or issues fatwas.
 
-**Shipped:** v1.0 — 4 phases, 12 plans, 39 requirements satisfied (2026-03-25) | v1.1 — 3 phases, 6 plans, AWS-free Supabase migration (2026-04-07)
+**Shipped:** v1.0 — 4 phases, 12 plans, 39 requirements satisfied (2026-03-25) | v1.1 — 3 phases, 6 plans, AWS-free Supabase migration (2026-04-07) | v1.2 in progress — Phase 8 complete (config + deps)
 
 ## Core Value
 
@@ -138,4 +138,4 @@ This document evolves at phase transitions and milestone boundaries.
 **After each milestone** (via `/gsd:complete-milestone`): full review of all sections.
 
 ---
-*Last updated: 2026-04-09 — v1.2 Claude Migration milestone started; OpenAI → Claude + Voyage AI*
+*Last updated: 2026-04-09 — Phase 8 complete: config/deps wired for Anthropic + Voyage AI; CONF-01–07 satisfied*
