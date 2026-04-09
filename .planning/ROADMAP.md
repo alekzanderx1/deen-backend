@@ -35,7 +35,7 @@ Full details: `.planning/milestones/v1.1-ROADMAP.md`
 
 **Milestone Goal:** Replace all OpenAI model usage with Anthropic Claude (LLM) and Voyage AI (embeddings) across the full pipeline. LangGraph + FastAPI + Pinecone + Redis architecture is unchanged — only the model providers swap.
 
-- [ ] **Phase 8: Config + Dependencies** - Wire ANTHROPIC_API_KEY + VOYAGE_API_KEY; swap pip packages; update defaults
+- [x] **Phase 8: Config + Dependencies** - Wire ANTHROPIC_API_KEY + VOYAGE_API_KEY; swap pip packages; update defaults (completed 2026-04-09)
 - [ ] **Phase 9: LLM Swap** - Replace all OpenAI LLM wiring with ChatAnthropic; fix Claude-specific compatibility issues
 - [ ] **Phase 10: Embedding Migration** - Swap embedding_service to Voyage AI; resize pgvector columns; backfill existing rows
 - [ ] **Phase 11: Dead Code Cleanup** - Remove dead OpenAI imports; verify zero openai references remain
@@ -55,8 +55,8 @@ Full details: `.planning/milestones/v1.1-ROADMAP.md`
 **Plans**: 2 plans
 
 Plans:
-- [ ] 08-01-PLAN.md — Update core/config.py: replace OPENAI guard with ANTHROPIC_API_KEY + VOYAGE_API_KEY; update LLM and embedding defaults
-- [ ] 08-02-PLAN.md — Update requirements.txt and .env.example: add Anthropic/Voyage AI packages, remove OpenAI packages
+- [x] 08-01-PLAN.md — Update core/config.py: replace OPENAI guard with ANTHROPIC_API_KEY + VOYAGE_API_KEY; update LLM and embedding defaults
+- [x] 08-02-PLAN.md — Update requirements.txt and .env.example: add Anthropic/Voyage AI packages, remove OpenAI packages
 
 ### Phase 9: LLM Swap
 **Goal**: All LLM calls across the pipeline use ChatAnthropic; the agentic chat endpoint returns valid streaming responses and fiqh classification routes correctly under Claude
@@ -71,8 +71,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 08-01-PLAN.md — Update core/config.py: replace OPENAI guard with ANTHROPIC_API_KEY + VOYAGE_API_KEY; update LLM and embedding defaults
-- [ ] 08-02-PLAN.md — Update requirements.txt and .env.example: add Anthropic/Voyage AI packages, remove OpenAI packages
+- [x] 08-01-PLAN.md — Update core/config.py: replace OPENAI guard with ANTHROPIC_API_KEY + VOYAGE_API_KEY; update LLM and embedding defaults
+- [x] 08-02-PLAN.md — Update requirements.txt and .env.example: add Anthropic/Voyage AI packages, remove OpenAI packages
 **UI hint**: no
 
 ### Phase 10: Embedding Migration
@@ -116,7 +116,7 @@ Plans:
 | 5. Database Migration | v1.1 | 2/2 | Complete | 2026-04-06 |
 | 6. Auth Migration | v1.1 | 3/3 | Complete | 2026-04-07 |
 | 7. Cleanup | v1.1 | 1/1 | Complete | 2026-04-07 |
-| 8. Config + Dependencies | v1.2 | 0/2 | Not started | - |
+| 8. Config + Dependencies | v1.2 | 2/2 | Complete   | 2026-04-09 |
 | 9. LLM Swap | v1.2 | 0/? | Not started | - |
 | 10. Embedding Migration | v1.2 | 0/? | Not started | - |
 | 11. Dead Code Cleanup | v1.2 | 0/? | Not started | - |

@@ -8,13 +8,13 @@ Replace all OpenAI model usage with Anthropic Claude (LLM) and Voyage AI (embedd
 
 ### Config + Dependencies (CONF)
 
-- [ ] **CONF-01**: `ANTHROPIC_API_KEY` replaces `OPENAI_API_KEY` in `core/config.py` startup validation guard
-- [ ] **CONF-02**: `VOYAGE_API_KEY` added to `core/config.py` with startup validation guard
-- [ ] **CONF-03**: `LARGE_LLM` env var default updated to `claude-sonnet-4-6`; `SMALL_LLM` to `claude-haiku-4-5-20251001`
-- [ ] **CONF-04**: `EMBEDDING_MODEL` default updated to `voyage-4`; `EMBEDDING_DIMENSIONS` to `1024`
-- [ ] **CONF-05**: `langchain-anthropic==0.3.22`, `anthropic==0.87.0`, `voyageai==0.3.7` added to `requirements.txt`
-- [ ] **CONF-06**: `langchain-openai`, `openai`, `tiktoken` removed from `requirements.txt`
-- [ ] **CONF-07**: `.env.example` updated — `ANTHROPIC_API_KEY` + `VOYAGE_API_KEY` added, `OPENAI_API_KEY` removed
+- [x] **CONF-01**: `ANTHROPIC_API_KEY` replaces `OPENAI_API_KEY` in `core/config.py` startup validation guard
+- [x] **CONF-02**: `VOYAGE_API_KEY` added to `core/config.py` with startup validation guard
+- [x] **CONF-03**: `LARGE_LLM` env var default updated to `claude-sonnet-4-6`; `SMALL_LLM` to `claude-haiku-4-5-20251001`
+- [x] **CONF-04**: `EMBEDDING_MODEL` default updated to `voyage-4`; `EMBEDDING_DIMENSIONS` to `1024`
+- [x] **CONF-05**: `langchain-anthropic==0.3.22`, `anthropic==0.87.0`, `voyageai==0.3.7` added to `requirements.txt`
+- [x] **CONF-06**: `langchain-openai`, `openai`, `tiktoken` removed from `requirements.txt`
+- [x] **CONF-07**: `.env.example` updated — `ANTHROPIC_API_KEY` + `VOYAGE_API_KEY` added, `OPENAI_API_KEY` removed
 
 ### LLM Migration (LLM)
 
