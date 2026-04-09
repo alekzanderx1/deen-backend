@@ -40,6 +40,18 @@ Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah
 - ✓ Session isolation via `checkpointer=False` on fiqh sub-graph — v1.0
 - ✓ Non-fiqh path preserved unchanged — v1.0
 
+## Current Milestone: v1.2 Claude Migration
+
+**Goal:** Replace all OpenAI model usage with Anthropic Claude (LLM) and Voyage AI (embeddings) across the full pipeline.
+
+**Target features:**
+- LLM swap: gpt-4.1 → claude-sonnet-4-6, gpt-4o-mini → claude-haiku-4-5
+- Embedding swap: text-embedding-3-small → voyage-4 (Voyage AI)
+- Config: CLAUDE_API_KEY wired; OPENAI_API_KEY dependency removed
+- DB migration: pgvector columns resized 1536 → 1024 dims
+- Dependencies: langchain-anthropic + voyageai added; langchain-openai removed
+- Dead code: 3 unused global OpenAI client imports cleaned up
+
 ## Shipped: v1.1 Supabase Migration ✅
 
 **Shipped:** 2026-04-07 — 3 phases, 6 plans
@@ -126,4 +138,4 @@ This document evolves at phase transitions and milestone boundaries.
 **After each milestone** (via `/gsd:complete-milestone`): full review of all sections.
 
 ---
-*Last updated: 2026-04-07 after v1.1 milestone complete — Supabase Postgres + Auth migration shipped; AWS-free*
+*Last updated: 2026-04-09 — v1.2 Claude Migration milestone started; OpenAI → Claude + Voyage AI*
