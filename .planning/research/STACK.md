@@ -1,200 +1,348 @@
-# Stack: Supabase Migration
+# Stack Research: v1.2 Claude + Voyage AI Migration
 
-**Project:** Deen Backend v1.1 — Supabase Migration
-**Researched:** 2026-04-06
-**Scope:** AWS RDS + Cognito → Supabase Postgres + Supabase Auth
+**Project:** Deen Backend v1.2 — Claude + Voyage AI Migration
+**Researched:** 2026-04-09
+**Scope:** Replace OpenAI LLM + embeddings with Anthropic Claude (LLM) + Voyage AI (embeddings)
 
 ---
 
-## What Changes
+## Packages to Add
 
-### Packages to REMOVE
+### 1. `langchain-anthropic==0.3.22`
 
-None need to be removed from `requirements.txt`. `boto3` is listed in requirements; it can stay if used for other AWS services — it is not actively used for Cognito JWT verification (that is handled by `python-jose` + JWKS fetch, not boto3).
+**Why:** Provides `ChatAnthropic`, the LangChain-native wrapper for Claude models. This is the drop-in replacement for `langchain-openai`'s `ChatOpenAI` within the existing LangChain/LangGraph stack.
 
-### Packages to ADD
+**Compatibility with existing stack:** `langchain-anthropic 0.3.22` requires `langchain-core>=0.3.31,<0.4.0`. The installed `langchain-core==0.3.74` satisfies this range. No LangChain version upgrades required.
 
-**None required.** The existing `python-jose`, `psycopg2-binary`, and `asyncpg` all work with Supabase without any additions.
+**Key capabilities confirmed:**
+- `init_chat_model()` works with Anthropic. Pass `model_provider="anthropic"` or prefix the model string with `"anthropic:"`. The `anthropic_api_key` parameter replaces `openai_api_key`.
+- `.bind_tools()` is supported. `ChatAnthropic.bind_tools()` accepts the same LangChain tool list format used in `ChatAgent._create_llm_with_tools()`. Tool calling uses Anthropic's `tool_use` content block protocol internally; LangChain abstracts this — the agent graph code is unchanged.
+- `.stream()` and `.astream()` are supported. The existing `chain.stream()` call in `pipeline_langgraph.py` and `agent.astream()` in the LangGraph graph work without modification.
 
-**Do NOT add `supabase-py`:** The supabase-py SDK wraps Supabase's PostgREST REST API, Auth REST API, Storage, and Realtime — none of which this app needs. This backend uses SQLAlchemy directly against the Postgres TCP connection string, and verifies JWTs locally via JWKS. Adding supabase-py introduces 10+ transitive dependencies for zero benefit. A recent supabase-py issue (v2.15 migration to JWKS) caused `get_user()` to break silently — the manual JWKS verification approach this app already uses is more robust and fully under your control.
+**Dependency pulled in:** `anthropic>=0.52.0,<1.0.0` (see below).
 
-### Environment Variables to CHANGE
+**Source:** [langchain-anthropic PyPI](https://pypi.org/project/langchain-anthropic/), [LangChain ChatAnthropic reference](https://python.langchain.com/api_reference/anthropic/chat_models/langchain_anthropic.chat_models.ChatAnthropic.html)
 
-| Old Variable | Old Value Example | New Variable | New Value Example |
-|-------------|-------------------|-------------|-------------------|
-| `COGNITO_REGION` | `us-east-1` | `SUPABASE_PROJECT_REF` | `abcdefghijkl` (the subdomain portion of your project URL) |
-| `COGNITO_POOL_ID` | `us-east-1_XxXxXxXx` | *(derived from `SUPABASE_PROJECT_REF`)* | — |
-| `DB_HOST` | `*.rds.amazonaws.com` | `DB_HOST` | `db.<project-ref>.supabase.co` |
-| `DB_PORT` | `5432` | `DB_PORT` | `5432` (unchanged — use direct connection, NOT 6543) |
-| `DB_USER` | *(whatever RDS user)* | `DB_USER` | `postgres` (Supabase default) |
-| `DB_PASSWORD` | *(RDS password)* | `DB_PASSWORD` | Supabase DB password from dashboard |
-| `DB_NAME` | *(whatever RDS DB)* | `DB_NAME` | `postgres` (Supabase default) |
+---
 
-`DATABASE_URL` and `ASYNC_DATABASE_URL` in `.env` continue to work if set directly, since `core/config.py`'s `build_database_url()` uses them as-is. The `db/config.py` `Settings` class builds `DATABASE_URL` from `DB_*` vars via `URL.create()` — no change to that code is needed.
+### 2. `anthropic==0.87.0`
 
-### Code Changes Required
+**Why:** The official Anthropic Python SDK. `langchain-anthropic` declares `anthropic>=0.52.0,<1.0.0` as a dependency, so it will be pulled in transitively — but pin it explicitly in `requirements.txt` to control the version used in production and Docker builds.
 
-**`core/auth.py`** — swap the JWKS endpoint URL (one line change):
+`0.87.0` is the latest stable release (April 8, 2026). It is within `langchain-anthropic 0.3.22`'s declared range.
+
+**Note:** The direct `from anthropic import Anthropic` import is not needed by this codebase — all LLM calls go through LangChain's abstraction layer. The SDK is a transitive dependency only. Pin it to prevent unexpected upgrades.
+
+**Source:** [anthropic PyPI](https://pypi.org/project/anthropic/)
+
+---
+
+### 3. `voyageai==0.3.7`
+
+**Why:** The official Voyage AI Python SDK. Used to replace the `openai.OpenAI` client in `EmbeddingService` for generating dense embeddings. There is no LangChain wrapper required — the `voyageai` SDK is used directly, just as `openai.OpenAI` was used directly.
+
+`0.3.7` is the latest stable release (December 2025 / early 2026).
+
+**Client initialization:**
+```python
+import voyageai
+vo = voyageai.Client(api_key=VOYAGE_API_KEY)  # sync
+# or
+vo = voyageai.AsyncClient(api_key=VOYAGE_API_KEY)  # async
+```
+
+**Embed method — sync:**
+```python
+result = vo.embed(
+    texts,                      # List[str]
+    model="voyage-4",           # model name
+    input_type="document",      # "document" | "query" | None
+    output_dimension=1024,      # optional; 1024 is the default for voyage-4
+)
+embeddings = result.embeddings  # List[List[float]]
+```
+
+**Embed method — async:**
+```python
+result = await vo.aembed(
+    texts,
+    model="voyage-4",
+    input_type="document",
+)
+embeddings = result.embeddings
+```
+
+**Source:** [voyageai PyPI](https://pypi.org/project/voyageai/), [Voyage AI embeddings docs](https://docs.voyageai.com/docs/embeddings), [voyageai-python GitHub](https://github.com/voyage-ai/voyageai-python)
+
+---
+
+## Packages to Remove
+
+### 1. `langchain-openai==0.3.25` — REMOVE
+
+**Why:** All LLM calls will use `langchain-anthropic`. `langchain-openai` provides `ChatOpenAI` and `OpenAIEmbeddings`. Neither is used after migration. Removing it eliminates the transitive `openai` SDK dependency and prevents any accidental fallback to OpenAI models.
+
+**Risk if kept:** Dead code in `requirements.txt`; `openai` SDK still installed; bloat. No functional risk since nothing will call it, but keeping it muddies the intent.
+
+---
+
+### 2. `openai==1.91.0` — REMOVE
+
+**Why:** The `openai` SDK is used in 3 places via `from openai import OpenAI`:
+- `services/embedding_service.py` — `OpenAI(api_key=OPENAI_API_KEY)` for generating embeddings
+- `modules/generation/stream_generator.py` — `OpenAI(api_key=OPENAI_API_KEY)` (legacy pipeline, kept for `POST /chat/` non-agentic path)
+- `modules/classification/classifier.py` — `from openai import OpenAI` import (unused in actual code — `chat_models.get_classifier_model()` is used instead; dead import)
+
+After migration, `embedding_service.py` uses `voyageai.Client` instead. `stream_generator.py` and `classifier.py` dead imports are cleaned up. With no remaining `openai` usage, remove the package.
+
+**Dependency chain:** Removing `openai` also removes `tiktoken==0.9.0` if it is only depended on by `openai`. Check whether `tiktoken` is used elsewhere before removing it.
+
+---
+
+### 3. `tiktoken==0.9.0` — REMOVE (conditional)
+
+**Why:** `tiktoken` is an OpenAI tokenizer library. It is listed in `requirements.txt` but is not referenced in any application code (`grep` shows no direct `import tiktoken` in the codebase). It appears to be a transitive dependency pulled in by `langchain-openai` or `openai`. Once those are removed, `tiktoken` can be removed too.
+
+**Confirm before removing:** Run `grep -r "import tiktoken"` in the codebase to verify there are no direct uses.
+
+---
+
+## Compatibility Notes
+
+### LangChain version: no upgrade needed
+
+The existing `langchain==0.3.27` + `langchain-core==0.3.74` stack is fully compatible with `langchain-anthropic==0.3.22`. Both packages track the same `0.3.x` release series. No LangChain version bump required.
+
+**Warning about LangChain 1.0:** LangChain 1.0 was released in November 2025 (currently at ~1.2.x). The 1.x ecosystem uses `langchain-anthropic 1.x` (latest 1.3.4), which requires `langchain-core 1.x`. Do NOT upgrade to `langchain-anthropic 1.x` — it would force a full LangChain stack upgrade and is out of scope for this milestone.
+
+### `init_chat_model` provider switching
+
+The current `core/chat_models.py` calls `init_chat_model(model=LARGE_LLM, openai_api_key=OPENAI_API_KEY)`. After migration:
 
 ```python
-# OLD (Cognito)
-f"https://cognito-idp.{COGNITO_REGION}.amazonaws.com/{COGNITO_POOL_ID}/.well-known/jwks.json"
+# Before
+from langchain.chat_models import init_chat_model
+from core.config import OPENAI_API_KEY, LARGE_LLM
 
-# NEW (Supabase)
-f"https://{SUPABASE_PROJECT_REF}.supabase.co/auth/v1/.well-known/jwks.json"
+chat_model = init_chat_model(
+    model=LARGE_LLM,
+    openai_api_key=OPENAI_API_KEY
+)
+
+# After
+from langchain.chat_models import init_chat_model
+from core.config import CLAUDE_API_KEY, LARGE_LLM
+
+chat_model = init_chat_model(
+    model=LARGE_LLM,           # e.g. "claude-sonnet-4-6"
+    model_provider="anthropic",
+    anthropic_api_key=CLAUDE_API_KEY
+)
 ```
 
-Also update the config imports: replace `COGNITO_REGION`, `COGNITO_POOL_ID` with `SUPABASE_PROJECT_REF` in `core/config.py` and `core/auth.py`.
+The `model_provider="anthropic"` parameter is required when the model string does not include the `"anthropic:"` prefix. Alternatively, set `LARGE_LLM="anthropic:claude-sonnet-4-6"` in the `.env` and the provider is inferred automatically.
 
-**`models/JWTBearer.py`** — no changes. The JWKS-based `kid` lookup + signature verification using `python-jose` is provider-agnostic and works identically for Supabase RS256/ES256 keys.
+### `.bind_tools()` in `ChatAgent`
 
-**`db/session.py`** — no changes. The `connect_args={"sslmode": "require"}` already set is correct for Supabase.
+`agents/core/chat_agent.py` calls `init_chat_model(...).bind_tools(self.tools)`. `ChatAnthropic.bind_tools()` accepts the same `@tool`-decorated LangChain tool list format. The tool-use protocol differs internally (Anthropic uses `tool_use` content blocks vs OpenAI's `function_calling`), but LangChain normalizes this — `ToolNode` and the LangGraph graph are unaffected. No changes to `agents/tools/` or `agents/core/chat_agent.py` beyond the `init_chat_model` call are required.
 
-**`core/config.py`** — remove `COGNITO_REGION`, `COGNITO_POOL_ID`; add `SUPABASE_PROJECT_REF`.
+**Known issue to watch:** A GitHub issue (#34406) reported empty `AIMessage` when using `astream()` with Anthropic tool calling in certain edge cases. This is in a narrow code path (streaming + tool invocation in the same turn). Monitor for this; the fix is to use `.invoke()` in those specific paths if streaming tool-call chunks are empty.
 
----
+### Voyage AI model and embedding dimensions
 
-## What Stays the Same
+**voyage-4** default output dimensions: **1024**. This is a breaking change from `text-embedding-3-small` which uses 1536 dimensions.
 
-| Component | Notes |
-|-----------|-------|
-| `psycopg2-binary==2.9.10` | Works with Supabase Postgres direct connection unchanged |
-| `asyncpg==0.30.0` | Works with Supabase Postgres **on port 5432 only** (see connection string section) |
-| `SQLAlchemy==2.0.41` | Same ORM, same session factory, same engine config |
-| `alembic==1.14.0` | All 13 tables and 6 migration files apply unmodified to Supabase Postgres |
-| `python-jose==3.5.0` | Already handles RS256/ES256 via JWKS `kid` lookup — same code path for Supabase |
-| `pydantic-settings` DB config | `db/config.py` `Settings` class unchanged |
-| `db/session.py` engine | `connect_args={"sslmode": "require"}` already set — correct for Supabase |
-| All 13 SQLAlchemy models | Schema is standard SQL, fully portable |
-| `models/JWTBearer.py` | JWKS verification logic is provider-agnostic |
-| Redis conversation memory | No Supabase involvement whatsoever |
-| All API endpoints | Zero behavior changes — infrastructure swap only |
-
----
-
-## Connection String Format
-
-### Direct Connection (use this — port 5432)
-
-Supabase provides a direct PostgreSQL connection on port **5432** that bypasses all proxies. Use this for the FastAPI backend.
-
-**psycopg2 (sync, `db/session.py`):**
-```
-postgresql+psycopg2://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres
-```
-
-**asyncpg (async, `ASYNC_DATABASE_URL`):**
-```
-postgresql+asyncpg://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres
-```
-
-The existing `db/config.py` `Settings.DATABASE_URL` property builds the correct string from `DB_*` env vars using `URL.create()` — set `DB_HOST=db.<project-ref>.supabase.co`, `DB_PORT=5432`, `DB_USER=postgres`, `DB_NAME=postgres`, `DB_PASSWORD=<your-password>`.
-
-### Do NOT use the Transaction Pooler (port 6543)
-
-Supabase also offers a PgBouncer transaction-mode pooler on port **6543**. Do not use it.
-
-**Why:** asyncpg uses named prepared statements internally. PgBouncer transaction mode does not maintain prepared statements across pooled connections, causing `prepared statement '__asyncpg_stmt_1__' already exists` on startup. This is a confirmed, known incompatibility. The direct connection on 5432 bypasses PgBouncer entirely and works correctly.
-
-**IPv4 fallback:** Supabase direct connections use IPv6 by default. If the deployment host only supports IPv4, use the **Session Mode pooler** instead — it is IPv4-compatible and session mode preserves prepared statements:
-```
-postgresql+psycopg2://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres
-```
-Note: the username format changes to `postgres.<project-ref>` for pooler connections.
-
-### SSL Configuration
-
-The existing `db/session.py` sets `connect_args={"sslmode": "require"}`. This is correct and requires no change.
-
-Supabase does not enforce SSL by default (for client compatibility), but `sslmode=require` is appropriate for any production deployment. No SSL certificate file download is needed unless you explicitly enable SSL enforcement with `verify-full` mode in the Supabase dashboard (which you do not need to do).
-
----
-
-## Supabase Auth JWKS
-
-### JWKS Endpoint URL
-
-```
-GET https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json
-```
-
-Replace `<project-ref>` with your Supabase project reference ID (the subdomain of your project URL). The endpoint returns a standard JWKS response. It is cached at Supabase's edge for 10 minutes. The existing startup JWKS fetch in `core/auth.py` works identically — just point it at this URL.
-
-### JWT Claims
-
-| Claim | Value for Supabase Auth |
-|-------|------------------------|
-| `iss` | `https://<project-ref>.supabase.co/auth/v1` |
-| `aud` | `authenticated` (logged-in users) or `anon` (anonymous) |
-| `sub` | UUID — Supabase Auth user ID |
-| `role` | `authenticated`, `anon`, or `service_role` |
-| `exp` | Unix timestamp — expiry |
-| `email` | User's email address |
-| `session_id` | Unique session UUID |
-
-**The `aud` claim is `"authenticated"`** for all non-anonymous user tokens. Cognito tokens had a different `aud` convention. The current `JWTBearer.verify_jwk_token()` only verifies the signature against the JWKS key — it does not validate `aud`, `iss`, or `exp` explicitly. This means the migration requires no claim-validation code changes. If you want to add `aud`/`iss` validation later, use `jose.jwt.decode()` with `audience="authenticated"` and `issuer=...`.
-
-### JWT Signing Algorithm
-
-New Supabase projects (created after May 2025) use **RS256 (RSA 2048)** asymmetric signing by default. Older projects may use HS256 (symmetric shared secret).
-
-**Confirm which your project uses:** After creating a test user token, run:
+This affects two SQLAlchemy models in `db/models/embeddings.py`:
 ```python
-from jose import jwt
-print(jwt.get_unverified_header(token))  # look at the "alg" field
+# Before
+EMBEDDING_DIMENSIONS = 1536
+
+# After
+EMBEDDING_DIMENSIONS = 1024
 ```
 
-Or check the Supabase dashboard under Authentication > Signing Keys.
+Both `NoteEmbedding.embedding` (`Vector(1536)`) and `LessonChunkEmbedding.embedding` (`Vector(1536)`) pgvector columns must be resized to `Vector(1024)`. This requires an Alembic migration (ALTER COLUMN with `USING` cast). All existing embeddings in `note_embeddings` and `lesson_chunk_embeddings` tables will be incompatible and must be regenerated after migration.
 
-**If RS256 (most likely for new projects):** The JWKS endpoint returns RSA public keys. The existing `JWTBearer` code handles this correctly — `jwk.construct(public_key)` in `python-jose` handles RS256 keys from JWKS without any code changes.
+**voyage-4 dimension options:** 256, 512, 1024 (default), 2048. Use 1024 (the default) — it provides the best balance between storage and retrieval quality without requiring `output_dimension` to be specified explicitly.
 
-**If HS256 (older project or self-hosted):** The JWKS endpoint will return an empty `keys` array. The current `JWTBearer` will fail with "JWK public key not found" because there are no asymmetric keys to look up. In this case, replace the JWKS-based verification with symmetric verification:
+**voyage-4 context length:** 320K tokens (vs 8,191 for `text-embedding-3-small`). This means the existing chunking logic in `EmbeddingService` is more than adequate; no chunk size changes are needed.
+
+### `input_type` parameter
+
+When generating embeddings for stored documents (lesson chunks, notes): use `input_type="document"`.
+When generating embeddings for query lookup: use `input_type="query"`.
+
+The current `EmbeddingService.generate_embedding()` does not distinguish between document and query embeddings — it uses a single method for all purposes. After migration, the query path in similarity search should use `input_type="query"` for best retrieval performance. This is an optimization, not a correctness requirement.
+
+### `OPENAI_API_KEY` guard in `core/config.py`
+
+Line 44 of `core/config.py`:
 ```python
-jose.jwt.decode(token, SUPABASE_JWT_SECRET, algorithms=["HS256"], audience="authenticated")
+if not OPENAI_API_KEY or not PINECONE_API_KEY:
+    raise ValueError("Missing API keys! Ensure they are set in the .env file.")
 ```
-The `SUPABASE_JWT_SECRET` is available in the Supabase dashboard under Settings > API > JWT Secret.
 
-The overwhelming recommendation — and Supabase's own guidance — is to use asymmetric JWKS verification (RS256/ES256). Use a new project or migrate to asymmetric keys if HS256 is the current state.
+This guard must be updated to check `CLAUDE_API_KEY` and `VOYAGE_API_KEY` instead. Otherwise the server will fail to start without `OPENAI_API_KEY` even after migration.
+
+### Pinecone dense vectors (no change needed)
+
+The Pinecone dense indexes (deen-fiqh-dense, deen-dense, quran-dense) use embeddings generated by `sentence-transformers/all-mpnet-base-v2` (768 dims) via `langchain-huggingface`, NOT by OpenAI `text-embedding-3-small`. The `embedder.py` in `modules/embedding/` uses `HuggingFaceEmbeddings` for Pinecone retrieval. This path is unaffected by the Voyage AI migration.
+
+**Only the pgvector tables (`note_embeddings`, `lesson_chunk_embeddings`) use OpenAI embeddings.** These are the only tables requiring the embedding model swap and column resize.
 
 ---
 
-## Recommendations
+## SDK Usage Examples
 
-### 1. Use Direct Connection on Port 5432
+### LLM Initialization (replaces `core/chat_models.py`)
 
-Set `DB_HOST=db.<project-ref>.supabase.co` and `DB_PORT=5432`. Zero code changes to `db/session.py`, `db/config.py`, or the SQLAlchemy engine. The existing `connect_args={"sslmode": "require"}` is correct.
+```python
+from langchain.chat_models import init_chat_model
+from core.config import CLAUDE_API_KEY, LARGE_LLM, SMALL_LLM
 
-### 2. Do Not Add supabase-py
+def get_generator_model():
+    return init_chat_model(
+        model=LARGE_LLM,           # "claude-sonnet-4-6"
+        model_provider="anthropic",
+        anthropic_api_key=CLAUDE_API_KEY,
+    )
 
-This backend has no use for the Supabase REST wrappers. SQLAlchemy owns all DB access. JWT verification works via `python-jose` + JWKS. Adding supabase-py would introduce package bloat and a dependency that has caused known breakage post-JWKS migration.
+def get_enhancer_model():
+    return init_chat_model(
+        model=SMALL_LLM,           # "claude-haiku-4-5-20251001"
+        model_provider="anthropic",
+        anthropic_api_key=CLAUDE_API_KEY,
+    )
 
-### 3. The Auth Change is One URL String
+def get_translator_model():
+    base = init_chat_model(
+        model=LARGE_LLM,
+        model_provider="anthropic",
+        anthropic_api_key=CLAUDE_API_KEY,
+    )
+    return base.bind(temperature=0)
+```
 
-`core/auth.py` changes one URL. `models/JWTBearer.py` is untouched. `python-jose` handles Supabase RS256 JWKS keys identically to Cognito RS256 JWKS keys — the JWKS key lookup by `kid` is the standard pattern and is provider-agnostic.
+### ChatAgent LLM with tools (replaces `agents/core/chat_agent.py` `_create_llm_with_tools`)
 
-### 4. Verify JWT Algorithm Before Deploying
+```python
+from langchain.chat_models import init_chat_model
+from core.config import CLAUDE_API_KEY
 
-After spinning up the Supabase project, create a test token and inspect the header. Confirm `alg` is `RS256` (or `ES256`) before running in production. If it is `HS256`, the JWKS-based verification will silently fail at runtime.
+llm = init_chat_model(
+    model=self.config.model.agent_model,  # "claude-sonnet-4-6"
+    model_provider="anthropic",
+    anthropic_api_key=CLAUDE_API_KEY,
+    temperature=self.config.model.temperature,
+    max_tokens=self.config.model.max_tokens,
+)
+return llm.bind_tools(self.tools)
+```
 
-### 5. Run Alembic Immediately Against Supabase
+### Embedding generation (replaces `services/embedding_service.py`)
 
-Supabase runs standard PostgreSQL 15. All 13 SQLAlchemy models and all 6 Alembic migration files apply without modification. Run `alembic upgrade head` with the new `DATABASE_URL` to provision the schema.
+```python
+import voyageai
+from core.config import VOYAGE_API_KEY, EMBEDDING_MODEL, EMBEDDING_DIMENSIONS
 
-### 6. IPv4 Fallback if Needed
+class EmbeddingService:
+    def __init__(self, db: Session):
+        self.db = db
+        self.client = voyageai.Client(api_key=VOYAGE_API_KEY)
 
-If your deployment environment (existing VPS, Docker host, or cloud region) does not support IPv6, direct connection to `db.<project-ref>.supabase.co` will time out. Switch to the Session Mode pooler (`aws-0-<region>.pooler.supabase.com:5432`) — it is IPv4-compatible, does not break prepared statements, and requires only changing `DB_HOST` and `DB_USER` (to `postgres.<project-ref>`).
+    def generate_embedding(self, text: str) -> List[float]:
+        result = self.client.embed(
+            [text],
+            model=EMBEDDING_MODEL,        # "voyage-4"
+            input_type="document",
+        )
+        return result.embeddings[0]
+
+    def generate_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
+        if not texts:
+            return []
+        result = self.client.embed(
+            texts,
+            model=EMBEDDING_MODEL,
+            input_type="document",
+        )
+        return result.embeddings
+```
+
+### Environment variable additions to `core/config.py`
+
+```python
+CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
+VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "voyage-4")       # was "text-embedding-3-small"
+EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "1024"))  # was 1536
+
+if not CLAUDE_API_KEY or not VOYAGE_API_KEY or not PINECONE_API_KEY:
+    raise ValueError("Missing API keys! Set CLAUDE_API_KEY, VOYAGE_API_KEY, PINECONE_API_KEY.")
+```
+
+---
+
+## New `.env` Variables Required
+
+| Variable | Example Value | Replaces |
+|----------|---------------|---------|
+| `CLAUDE_API_KEY` | `sk-ant-...` | `OPENAI_API_KEY` |
+| `VOYAGE_API_KEY` | `pa-...` | (was embedded in OpenAI SDK usage) |
+| `LARGE_LLM` | `claude-sonnet-4-6` | `gpt-4.1-2025-04-14` |
+| `SMALL_LLM` | `claude-haiku-4-5-20251001` | `gpt-4o-mini-2024-07-18` |
+| `EMBEDDING_MODEL` | `voyage-4` | `text-embedding-3-small` |
+| `EMBEDDING_DIMENSIONS` | `1024` | `1536` |
+
+**Remove from `.env`:** `OPENAI_API_KEY`
+
+---
+
+## Files Requiring Changes
+
+| File | Change Required |
+|------|----------------|
+| `requirements.txt` | Add `langchain-anthropic==0.3.22`, `anthropic==0.87.0`, `voyageai==0.3.7`; remove `langchain-openai==0.3.25`, `openai==1.91.0`, `tiktoken==0.9.0` |
+| `core/config.py` | Replace `OPENAI_API_KEY` with `CLAUDE_API_KEY` + `VOYAGE_API_KEY`; update startup guard; update `EMBEDDING_MODEL` default to `"voyage-4"` and `EMBEDDING_DIMENSIONS` default to `1024` |
+| `core/chat_models.py` | Replace `openai_api_key=OPENAI_API_KEY` with `model_provider="anthropic", anthropic_api_key=CLAUDE_API_KEY` in all 4 model factory functions |
+| `agents/core/chat_agent.py` | Replace `openai_api_key=OPENAI_API_KEY` with `model_provider="anthropic", anthropic_api_key=CLAUDE_API_KEY` in `_create_llm_with_tools()` |
+| `services/embedding_service.py` | Replace `from openai import OpenAI` + `OpenAI(api_key=...)` with `import voyageai` + `voyageai.Client(api_key=VOYAGE_API_KEY)` |
+| `modules/classification/classifier.py` | Remove dead `from openai import OpenAI` and `from core.config import OPENAI_API_KEY` imports |
+| `modules/generation/stream_generator.py` | Remove `from openai import OpenAI` + `OpenAI(api_key=OPENAI_API_KEY)` globals (legacy pipeline; assess whether this module still needs updating) |
+| `modules/generation/generator.py` | Remove `from core.config import OPENAI_API_KEY` dead import |
+| `modules/enhancement/enhancer.py` | Remove `from core.config import OPENAI_API_KEY` dead import |
+| `db/models/embeddings.py` | Change `EMBEDDING_DIMENSIONS = 1536` to `EMBEDDING_DIMENSIONS = 1024` |
+| `alembic/versions/` | New migration: resize `note_embeddings.embedding` and `lesson_chunk_embeddings.embedding` from `vector(1536)` to `vector(1024)` |
+
+---
+
+## What Does NOT Change
+
+| Component | Reason |
+|-----------|--------|
+| `langchain-huggingface==0.1.2` | Pinecone dense embedding uses `HuggingFaceEmbeddings` (all-mpnet-base-v2, 768 dims) — unaffected |
+| `langchain-pinecone==0.2.8` | Pinecone vector store integration unchanged |
+| `langchain==0.3.27` | No version change needed; compatible with `langchain-anthropic 0.3.x` |
+| `langchain-core==0.3.74` | Within the `>=0.3.31,<0.4.0` range required by `langchain-anthropic 0.3.22` |
+| `langgraph==0.2.64` | LangGraph graph structure, nodes, tools, routing — unchanged |
+| `sentence-transformers==3.4.1` | Used for Pinecone sparse/dense embeddings — unaffected |
+| `torch==2.6.0` | Required by sentence-transformers — unaffected |
+| `pgvector==0.3.6` | SQLAlchemy pgvector extension — unchanged, only column dimension changes |
+| Redis, Pinecone, PostgreSQL, Alembic | Infrastructure unchanged |
+| All API endpoints and SSE protocol | Zero behavioral changes from the frontend's perspective |
 
 ---
 
 ## Sources
 
-- [Supabase: Connect to your database](https://supabase.com/docs/guides/database/connecting-to-postgres) — direct vs pooler connection strings, port 5432 vs 6543, IPv4/IPv6 notes (MEDIUM confidence — official docs)
-- [Supabase: JWT Claims Reference](https://supabase.com/docs/guides/auth/jwt-fields) — iss, aud, sub, role, session_id claim values (HIGH confidence — official docs)
-- [Supabase: JWT Signing Keys](https://supabase.com/docs/guides/auth/signing-keys) — RS256/ES256/HS256 signing modes, JWKS discovery (HIGH confidence — official docs)
-- [Supabase: JSON Web Token (JWT)](https://supabase.com/docs/guides/auth/jwts) — JWKS URL format, edge caching behavior (HIGH confidence — official docs)
-- [Supabase: SSL Enforcement](https://supabase.com/docs/guides/platform/ssl-enforcement) — sslmode=require is appropriate default (HIGH confidence — official docs)
-- [Medium: Supabase Pooling and asyncpg Don't Mix](https://medium.com/@patrickduch93/supabase-pooling-and-asyncpg-dont-mix-here-s-the-real-fix-44f700b05249) — port 6543 breaks asyncpg prepared statements; fix is port 5432 (MEDIUM confidence — community, verified against Supabase docs behavior)
-- [GitHub Discussion: Verifying Supabase JWT Myself](https://github.com/orgs/supabase/discussions/20763) — aud="authenticated", HS256 manual verification approach (MEDIUM confidence — community discussion)
-- [GitHub: supabase-py issue #1183](https://github.com/supabase/supabase-py/issues/1183) — get_user() breakage after JWKS migration; manual JWKS verification is more robust (MEDIUM confidence — issue report)
-- [GitHub Discussion: Using SQLAlchemy with Supabase](https://github.com/orgs/supabase/discussions/27071) — connect_args for disabling prepared statements relevant only for pooler mode (MEDIUM confidence — community discussion)
-- Codebase read: `models/JWTBearer.py`, `core/auth.py`, `db/session.py`, `db/config.py`, `core/config.py` — confirmed current Cognito JWKS pattern, existing sslmode=require, existing DB config structure (HIGH confidence — direct source read)
+- [langchain-anthropic PyPI](https://pypi.org/project/langchain-anthropic/) — version 0.3.22 exists; dependency range `langchain-core>=0.3.31,<0.4.0` (MEDIUM confidence — search result excerpt, not direct page read)
+- [LangChain ChatAnthropic reference](https://python.langchain.com/api_reference/anthropic/chat_models/langchain_anthropic.chat_models.ChatAnthropic.html) — `bind_tools()` documented; streaming via Runnable interface (HIGH confidence — official docs)
+- [LangChain init_chat_model reference](https://reference.langchain.com/python/langchain/chat_models/base/init_chat_model) — `model_provider="anthropic"` parameter (HIGH confidence — official docs)
+- [anthropic PyPI](https://pypi.org/project/anthropic/) — latest version 0.87.0, April 2026 (MEDIUM confidence — search result)
+- [voyageai PyPI](https://pypi.org/project/voyageai/) — version 0.3.7 (MEDIUM confidence — search result)
+- [Voyage AI embeddings docs](https://docs.voyageai.com/docs/embeddings) — `vo.embed(texts, model, input_type)` method signature; `result.embeddings` accessor (HIGH confidence — official docs)
+- [Voyage AI blog: voyage-4 family](https://blog.voyageai.com/2026/01/15/voyage-4/) — voyage-4 default 1024 dims, 320K token context (HIGH confidence — official blog)
+- [Voyage AI flexible dimensions](https://docs.voyageai.com/docs/flexible-dimensions-and-quantization) — supported dimension values: 256, 512, 1024, 2048 (HIGH confidence — official docs)
+- [voyageai-python GitHub](https://github.com/voyage-ai/voyageai-python) — `AsyncClient.aembed()` method available (MEDIUM confidence — GitHub repo)
+- [langchain-ai/langchain #34406](https://github.com/langchain-ai/langchain/issues/34406) — empty AIMessage with astream + Anthropic tool calling edge case (MEDIUM confidence — GitHub issue)
+- Codebase read: `services/embedding_service.py`, `core/chat_models.py`, `agents/core/chat_agent.py`, `db/models/embeddings.py`, `core/config.py`, `modules/generation/generator.py`, `modules/classification/classifier.py` — confirmed all OpenAI import sites and embedding dimension usage (HIGH confidence — direct source read)
