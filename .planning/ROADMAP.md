@@ -52,7 +52,11 @@ Full details: `.planning/milestones/v1.1-ROADMAP.md`
   3. App startup fails with a clear ValueError when ANTHROPIC_API_KEY or VOYAGE_API_KEY is missing
   4. `.env.example` contains ANTHROPIC_API_KEY and VOYAGE_API_KEY entries and does not contain OPENAI_API_KEY
   5. `LARGE_LLM`, `SMALL_LLM`, `EMBEDDING_MODEL`, and `EMBEDDING_DIMENSIONS` defaults reflect Claude and Voyage AI values
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — Update core/config.py: replace OPENAI guard with ANTHROPIC_API_KEY + VOYAGE_API_KEY; update LLM and embedding defaults
+- [ ] 08-02-PLAN.md — Update requirements.txt and .env.example: add Anthropic/Voyage AI packages, remove OpenAI packages
 
 ### Phase 9: LLM Swap
 **Goal**: All LLM calls across the pipeline use ChatAnthropic; the agentic chat endpoint returns valid streaming responses and fiqh classification routes correctly under Claude
@@ -64,7 +68,11 @@ Full details: `.planning/milestones/v1.1-ROADMAP.md`
   3. Structured Evidence Assessment (SEA) returns a valid sufficiency verdict using Claude Haiku via `with_structured_output`
   4. Non-fiqh queries reach the main agent and return a normal response without error
   5. The hikmah generation script runs without error when ANTHROPIC_API_KEY is set
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — Update core/config.py: replace OPENAI guard with ANTHROPIC_API_KEY + VOYAGE_API_KEY; update LLM and embedding defaults
+- [ ] 08-02-PLAN.md — Update requirements.txt and .env.example: add Anthropic/Voyage AI packages, remove OpenAI packages
 **UI hint**: no
 
 ### Phase 10: Embedding Migration
@@ -76,7 +84,11 @@ Full details: `.planning/milestones/v1.1-ROADMAP.md`
   2. `find_similar_notes_to_lesson()` returns ranked results after the backfill script has been run
   3. `alembic upgrade head` runs to completion on a fresh Supabase DB without error (vector columns are 1024-dimensional)
   4. The backfill script `scripts/reembed_pgvector.py` processes all existing `note_embeddings` and `lesson_chunk_embeddings` rows and reports completion without exception
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — Update core/config.py: replace OPENAI guard with ANTHROPIC_API_KEY + VOYAGE_API_KEY; update LLM and embedding defaults
+- [ ] 08-02-PLAN.md — Update requirements.txt and .env.example: add Anthropic/Voyage AI packages, remove OpenAI packages
 
 ### Phase 11: Dead Code Cleanup
 **Goal**: The codebase contains zero OpenAI references in application code; the app starts clean with no import errors from removed packages
@@ -87,7 +99,11 @@ Full details: `.planning/milestones/v1.1-ROADMAP.md`
   2. `openai` and `langchain-openai` are not present in `requirements.txt`
   3. The full pytest test suite passes after package removal
   4. `uvicorn main:app` starts without ImportError or ModuleNotFoundError
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — Update core/config.py: replace OPENAI guard with ANTHROPIC_API_KEY + VOYAGE_API_KEY; update LLM and embedding defaults
+- [ ] 08-02-PLAN.md — Update requirements.txt and .env.example: add Anthropic/Voyage AI packages, remove OpenAI packages
 
 ## Progress
 
@@ -100,7 +116,7 @@ Full details: `.planning/milestones/v1.1-ROADMAP.md`
 | 5. Database Migration | v1.1 | 2/2 | Complete | 2026-04-06 |
 | 6. Auth Migration | v1.1 | 3/3 | Complete | 2026-04-07 |
 | 7. Cleanup | v1.1 | 1/1 | Complete | 2026-04-07 |
-| 8. Config + Dependencies | v1.2 | 0/? | Not started | - |
+| 8. Config + Dependencies | v1.2 | 0/2 | Not started | - |
 | 9. LLM Swap | v1.2 | 0/? | Not started | - |
 | 10. Embedding Migration | v1.2 | 0/? | Not started | - |
 | 11. Dead Code Cleanup | v1.2 | 0/? | Not started | - |
