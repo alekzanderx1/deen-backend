@@ -46,7 +46,7 @@ _prompt = ChatPromptTemplate.from_messages([
 
 def decompose_query(query: str) -> list[str]:
     """
-    Decomposes a fiqh query into 1-4 keyword-rich sub-queries using gpt-4o-mini.
+    Decomposes a fiqh query into 1-4 keyword-rich sub-queries using the configured LLM (SMALL_LLM).
     Falls back to [query] on any parse error or unexpected output.
 
     Returns:

@@ -111,7 +111,7 @@ config = AgentConfig(
         sunni_doc_count=3      # Retrieve 3 Sunni documents
     ),
     model=ModelConfig(
-        agent_model="gpt-4o",  # Or use LARGE_LLM from environment
+        agent_model="claude-sonnet-4-6",  # Or use LARGE_LLM from environment
         temperature=0.7
     ),
     max_iterations=5,
