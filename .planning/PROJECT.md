@@ -4,7 +4,7 @@
 
 An enhancement to the Deen Islamic education platform's chatbot agent that enables it to answer Twelver Shia fiqh questions grounded in Ayatollah Sistani's published rulings. The system implements a FAIR-RAG (Faithful Agentic Iterative Retrieval-Augmented Generation) pipeline that iteratively retrieves, verifies, and synthesizes evidence from Sistani's "Islamic Laws" (4th edition) before generating any answer — ensuring the chatbot never derives its own conclusions or issues fatwas.
 
-**Shipped:** v1.0 — 4 phases, 12 plans, 39 requirements satisfied (2026-03-25) | v1.1 — 3 phases, 6 plans, AWS-free Supabase migration (2026-04-07) | v1.2 in progress — Phases 8–10 complete (config + deps, LLM swap, embedding migration)
+**Shipped:** v1.0 — 4 phases, 12 plans, 39 requirements satisfied (2026-03-25) | v1.1 — 3 phases, 6 plans, AWS-free Supabase migration (2026-04-07) | v1.2 complete — Phases 8–11 (config + deps, LLM swap, embedding migration, dead code cleanup)
 
 ## Core Value
 
@@ -49,8 +49,8 @@ Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah
 - Embedding swap: text-embedding-3-small → all-mpnet-base-v2 (HuggingFace, free, already installed) ✓ Phase 10 complete
 - Config: ANTHROPIC_API_KEY wired; OPENAI_API_KEY dependency removed ✓ Phase 8 complete
 - DB migration: pgvector columns resized 1536 → 768 dims (all-mpnet-base-v2 produces 768-dim) ✓ Phase 10 complete
-- Dependencies: langchain-anthropic added; langchain-openai + voyageai not needed
-- Dead code: OpenAI client imports and OPENAI_API_KEY usage cleaned up
+- Dependencies: langchain-anthropic added; voyageai removed ✓ Phase 11 complete
+- Dead code: OpenAI client imports, OPENAI_API_KEY shim, and stale test mocks cleaned up ✓ Phase 11 complete
 
 **Decision (Phase 9):** Voyage AI dropped in favour of HuggingFace `all-mpnet-base-v2` for pgvector embeddings — already installed, free, no API key required. Phase 10 plan to be updated accordingly.
 
