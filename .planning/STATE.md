@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Claude Migration
-status: executing
-stopped_at: Completed 11-01-PLAN.md
-last_updated: "2026-04-10T16:10:25.342Z"
+status: verifying
+stopped_at: Completed 11-02-PLAN.md
+last_updated: "2026-04-10T16:15:18.598Z"
 last_activity: 2026-04-10
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 8
-  completed_plans: 7
+  completed_plans: 8
   percent: 0
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-09 after v1.2 milestone start)
 
 Phase: 11 (dead-code-cleanup) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-10
 
 Progress: [░░░░░░░░░░] 0%  (0/4 phases complete)
@@ -66,6 +66,7 @@ Progress: [░░░░░░░░░░] 0%  (0/4 phases complete)
 | Phase 10 P01 | 159 | 3 tasks | 6 files |
 | Phase 10 P02 | 77 | 2 tasks | 2 files |
 | Phase 11 P01 | 5 | 7 tasks | 7 files |
+| Phase 11 P02 | 2 | 5 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,7 @@ Recent decisions affecting current work:
 - [Phase 10]: git mv used for backfill script rename (migrate_embeddings.py -> reembed_pgvector.py) to preserve git history
 - [Phase 11]: OPENAI_API_KEY shim deleted from core/config.py after all import sites cleaned — ImportError confirms removal
 - [Phase 11]: voyageai dropped from requirements.txt — replaced by HuggingFace all-mpnet-base-v2 in Phase 10
+- [Phase 11]: mock_embedder fixture patches getDenseEmbedder at services.embedding_service.getDenseEmbedder — consistent with how the service imports and calls it
 
 ### Pending Todos
 
@@ -111,7 +113,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-10T16:10:25.331Z
-Stopped at: Completed 11-01-PLAN.md
+Last session: 2026-04-10T16:15:18.586Z
+Stopped at: Completed 11-02-PLAN.md
 Resume file: None
 Next action: Execute Phase 10 — Embedding Migration
