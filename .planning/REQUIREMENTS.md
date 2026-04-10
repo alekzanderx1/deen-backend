@@ -9,9 +9,9 @@ Replace all OpenAI model usage with Anthropic Claude (LLM) and Voyage AI (embedd
 ### Config + Dependencies (CONF)
 
 - [x] **CONF-01**: `ANTHROPIC_API_KEY` replaces `OPENAI_API_KEY` in `core/config.py` startup validation guard
-- [x] **CONF-02**: `VOYAGE_API_KEY` added to `core/config.py` with startup validation guard
+- [x] **CONF-02**: `VOYAGE_API_KEY` added to `core/config.py` with startup validation guard *(superseded by Phase 10 — guard removed since HuggingFace requires no API key)*
 - [x] **CONF-03**: `LARGE_LLM` env var default updated to `claude-sonnet-4-6`; `SMALL_LLM` to `claude-haiku-4-5-20251001`
-- [x] **CONF-04**: `EMBEDDING_MODEL` default updated to `voyage-4`; `EMBEDDING_DIMENSIONS` to `1024`
+- [x] **CONF-04**: `EMBEDDING_MODEL` default updated to `voyage-4`; `EMBEDDING_DIMENSIONS` to `1024` *(superseded by Phase 10 — defaults changed to `sentence-transformers/all-mpnet-base-v2` / `768`)*
 - [x] **CONF-05**: `langchain-anthropic==0.3.22`, `anthropic==0.87.0`, `voyageai==0.3.7` added to `requirements.txt`
 - [x] **CONF-06**: `langchain-openai`, `openai` removed from `requirements.txt`; `tiktoken` retained (imported directly by `scripts/ingest_fiqh.py`)
 - [x] **CONF-07**: `.env.example` updated — `ANTHROPIC_API_KEY` + `VOYAGE_API_KEY` added, `OPENAI_API_KEY` removed
@@ -38,6 +38,8 @@ Replace all OpenAI model usage with Anthropic Claude (LLM) and Voyage AI (embedd
 
 - [x] **CLEAN-03**: Dead `from openai import OpenAI` and module-level `OpenAI()` instances removed from 4 files (`stream_generator.py`, `classification/classifier.py`, `fiqh/classifier.py`, `pipeline.py`)
 - [x] **CLEAN-04**: `openai` and `langchain-openai` removal verified — `grep -r "from openai"` returns zero results; app starts clean
+- [ ] **CLEAN-05**: User-facing documentation updated — `README.md` lists `ANTHROPIC_API_KEY` (not `OPENAI_API_KEY`); `documentation/DEPLOYMENT.md` and `documentation/CHATBOT.md` describe Claude/Anthropic as LLM provider
+- [ ] **CLEAN-06**: Stale in-code OpenAI references removed from comments and docstrings — `core/pipeline.py` lines 74+110, `agents/README_LANGGRAPH.md` example, `modules/fiqh/decomposer.py` docstring; `09-VERIFICATION.md` body reconciled with frontmatter `status: passed`
 
 ## Future Requirements
 
@@ -78,3 +80,5 @@ Replace all OpenAI model usage with Anthropic Claude (LLM) and Voyage AI (embedd
 | EMBED-05 | Phase 10 | 10-02-PLAN.md |
 | CLEAN-03 | Phase 11 | — |
 | CLEAN-04 | Phase 11 | — |
+| CLEAN-05 | Phase 12 | 12-01-PLAN.md |
+| CLEAN-06 | Phase 12 | 12-01-PLAN.md |

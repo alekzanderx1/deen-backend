@@ -4,7 +4,7 @@
 
 - ✅ **v1.0 Fiqh Agentic RAG MVP** — Phases 1-4 (shipped 2026-03-25)
 - ✅ **v1.1 Supabase Migration** — Phases 5-7 (shipped 2026-04-07)
-- 🚧 **v1.2 Claude Migration** — Phases 8-11 (in progress)
+- 🚧 **v1.2 Claude Migration** — Phases 8-12 (in progress)
 
 ## Phases
 
@@ -39,6 +39,7 @@ Full details: `.planning/milestones/v1.1-ROADMAP.md`
 - [x] **Phase 9: LLM Swap** - Replace all OpenAI LLM wiring with ChatAnthropic; fix Claude-specific compatibility issues (completed 2026-04-10)
 - [x] **Phase 10: Embedding Migration** - Swap embedding_service to HuggingFace all-mpnet-base-v2; resize pgvector columns to 768-dim; backfill existing rows (completed 2026-04-10)
 - [x] **Phase 11: Dead Code Cleanup** - Remove dead OpenAI imports; verify zero openai references remain (completed 2026-04-10)
+- [ ] **Phase 12: Docs & Reference Cleanup** - Update all user-facing docs and in-code comments/docstrings to reflect Anthropic/Claude providers; annotate superseded requirements
 
 ## Phase Details
 
@@ -104,6 +105,24 @@ Plans:
 - [x] 11-01-PLAN.md — Remove dead OpenAI imports from app code + voyageai from requirements + OPENAI_API_KEY shim from config
 - [x] 11-02-PLAN.md — Update test_embedding_service.py mocks to HuggingFace; verify grep zero + app startup clean
 
+### Phase 12: Docs & Reference Cleanup
+**Goal**: All user-facing documentation and in-code comments/docstrings reflect Anthropic/Claude and HuggingFace providers; no stale OpenAI references remain anywhere in docs, comments, or planning artifacts
+**Depends on**: Phase 11
+**Requirements**: CLEAN-05, CLEAN-06
+**Gap Closure**: Closes 10 tech debt items from v1.2 milestone audit
+**Success Criteria** (what must be TRUE):
+  1. `README.md` lists `ANTHROPIC_API_KEY` (not `OPENAI_API_KEY`) in required environment variables
+  2. `documentation/DEPLOYMENT.md` and `documentation/CHATBOT.md` describe Claude/Anthropic as the LLM provider
+  3. `grep -r "OpenAI\|openai" --include="*.md" .` returns zero matches in user-facing documentation files (README.md, documentation/)
+  4. `core/pipeline.py` lines 74 and 110 comment text updated to remove "from OpenAI" reference
+  5. `agents/README_LANGGRAPH.md` example uses `agent_model="claude-sonnet-4-6"`; `modules/fiqh/decomposer.py` docstring updated
+  6. `.planning/REQUIREMENTS.md` CONF-02 and CONF-04 descriptions annotated to note Phase 10 supersession
+  7. `.planning/phases/09-llm-swap/09-VERIFICATION.md` body updated to match frontmatter `status: passed`
+**Plans**: 1 plan
+
+Plans:
+- [ ] 12-01-PLAN.md — Update README + docs + in-code comments/docstrings + planning artifacts to reflect Claude migration outcome
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -119,3 +138,4 @@ Plans:
 | 9. LLM Swap | v1.2 | 2/2 | Complete   | 2026-04-10 |
 | 10. Embedding Migration | v1.2 | 2/2 | Complete    | 2026-04-10 |
 | 11. Dead Code Cleanup | v1.2 | 2/2 | Complete    | 2026-04-10 |
+| 12. Docs & Reference Cleanup | v1.2 | 0/1 | Pending | — |
