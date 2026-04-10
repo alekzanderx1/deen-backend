@@ -4,7 +4,7 @@
 
 An enhancement to the Deen Islamic education platform's chatbot agent that enables it to answer Twelver Shia fiqh questions grounded in Ayatollah Sistani's published rulings. The system implements a FAIR-RAG (Faithful Agentic Iterative Retrieval-Augmented Generation) pipeline that iteratively retrieves, verifies, and synthesizes evidence from Sistani's "Islamic Laws" (4th edition) before generating any answer — ensuring the chatbot never derives its own conclusions or issues fatwas.
 
-**Shipped:** v1.0 — 4 phases, 12 plans, 39 requirements satisfied (2026-03-25) | v1.1 — 3 phases, 6 plans, AWS-free Supabase migration (2026-04-07) | v1.2 complete — Phases 8–11 (config + deps, LLM swap, embedding migration, dead code cleanup)
+**Shipped:** v1.0 — 4 phases, 12 plans, 39 requirements satisfied (2026-03-25) | v1.1 — 3 phases, 6 plans, AWS-free Supabase migration (2026-04-07) | v1.2 complete — Phases 8–12 (config + deps, LLM swap, embedding migration, dead code cleanup, docs cleanup)
 
 ## Core Value
 
@@ -51,6 +51,7 @@ Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah
 - DB migration: pgvector columns resized 1536 → 768 dims (all-mpnet-base-v2 produces 768-dim) ✓ Phase 10 complete
 - Dependencies: langchain-anthropic added; voyageai removed ✓ Phase 11 complete
 - Dead code: OpenAI client imports, OPENAI_API_KEY shim, and stale test mocks cleaned up ✓ Phase 11 complete
+- Docs cleanup: all user-facing docs, in-code comments, docstrings updated to remove stale OpenAI/GPT refs ✓ Phase 12 complete — Validated in Phase 12: CLEAN-05, CLEAN-06
 
 **Decision (Phase 9):** Voyage AI dropped in favour of HuggingFace `all-mpnet-base-v2` for pgvector embeddings — already installed, free, no API key required. Phase 10 plan to be updated accordingly.
 
@@ -140,4 +141,4 @@ This document evolves at phase transitions and milestone boundaries.
 **After each milestone** (via `/gsd:complete-milestone`): full review of all sections.
 
 ---
-*Last updated: 2026-04-10 — Phase 9 complete: all LLM calls use ChatAnthropic (claude-sonnet-4-6 / claude-haiku-4-5); LLM-01–07 satisfied; Voyage AI dropped in favour of HuggingFace all-mpnet-base-v2 for Phase 10*
+*Last updated: 2026-04-10 — Phase 12 complete: all docs/comments/docstrings updated to remove stale OpenAI/GPT references; CLEAN-05 and CLEAN-06 satisfied; v1.2 Claude Migration milestone complete*
