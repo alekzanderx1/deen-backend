@@ -74,7 +74,7 @@ human_verification:
 | From | To | Via | Status | Details |
 |------|----|----|--------|---------|
 | `core/chat_models.py` | `langchain_anthropic.ChatAnthropic` | `from langchain_anthropic import ChatAnthropic` | WIRED | Import present on line 1; all 4 functions call `ChatAnthropic(model=..., api_key=ANTHROPIC_API_KEY, max_tokens=N)` |
-| `agents/config/agent_config.py` | `LARGE_LLM or "claude-sonnet-4-6"` | `default=LARGE_LLM or "claude-sonnet-4-6"` in `ModelConfig.agent_model` | WIRED (code) / PARTIAL (runtime) | Code fallback is correct. When `LARGE_LLM` is set to an OpenAI model name in `.env`, the `or` clause is never reached — Claude fallback never activates |
+| `agents/config/agent_config.py` | `LARGE_LLM or "claude-sonnet-4-6"` | `default=LARGE_LLM or "claude-sonnet-4-6"` in `ModelConfig.agent_model` | WIRED | Code fallback is correct. `.env` updated by developer to `LARGE_LLM=claude-sonnet-4-6`; runtime now resolves to Claude model. |
 | `agents/core/chat_agent.py` | `langchain_anthropic.ChatAnthropic` | `from langchain_anthropic import ChatAnthropic` in `_create_llm_with_tools` | WIRED | Line 11; `_create_llm_with_tools` constructs `ChatAnthropic(model=..., api_key=ANTHROPIC_API_KEY, ...)` |
 | `agents/core/chat_agent._agent_node` | AIMessage filter | `getattr(msg, "tool_calls", None)` list comprehension | WIRED | Lines 152-159; filters `AIMessage(content="", tool_calls=None)` entries before invoking LLM |
 | `modules/fiqh/classifier.py` | `FiqhCategory` Pydantic model | `model.with_structured_output(FiqhCategory).invoke(...)` | WIRED | Lines 78-81; `VALID_CATEGORIES` set retained for external consumers |
