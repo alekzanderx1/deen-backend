@@ -71,7 +71,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 09-01-PLAN.md — Fix import chain + replace chat_models.py with ChatAnthropic factories + update ModelConfig for Claude constraints
+- [x] 09-01-PLAN.md — Fix import chain + replace chat_models.py with ChatAnthropic factories + update ModelConfig for Claude constraints
 - [ ] 09-02-PLAN.md — Update chat_agent.py (ChatAnthropic + AIMessage filter) + classifier preamble fix + hikmah script
 
 ### Phase 10: Embedding Migration
@@ -116,6 +116,6 @@ Plans:
 | 6. Auth Migration | v1.1 | 3/3 | Complete | 2026-04-07 |
 | 7. Cleanup | v1.1 | 1/1 | Complete | 2026-04-07 |
 | 8. Config + Dependencies | v1.2 | 2/2 | Complete   | 2026-04-09 |
-| 9. LLM Swap | v1.2 | 0/2 | Not started | - |
+| 9. LLM Swap | v1.2 | 1/2 | In progress | - |
 | 10. Embedding Migration | v1.2 | 0/? | Not started | - |
 | 11. Dead Code Cleanup | v1.2 | 0/? | Not started | - |
