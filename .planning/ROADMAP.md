@@ -117,5 +117,5 @@ Plans:
 | 7. Cleanup | v1.1 | 1/1 | Complete | 2026-04-07 |
 | 8. Config + Dependencies | v1.2 | 2/2 | Complete   | 2026-04-09 |
 | 9. LLM Swap | v1.2 | 2/2 | Complete   | 2026-04-10 |
-| 10. Embedding Migration | v1.2 | 2/2 | Complete   | 2026-04-10 |
+| 10. Embedding Migration | v1.2 | 2/2 | Complete    | 2026-04-10 |
 | 11. Dead Code Cleanup | v1.2 | 0/? | Not started | - |
