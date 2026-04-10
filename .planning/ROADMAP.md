@@ -101,8 +101,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 11-01-PLAN.md — TBD
-- [ ] 11-02-PLAN.md — TBD
+- [ ] 11-01-PLAN.md — Remove dead OpenAI imports from app code + voyageai from requirements + OPENAI_API_KEY shim from config
+- [ ] 11-02-PLAN.md — Update test_embedding_service.py mocks to HuggingFace; verify grep zero + app startup clean
 
 ## Progress
 
