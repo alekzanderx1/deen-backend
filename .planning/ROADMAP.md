@@ -71,9 +71,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [x] 08-01-PLAN.md — Update core/config.py: replace OPENAI guard with ANTHROPIC_API_KEY + VOYAGE_API_KEY; update LLM and embedding defaults
-- [x] 08-02-PLAN.md — Update requirements.txt and .env.example: add Anthropic/Voyage AI packages, remove OpenAI packages
-**UI hint**: no
+- [ ] 09-01-PLAN.md — Fix import chain + replace chat_models.py with ChatAnthropic factories + update ModelConfig for Claude constraints
+- [ ] 09-02-PLAN.md — Update chat_agent.py (ChatAnthropic + AIMessage filter) + classifier preamble fix + hikmah script
 
 ### Phase 10: Embedding Migration
 **Goal**: All pgvector embeddings are 1024-dimensional voyage-4 vectors; similarity search returns results; the Alembic migration chain runs clean on a fresh database
@@ -87,8 +86,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 08-01-PLAN.md — Update core/config.py: replace OPENAI guard with ANTHROPIC_API_KEY + VOYAGE_API_KEY; update LLM and embedding defaults
-- [ ] 08-02-PLAN.md — Update requirements.txt and .env.example: add Anthropic/Voyage AI packages, remove OpenAI packages
+- [ ] 10-01-PLAN.md — TBD
+- [ ] 10-02-PLAN.md — TBD
 
 ### Phase 11: Dead Code Cleanup
 **Goal**: The codebase contains zero OpenAI references in application code; the app starts clean with no import errors from removed packages
@@ -102,8 +101,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 08-01-PLAN.md — Update core/config.py: replace OPENAI guard with ANTHROPIC_API_KEY + VOYAGE_API_KEY; update LLM and embedding defaults
-- [ ] 08-02-PLAN.md — Update requirements.txt and .env.example: add Anthropic/Voyage AI packages, remove OpenAI packages
+- [ ] 11-01-PLAN.md — TBD
+- [ ] 11-02-PLAN.md — TBD
 
 ## Progress
 
@@ -117,6 +116,6 @@ Plans:
 | 6. Auth Migration | v1.1 | 3/3 | Complete | 2026-04-07 |
 | 7. Cleanup | v1.1 | 1/1 | Complete | 2026-04-07 |
 | 8. Config + Dependencies | v1.2 | 2/2 | Complete   | 2026-04-09 |
-| 9. LLM Swap | v1.2 | 0/? | Not started | - |
+| 9. LLM Swap | v1.2 | 0/2 | Not started | - |
 | 10. Embedding Migration | v1.2 | 0/? | Not started | - |
 | 11. Dead Code Cleanup | v1.2 | 0/? | Not started | - |
