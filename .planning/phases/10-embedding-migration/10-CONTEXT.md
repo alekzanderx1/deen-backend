@@ -38,7 +38,7 @@ Swap the pgvector embedding provider from OpenAI `text-embedding-3-small` (1536-
   3. `DROP TABLE note_embeddings`
   4. Recreate both tables with `Vector(768)` columns
   5. Recreate HNSW indexes
-  - Migration revision chains from `embeddings_001` (the existing 1536-dim migration).
+  - Migration revision chains from `memory_agent_001` (current chain HEAD after Phase 9 completion, NOT `embeddings_001`).
 
 ### Backfill Script (EMBED-03)
 
@@ -69,7 +69,7 @@ Swap the pgvector embedding provider from OpenAI `text-embedding-3-small` (1536-
 
 ### Reference Implementations
 - `modules/embedding/embedder.py` — `getDenseEmbedder()` returns the shared `HuggingFaceEmbeddings` instance; D-02 imports from here
-- `alembic/versions/20260122_create_embedding_tables.py` — Existing 1536-dim migration; new migration chains from `embeddings_001`
+- `alembic/versions/20260122_create_embedding_tables.py` — Existing 1536-dim migration (revision `embeddings_001`); the new migration does NOT chain from this — it chains from `memory_agent_001`
 - `.planning/phases/08-config-dependencies/08-CONTEXT.md` — Shows the guard pattern added in Phase 8 (D-03 reverts part of it)
 
 ### Phase Requirements (need updating)
@@ -93,7 +93,7 @@ Swap the pgvector embedding provider from OpenAI `text-embedding-3-small` (1536-
 
 ### Integration Points
 - `services/memory_service.py` and `services/consolidation_service.py` call `EmbeddingService` — interface unchanged (same method signatures), so no changes needed there.
-- `alembic/versions/20260122_create_embedding_tables.py` revision `embeddings_001` — new migration sets `down_revision = 'embeddings_001'`.
+- `alembic/versions/20260122_create_embedding_tables.py` revision `embeddings_001` — the new migration sets `down_revision = 'memory_agent_001'` (Phase 9 HEAD), not `embeddings_001`.
 - `core/config.py` `OPENAI_API_KEY` import in `services/embedding_service.py` — removed (replaced by embedder import).
 
 </code_context>
