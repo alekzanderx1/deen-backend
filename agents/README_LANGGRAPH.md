@@ -455,7 +455,7 @@ For questions or issues with the agentic pipeline:
 
 ---
 
-**Built with LangGraph** | **Powered by OpenAI** | **For Islamic Education**
+**Built with LangGraph** | **Powered by Anthropic Claude** | **For Islamic Education**
 
 
 
