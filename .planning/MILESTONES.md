@@ -1,5 +1,22 @@
 # Milestones
 
+## v1.2 Claude Migration (Shipped: 2026-04-10)
+
+**Phases completed:** 5 phases, 9 plans, 20 tasks
+
+**Key accomplishments:**
+
+- One-liner:
+- ChatAnthropic replaces init_chat_model/OpenAI in all four factory functions, OPENAI_API_KEY shim added for legacy import compat, ModelConfig updated with Claude API constraints (temperature<=1.0, max_tokens=4096)
+- ChatAnthropic wired end-to-end in ChatAgent and hikmah script; fiqh classifier made preamble-safe via with_structured_output(FiqhCategory); D-08 AIMessage filter added to prevent Claude tool-call sequence crashes
+- One-liner:
+- One-liner:
+- Dead `openai` imports, `OPENAI_API_KEY` references, and `voyageai` dependency fully excised from application code — zero OpenAI import sites remain
+- One-liner:
+- Removed all 10 stale OpenAI/GPT references from user-facing docs, in-code comments, docstrings, and planning artifacts — README, DEPLOYMENT, CHATBOT, pipeline.py, README_LANGGRAPH, decomposer.py, and 09-VERIFICATION.md now accurately reflect the Claude + HuggingFace stack
+
+---
+
 ## v1.1 Supabase Migration (Shipped: 2026-04-07)
 
 **Phases completed:** 3 phases, 6 plans, 6 tasks
