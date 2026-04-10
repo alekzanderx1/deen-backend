@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Claude Migration
-status: verifying
-stopped_at: Completed 10-02-PLAN.md
-last_updated: "2026-04-10T15:53:03.661Z"
+status: executing
+stopped_at: Completed 11-01-PLAN.md
+last_updated: "2026-04-10T16:10:25.342Z"
 last_activity: 2026-04-10
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 8
+  completed_plans: 7
   percent: 0
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-09 after v1.2 milestone start)
 
 **Core value:** Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah Sistani's published rulings — the system refuses to answer rather than hallucinate or speculate.
-**Current focus:** Phase 10 — embedding-migration
+**Current focus:** Phase 11 — dead-code-cleanup
 
 ## Current Position
 
-Phase: 11
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 11 (dead-code-cleanup) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-04-10
 
 Progress: [░░░░░░░░░░] 0%  (0/4 phases complete)
@@ -65,6 +65,7 @@ Progress: [░░░░░░░░░░] 0%  (0/4 phases complete)
 | Phase 08-config-dependencies P01 | 1 | 1 tasks | 1 files |
 | Phase 10 P01 | 159 | 3 tasks | 6 files |
 | Phase 10 P02 | 77 | 2 tasks | 2 files |
+| Phase 11 P01 | 5 | 7 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -97,6 +98,8 @@ Recent decisions affecting current work:
 - [Phase 10]: EMBEDDING_DIMENSIONS default 1536 -> 768; EMBEDDING_MODEL default -> sentence-transformers/all-mpnet-base-v2
 - [Phase 10]: embeddings_002 uses DROP+recreate strategy — safe because no production rows; downgrade() raises NotImplementedError to prevent silent data loss
 - [Phase 10]: git mv used for backfill script rename (migrate_embeddings.py -> reembed_pgvector.py) to preserve git history
+- [Phase 11]: OPENAI_API_KEY shim deleted from core/config.py after all import sites cleaned — ImportError confirms removal
+- [Phase 11]: voyageai dropped from requirements.txt — replaced by HuggingFace all-mpnet-base-v2 in Phase 10
 
 ### Pending Todos
 
@@ -108,7 +111,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-10T15:49:57.577Z
-Stopped at: Completed 10-02-PLAN.md
+Last session: 2026-04-10T16:10:25.331Z
+Stopped at: Completed 11-01-PLAN.md
 Resume file: None
 Next action: Execute Phase 10 — Embedding Migration

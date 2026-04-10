@@ -101,7 +101,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 11-01-PLAN.md — Remove dead OpenAI imports from app code + voyageai from requirements + OPENAI_API_KEY shim from config
+- [x] 11-01-PLAN.md — Remove dead OpenAI imports from app code + voyageai from requirements + OPENAI_API_KEY shim from config
 - [ ] 11-02-PLAN.md — Update test_embedding_service.py mocks to HuggingFace; verify grep zero + app startup clean
 
 ## Progress
@@ -118,4 +118,4 @@ Plans:
 | 8. Config + Dependencies | v1.2 | 2/2 | Complete   | 2026-04-09 |
 | 9. LLM Swap | v1.2 | 2/2 | Complete   | 2026-04-10 |
 | 10. Embedding Migration | v1.2 | 2/2 | Complete    | 2026-04-10 |
-| 11. Dead Code Cleanup | v1.2 | 0/? | Not started | - |
+| 11. Dead Code Cleanup | v1.2 | 1/2 | In Progress|  |

@@ -36,7 +36,7 @@ Replace all OpenAI model usage with Anthropic Claude (LLM) and Voyage AI (embedd
 
 ### Cleanup (CLEAN)
 
-- [ ] **CLEAN-03**: Dead `from openai import OpenAI` and module-level `OpenAI()` instances removed from 4 files (`stream_generator.py`, `classification/classifier.py`, `fiqh/classifier.py`, `pipeline.py`)
+- [x] **CLEAN-03**: Dead `from openai import OpenAI` and module-level `OpenAI()` instances removed from 4 files (`stream_generator.py`, `classification/classifier.py`, `fiqh/classifier.py`, `pipeline.py`)
 - [ ] **CLEAN-04**: `openai` and `langchain-openai` removal verified — `grep -r "from openai"` returns zero results; app starts clean
 
 ## Future Requirements
