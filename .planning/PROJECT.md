@@ -4,7 +4,7 @@
 
 An enhancement to the Deen Islamic education platform's chatbot agent that enables it to answer Twelver Shia fiqh questions grounded in Ayatollah Sistani's published rulings. The system implements a FAIR-RAG (Faithful Agentic Iterative Retrieval-Augmented Generation) pipeline that iteratively retrieves, verifies, and synthesizes evidence from Sistani's "Islamic Laws" (4th edition) before generating any answer — ensuring the chatbot never derives its own conclusions or issues fatwas.
 
-**Shipped:** v1.0 — 4 phases, 12 plans, 39 requirements satisfied (2026-03-25) | v1.1 — 3 phases, 6 plans, AWS-free Supabase migration (2026-04-07) | v1.2 in progress — Phases 8–9 complete (config + deps, LLM swap)
+**Shipped:** v1.0 — 4 phases, 12 plans, 39 requirements satisfied (2026-03-25) | v1.1 — 3 phases, 6 plans, AWS-free Supabase migration (2026-04-07) | v1.2 in progress — Phases 8–10 complete (config + deps, LLM swap, embedding migration)
 
 ## Core Value
 
@@ -46,9 +46,9 @@ Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah
 
 **Target features:**
 - LLM swap: gpt-4.1 → claude-sonnet-4-6, gpt-4o-mini → claude-haiku-4-5 ✓ Phase 9 complete
-- Embedding swap: text-embedding-3-small → all-mpnet-base-v2 (HuggingFace, free, already installed)
+- Embedding swap: text-embedding-3-small → all-mpnet-base-v2 (HuggingFace, free, already installed) ✓ Phase 10 complete
 - Config: ANTHROPIC_API_KEY wired; OPENAI_API_KEY dependency removed ✓ Phase 8 complete
-- DB migration: pgvector columns resized 1536 → 768 dims (all-mpnet-base-v2 produces 768-dim)
+- DB migration: pgvector columns resized 1536 → 768 dims (all-mpnet-base-v2 produces 768-dim) ✓ Phase 10 complete
 - Dependencies: langchain-anthropic added; langchain-openai + voyageai not needed
 - Dead code: OpenAI client imports and OPENAI_API_KEY usage cleaned up
 
