@@ -37,7 +37,7 @@ Full details: `.planning/milestones/v1.1-ROADMAP.md`
 
 - [x] **Phase 8: Config + Dependencies** - Wire ANTHROPIC_API_KEY + VOYAGE_API_KEY; swap pip packages; update defaults (completed 2026-04-09)
 - [x] **Phase 9: LLM Swap** - Replace all OpenAI LLM wiring with ChatAnthropic; fix Claude-specific compatibility issues (completed 2026-04-10)
-- [ ] **Phase 10: Embedding Migration** - Swap embedding_service to HuggingFace all-mpnet-base-v2; resize pgvector columns to 768-dim; backfill existing rows
+- [x] **Phase 10: Embedding Migration** - Swap embedding_service to HuggingFace all-mpnet-base-v2; resize pgvector columns to 768-dim; backfill existing rows (completed 2026-04-10)
 - [ ] **Phase 11: Dead Code Cleanup** - Remove dead OpenAI imports; verify zero openai references remain
 
 ## Phase Details
@@ -87,7 +87,7 @@ Plans:
 
 Plans:
 - [x] 10-01-PLAN.md — Swap EmbeddingService to HuggingFace; update config defaults; update EMBEDDING_DIMENSIONS to 768; update planning docs
-- [ ] 10-02-PLAN.md — Alembic DROP+recreate migration for Vector(768); rename + update backfill script
+- [x] 10-02-PLAN.md — Alembic DROP+recreate migration for Vector(768); rename + update backfill script
 
 ### Phase 11: Dead Code Cleanup
 **Goal**: The codebase contains zero OpenAI references in application code; the app starts clean with no import errors from removed packages
@@ -117,5 +117,5 @@ Plans:
 | 7. Cleanup | v1.1 | 1/1 | Complete | 2026-04-07 |
 | 8. Config + Dependencies | v1.2 | 2/2 | Complete   | 2026-04-09 |
 | 9. LLM Swap | v1.2 | 2/2 | Complete   | 2026-04-10 |
-| 10. Embedding Migration | v1.2 | 1/2 | In Progress|  |
+| 10. Embedding Migration | v1.2 | 2/2 | Complete   | 2026-04-10 |
 | 11. Dead Code Cleanup | v1.2 | 0/? | Not started | - |
