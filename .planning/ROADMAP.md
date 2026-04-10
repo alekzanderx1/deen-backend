@@ -86,7 +86,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 10-01-PLAN.md — Swap EmbeddingService to HuggingFace; update config defaults; update EMBEDDING_DIMENSIONS to 768; update planning docs
+- [x] 10-01-PLAN.md — Swap EmbeddingService to HuggingFace; update config defaults; update EMBEDDING_DIMENSIONS to 768; update planning docs
 - [ ] 10-02-PLAN.md — Alembic DROP+recreate migration for Vector(768); rename + update backfill script
 
 ### Phase 11: Dead Code Cleanup
@@ -117,5 +117,5 @@ Plans:
 | 7. Cleanup | v1.1 | 1/1 | Complete | 2026-04-07 |
 | 8. Config + Dependencies | v1.2 | 2/2 | Complete   | 2026-04-09 |
 | 9. LLM Swap | v1.2 | 2/2 | Complete   | 2026-04-10 |
-| 10. Embedding Migration | v1.2 | 0/? | Not started | - |
+| 10. Embedding Migration | v1.2 | 1/2 | In Progress|  |
 | 11. Dead Code Cleanup | v1.2 | 0/? | Not started | - |

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Claude Migration
 status: executing
-stopped_at: Completed 09-02-PLAN.md
-last_updated: "2026-04-10T15:20:33.816Z"
+stopped_at: Completed 10-01-PLAN.md
+last_updated: "2026-04-10T15:46:55.495Z"
 last_activity: 2026-04-10
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 6
+  completed_plans: 5
   percent: 0
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-09 after v1.2 milestone start)
 
 **Core value:** Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah Sistani's published rulings — the system refuses to answer rather than hallucinate or speculate.
-**Current focus:** Phase 09 — LLM swap (09-01 complete, 09-02 complete)
+**Current focus:** Phase 10 — embedding-migration
 
 ## Current Position
 
-Phase: 10
-Plan: Not started
-Status: In progress
+Phase: 10 (embedding-migration) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-04-10
 
 Progress: [░░░░░░░░░░] 0%  (0/4 phases complete)
@@ -63,6 +63,7 @@ Progress: [░░░░░░░░░░] 0%  (0/4 phases complete)
 *Updated after each plan completion*
 | Phase 08 P02 | 1 | 2 tasks | 2 files |
 | Phase 08-config-dependencies P01 | 1 | 1 tasks | 1 files |
+| Phase 10 P01 | 159 | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -90,6 +91,9 @@ Recent decisions affecting current work:
 - [Phase 09-02]: FiqhCategory Literal enforces valid category at schema level — VALID_CATEGORIES set check inside classify_fiqh_query removed; set retained for external consumers
 - [Phase 09-02]: D-08 AIMessage filter uses getattr(msg, "tool_calls", None) for broad message type safety; filters empty AIMessages with no tool_calls before each llm.invoke()
 - [Phase 09-02]: hikmah script lazy-imports ChatAnthropic inside init_llm() branches (consistent with factory function pattern); top-level init_chat_model import removed
+- [Phase 10]: EmbeddingService reuses getDenseEmbedder() from modules.embedding.embedder — no second model load, 768-dim HuggingFace vectors
+- [Phase 10]: VOYAGE_API_KEY removed from startup guard; app boots with only ANTHROPIC_API_KEY + PINECONE_API_KEY
+- [Phase 10]: EMBEDDING_DIMENSIONS default 1536 -> 768; EMBEDDING_MODEL default -> sentence-transformers/all-mpnet-base-v2
 
 ### Pending Todos
 
@@ -101,7 +105,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-10T14:19:00.000Z
-Stopped at: Completed 09-02-PLAN.md
+Last session: 2026-04-10T15:46:55.483Z
+Stopped at: Completed 10-01-PLAN.md
 Resume file: None
 Next action: Execute Phase 10 — Embedding Migration
