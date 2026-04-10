@@ -30,7 +30,7 @@ def chat_pipeline(user_query: str, session_id: str):
     # Step 4: Retrieve relevant documents from Pinecone
     relevant_docs = retriever.retrieve_documents(enhanced_query,REFERENCE_FETCH_COUNT)
 
-    # Step 5: Generate AI response using OpenAI
+    # Step 5: Generate AI response using LLM
     ai_response = generator.generate_response(enhanced_query, relevant_docs)
 
     return ai_response

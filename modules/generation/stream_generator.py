@@ -1,6 +1,4 @@
 import logging
-from openai import OpenAI
-from core.config import OPENAI_API_KEY
 from core import utils
 from core import chat_models
 from core import prompt_templates
@@ -10,7 +8,6 @@ import asyncio
 from typing import Optional
 import threading
 
-client = OpenAI(api_key=OPENAI_API_KEY)
 setup_logging()
 logger = logging.getLogger("hikmah.stream")
 memory_logger = get_memory_logger(level=logging.DEBUG)
