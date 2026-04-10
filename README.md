@@ -19,7 +19,7 @@ This is the backend service for the **Deen AI platform**, built with **FastAPI**
 - Supabase account (Postgres + Auth)
 - Redis server
 - Pinecone account (for vector search)
-- OpenAI API key
+- Anthropic API key
 
 ### 1. Clone and Setup Virtual Environment
 
@@ -167,7 +167,7 @@ For detailed architecture information, see [Architecture Documentation](document
 - **PostgreSQL** - Primary database for structured data
 - **Redis** - Session and conversation memory storage
 - **Pinecone** - Vector database for semantic search
-- **OpenAI LLMs** - Large language model for AI responses
+- **Anthropic Claude** - Large language model for AI responses
 - **LangChain** - Framework for LLM application development
 - **SQLAlchemy** - ORM for database operations
 - **Alembic** - Database migration tool
@@ -178,13 +178,13 @@ Copy `.env.example` to `.env` and fill in the real values. All variables are des
 
 > **Upgrading from v1.0?** Remove `COGNITO_REGION` and `COGNITO_POOL_ID` from your `.env` — these are no longer used. Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` instead.
 
-### OpenAI
+### Anthropic
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `OPENAI_API_KEY` | Yes | OpenAI API key. Get from [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
-| `LARGE_LLM` | Yes | Large model ID for generation, filtering, refinement. Default: `gpt-4.1-2025-04-14` |
-| `SMALL_LLM` | Yes | Small model ID for classification, routing, decomposition. Default: `gpt-4o-mini-2024-07-18` |
+| `ANTHROPIC_API_KEY` | Yes | Anthropic API key. Get from [console.anthropic.com](https://console.anthropic.com) |
+| `LARGE_LLM` | Yes | Large model ID for generation, filtering, refinement. Default: `claude-sonnet-4-6` |
+| `SMALL_LLM` | Yes | Small model ID for classification, routing, decomposition. Default: `claude-haiku-4-5-20251001` |
 
 ### Pinecone
 
@@ -238,8 +238,8 @@ Use the **direct connection** (port 5432), not the transaction pooler (port 6543
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `EMBEDDING_MODEL` | No | OpenAI embedding model for user memory note vectors (default: `text-embedding-3-small`). Must match the dimension count of the Pinecone memory index |
-| `EMBEDDING_DIMENSIONS` | No | Vector dimension count matching `EMBEDDING_MODEL` (default: `1536`) |
+| `EMBEDDING_MODEL` | No | HuggingFace embedding model for user memory note vectors (default: `sentence-transformers/all-mpnet-base-v2`). Must match the dimension count of the pgvector columns |
+| `EMBEDDING_DIMENSIONS` | No | Vector dimension count matching `EMBEDDING_MODEL` (default: `768`) |
 | `NOTE_FILTER_THRESHOLD` | No | Minimum cosine similarity score (0.0-1.0) for a memory note to be injected into context (default: `0.4`) |
 | `SIGNAL_QUALITY_THRESHOLD` | No | Minimum quality score (0.0-1.0) required before a memory signal is persisted (default: `0.5`) |
 
@@ -268,6 +268,40 @@ Features:
 - View consolidation history
 
 See [Memory Agent Documentation](documentation/MEMORY_AGENT.md) for details.
+
+### Embedding Backfill
+
+`scripts/reembed_pgvector.py` regenerates pgvector embeddings for lesson chunks and user memory notes using the current embedding model (HuggingFace `all-mpnet-base-v2`, 768-dim).
+
+**When to run this:**
+
+- **After switching the embedding model** — the embedding tables are dropped and recreated empty when vector dimensions change (e.g., the Phase 10 migration from OpenAI 1536-dim to HuggingFace 768-dim). Run this script immediately after `alembic upgrade head` to repopulate them.
+- **On a fresh database with existing lesson content** — if you restore a DB snapshot that has lessons but empty embedding tables, run this to regenerate.
+- **`lesson_chunk_embeddings` table is empty** — the primers and memory personalization features depend on this table. If it's empty, similarity search will return no results.
+
+The script is safe to re-run at any time — it uses content hashing to skip rows that haven't changed.
+
+```bash
+# Check current embedding counts before running
+python scripts/reembed_pgvector.py --stats-only
+
+# Backfill everything (lesson chunks + user memory note embeddings)
+python scripts/reembed_pgvector.py
+
+# Backfill only lesson chunk embeddings
+python scripts/reembed_pgvector.py --lessons-only
+
+# Backfill only user memory note embeddings
+python scripts/reembed_pgvector.py --notes-only
+
+# Backfill notes for a single user
+python scripts/reembed_pgvector.py --notes-only --user-id <user_id>
+
+# Tune commit batch size (default: 50 lessons / 100 notes)
+python scripts/reembed_pgvector.py --batch-size 25
+```
+
+**Prerequisites:** `DATABASE_URL` must be set in `.env`. The HuggingFace model (`all-mpnet-base-v2`) downloads automatically on first use (~420 MB) and is cached locally for subsequent runs.
 
 ### Health Check Endpoints
 
@@ -335,7 +369,7 @@ venv\Scripts\activate          # Windows
 pip install -r requirements.txt
 ```
 
-Ensure `.env` is configured (OpenAI, Redis, Pinecone, etc.). You do **not** need to start the server.
+Ensure `.env` is configured (Anthropic, Redis, Pinecone, etc.). You do **not** need to start the server.
 
 Run from the **project root**:
 
