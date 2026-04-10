@@ -39,7 +39,7 @@ Full details: `.planning/milestones/v1.1-ROADMAP.md`
 - [x] **Phase 9: LLM Swap** - Replace all OpenAI LLM wiring with ChatAnthropic; fix Claude-specific compatibility issues (completed 2026-04-10)
 - [x] **Phase 10: Embedding Migration** - Swap embedding_service to HuggingFace all-mpnet-base-v2; resize pgvector columns to 768-dim; backfill existing rows (completed 2026-04-10)
 - [x] **Phase 11: Dead Code Cleanup** - Remove dead OpenAI imports; verify zero openai references remain (completed 2026-04-10)
-- [ ] **Phase 12: Docs & Reference Cleanup** - Update all user-facing docs and in-code comments/docstrings to reflect Anthropic/Claude providers; annotate superseded requirements
+- [x] **Phase 12: Docs & Reference Cleanup** - Update all user-facing docs and in-code comments/docstrings to reflect Anthropic/Claude providers; annotate superseded requirements (completed 2026-04-10)
 
 ## Phase Details
 
@@ -138,4 +138,4 @@ Plans:
 | 9. LLM Swap | v1.2 | 2/2 | Complete   | 2026-04-10 |
 | 10. Embedding Migration | v1.2 | 2/2 | Complete    | 2026-04-10 |
 | 11. Dead Code Cleanup | v1.2 | 2/2 | Complete    | 2026-04-10 |
-| 12. Docs & Reference Cleanup | v1.2 | 0/1 | Pending | — |
+| 12. Docs & Reference Cleanup | v1.2 | 0/1 | Complete    | 2026-04-10 |
