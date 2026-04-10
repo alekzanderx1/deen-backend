@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Claude Migration
 status: verifying
-stopped_at: Completed 09-01-PLAN.md
-last_updated: "2026-04-10T00:15:00.000Z"
+stopped_at: Completed 09-02-PLAN.md
+last_updated: "2026-04-10T14:19:00.000Z"
 last_activity: 2026-04-10
 progress:
   total_phases: 4
@@ -21,12 +21,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-09 after v1.2 milestone start)
 
 **Core value:** Every fiqh answer must be strictly grounded in retrieved evidence from Ayatollah Sistani's published rulings — the system refuses to answer rather than hallucinate or speculate.
-**Current focus:** Phase 09 — LLM swap (09-01 complete, 09-02 next)
+**Current focus:** Phase 09 — LLM swap (09-01 complete, 09-02 complete)
 
 ## Current Position
 
 Phase: 9
-Plan: 01 complete — ready for 09-02
+Plan: 02 complete — Phase 09 all plans done
 Status: In progress
 Last activity: 2026-04-10
 
@@ -87,6 +87,10 @@ Recent decisions affecting current work:
 - [Phase 09-01]: ChatAnthropic constructor uses api_key kwarg (not anthropic_api_key); max_tokens set at construction per D-02
 - [Phase 09-01]: ModelConfig max_tokens changed from Optional[int]=None to int=4096; Optional removed from typing imports
 
+- [Phase 09-02]: FiqhCategory Literal enforces valid category at schema level — VALID_CATEGORIES set check inside classify_fiqh_query removed; set retained for external consumers
+- [Phase 09-02]: D-08 AIMessage filter uses getattr(msg, "tool_calls", None) for broad message type safety; filters empty AIMessages with no tool_calls before each llm.invoke()
+- [Phase 09-02]: hikmah script lazy-imports ChatAnthropic inside init_llm() branches (consistent with factory function pattern); top-level init_chat_model import removed
+
 ### Pending Todos
 
 None yet.
@@ -97,7 +101,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-10T00:15:00.000Z
-Stopped at: Completed 09-01-PLAN.md
+Last session: 2026-04-10T14:19:00.000Z
+Stopped at: Completed 09-02-PLAN.md
 Resume file: None
-Next action: Execute 09-02-PLAN.md
+Next action: Execute Phase 10 — Embedding Migration

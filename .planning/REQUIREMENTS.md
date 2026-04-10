@@ -19,12 +19,12 @@ Replace all OpenAI model usage with Anthropic Claude (LLM) and Voyage AI (embedd
 ### LLM Migration (LLM)
 
 - [x] **LLM-01**: `core/chat_models.py` factory functions use `ChatAnthropic(api_key=ANTHROPIC_API_KEY)` instead of `init_chat_model(..., openai_api_key=)`
-- [ ] **LLM-02**: `agents/core/chat_agent.py` uses `ChatAnthropic` with `ANTHROPIC_API_KEY`; `openai_api_key=` kwarg removed
+- [x] **LLM-02**: `agents/core/chat_agent.py` uses `ChatAnthropic` with `ANTHROPIC_API_KEY`; `openai_api_key=` kwarg removed
 - [x] **LLM-03**: `agents/config/agent_config.py` fallback model string updated from `gpt-4o` to `claude-sonnet-4-6`
 - [x] **LLM-04**: `ModelConfig` in `agent_config.py` gets `max_tokens=4096` default and temperature validator `le=1.0`
-- [ ] **LLM-05**: `modules/fiqh/classifier.py` `classify_fiqh_query()` response parsing robust to Claude preamble text
-- [ ] **LLM-06**: `_agent_node` in `chat_agent.py` filters empty `AIMessage` content before passing history to LLM
-- [ ] **LLM-07**: `scripts/hikmah_generation/generate_hikmah_tree.py` updated to use `ANTHROPIC_API_KEY`
+- [x] **LLM-05**: `modules/fiqh/classifier.py` `classify_fiqh_query()` response parsing robust to Claude preamble text
+- [x] **LLM-06**: `_agent_node` in `chat_agent.py` filters empty `AIMessage` content before passing history to LLM
+- [x] **LLM-07**: `scripts/hikmah_generation/generate_hikmah_tree.py` updated to use `ANTHROPIC_API_KEY`
 
 ### Embedding Migration (EMBED)
 

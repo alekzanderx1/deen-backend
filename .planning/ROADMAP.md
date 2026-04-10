@@ -36,7 +36,7 @@ Full details: `.planning/milestones/v1.1-ROADMAP.md`
 **Milestone Goal:** Replace all OpenAI model usage with Anthropic Claude (LLM) and Voyage AI (embeddings) across the full pipeline. LangGraph + FastAPI + Pinecone + Redis architecture is unchanged — only the model providers swap.
 
 - [x] **Phase 8: Config + Dependencies** - Wire ANTHROPIC_API_KEY + VOYAGE_API_KEY; swap pip packages; update defaults (completed 2026-04-09)
-- [ ] **Phase 9: LLM Swap** - Replace all OpenAI LLM wiring with ChatAnthropic; fix Claude-specific compatibility issues
+- [x] **Phase 9: LLM Swap** - Replace all OpenAI LLM wiring with ChatAnthropic; fix Claude-specific compatibility issues (completed 2026-04-10)
 - [ ] **Phase 10: Embedding Migration** - Swap embedding_service to Voyage AI; resize pgvector columns; backfill existing rows
 - [ ] **Phase 11: Dead Code Cleanup** - Remove dead OpenAI imports; verify zero openai references remain
 
@@ -72,7 +72,7 @@ Plans:
 
 Plans:
 - [x] 09-01-PLAN.md — Fix import chain + replace chat_models.py with ChatAnthropic factories + update ModelConfig for Claude constraints
-- [ ] 09-02-PLAN.md — Update chat_agent.py (ChatAnthropic + AIMessage filter) + classifier preamble fix + hikmah script
+- [x] 09-02-PLAN.md — Update chat_agent.py (ChatAnthropic + AIMessage filter) + classifier preamble fix + hikmah script
 
 ### Phase 10: Embedding Migration
 **Goal**: All pgvector embeddings are 1024-dimensional voyage-4 vectors; similarity search returns results; the Alembic migration chain runs clean on a fresh database
@@ -116,6 +116,6 @@ Plans:
 | 6. Auth Migration | v1.1 | 3/3 | Complete | 2026-04-07 |
 | 7. Cleanup | v1.1 | 1/1 | Complete | 2026-04-07 |
 | 8. Config + Dependencies | v1.2 | 2/2 | Complete   | 2026-04-09 |
-| 9. LLM Swap | v1.2 | 1/2 | In progress | - |
+| 9. LLM Swap | v1.2 | 2/2 | Complete   | 2026-04-10 |
 | 10. Embedding Migration | v1.2 | 0/? | Not started | - |
 | 11. Dead Code Cleanup | v1.2 | 0/? | Not started | - |
