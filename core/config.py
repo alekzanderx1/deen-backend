@@ -94,3 +94,9 @@ EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "1024"))
 NOTE_FILTER_THRESHOLD = float(os.getenv("NOTE_FILTER_THRESHOLD", "0.4"))
 # Personalization requires average similarity of filtered notes >= SIGNAL_QUALITY_THRESHOLD
 SIGNAL_QUALITY_THRESHOLD = float(os.getenv("SIGNAL_QUALITY_THRESHOLD", "0.5"))
+
+# Compatibility shim: legacy pipeline modules (modules/classification, modules/enhancement,
+# modules/generation, modules/generation/stream_generator) still import OPENAI_API_KEY
+# from core.config. Phase 11 will remove those imports. This shim prevents ImportError
+# at startup until Phase 11 cleanup is complete.
+OPENAI_API_KEY = ""
