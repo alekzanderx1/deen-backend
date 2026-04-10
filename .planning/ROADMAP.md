@@ -37,7 +37,7 @@ Full details: `.planning/milestones/v1.1-ROADMAP.md`
 
 - [x] **Phase 8: Config + Dependencies** - Wire ANTHROPIC_API_KEY + VOYAGE_API_KEY; swap pip packages; update defaults (completed 2026-04-09)
 - [x] **Phase 9: LLM Swap** - Replace all OpenAI LLM wiring with ChatAnthropic; fix Claude-specific compatibility issues (completed 2026-04-10)
-- [ ] **Phase 10: Embedding Migration** - Swap embedding_service to Voyage AI; resize pgvector columns; backfill existing rows
+- [ ] **Phase 10: Embedding Migration** - Swap embedding_service to HuggingFace all-mpnet-base-v2; resize pgvector columns to 768-dim; backfill existing rows
 - [ ] **Phase 11: Dead Code Cleanup** - Remove dead OpenAI imports; verify zero openai references remain
 
 ## Phase Details
@@ -75,19 +75,19 @@ Plans:
 - [x] 09-02-PLAN.md — Update chat_agent.py (ChatAnthropic + AIMessage filter) + classifier preamble fix + hikmah script
 
 ### Phase 10: Embedding Migration
-**Goal**: All pgvector embeddings are 1024-dimensional voyage-4 vectors; similarity search returns results; the Alembic migration chain runs clean on a fresh database
+**Goal**: All pgvector embeddings are 768-dimensional HuggingFace all-mpnet-base-v2 vectors; similarity search returns results; the Alembic migration chain runs clean on a fresh database
 **Depends on**: Phase 9
 **Requirements**: EMBED-01, EMBED-02, EMBED-03, EMBED-04, EMBED-05
 **Success Criteria** (what must be TRUE):
-  1. `embedding_service.generate_embedding()` returns a 1024-dimensional vector via the Voyage AI API
+  1. `embedding_service.generate_embedding()` returns a 768-dimensional vector using the shared HuggingFace all-mpnet-base-v2 embedder
   2. `find_similar_notes_to_lesson()` returns ranked results after the backfill script has been run
-  3. `alembic upgrade head` runs to completion on a fresh Supabase DB without error (vector columns are 1024-dimensional)
+  3. `alembic upgrade head` runs to completion on a fresh Supabase DB without error (vector columns are 768-dimensional)
   4. The backfill script `scripts/reembed_pgvector.py` processes all existing `note_embeddings` and `lesson_chunk_embeddings` rows and reports completion without exception
 **Plans**: 2 plans
 
 Plans:
-- [ ] 10-01-PLAN.md — TBD
-- [ ] 10-02-PLAN.md — TBD
+- [ ] 10-01-PLAN.md — Swap EmbeddingService to HuggingFace; update config defaults; update EMBEDDING_DIMENSIONS to 768; update planning docs
+- [ ] 10-02-PLAN.md — Alembic DROP+recreate migration for Vector(768); rename + update backfill script
 
 ### Phase 11: Dead Code Cleanup
 **Goal**: The codebase contains zero OpenAI references in application code; the app starts clean with no import errors from removed packages

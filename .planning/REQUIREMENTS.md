@@ -28,11 +28,11 @@ Replace all OpenAI model usage with Anthropic Claude (LLM) and Voyage AI (embedd
 
 ### Embedding Migration (EMBED)
 
-- [ ] **EMBED-01**: `services/embedding_service.py` uses `voyageai.Client(api_key=VOYAGE_API_KEY)` to generate embeddings
-- [ ] **EMBED-02**: `generate_embedding()` and `generate_embeddings_batch()` adapted to voyage-4 response shape (`result.embeddings`)
-- [ ] **EMBED-03**: `scripts/reembed_pgvector.py` backfill script re-generates voyage-4 embeddings for all existing `note_embeddings` and `lesson_chunk_embeddings` rows
-- [ ] **EMBED-04**: `db/models/embeddings.py` `Vector(1536)` columns changed to `Vector(1024)`
-- [ ] **EMBED-05**: Alembic migration: add `embedding_new vector(1024)` column → backfill populates it → drop old `vector(1536)` column → rename → recreate HNSW indexes
+- [ ] **EMBED-01**: `services/embedding_service.py` uses `getDenseEmbedder()` from `modules.embedding.embedder` to generate 768-dim HuggingFace embeddings (no API key required)
+- [ ] **EMBED-02**: `generate_embedding()` calls `embedder.embed_query(text)` and `generate_embeddings_batch()` calls `embedder.embed_documents(texts)`; OpenAI client instantiation removed
+- [ ] **EMBED-03**: `scripts/reembed_pgvector.py` backfill script re-generates HuggingFace embeddings for all existing `note_embeddings` and `lesson_chunk_embeddings` rows (renamed from `scripts/migrate_embeddings.py` via git mv)
+- [ ] **EMBED-04**: `db/models/embeddings.py` `EMBEDDING_DIMENSIONS` constant changed from `1536` to `768`; both `Vector` columns updated
+- [ ] **EMBED-05**: Alembic migration: drop HNSW indexes → drop `lesson_chunk_embeddings` → drop `note_embeddings` → recreate both tables with `Vector(768)` columns → recreate HNSW indexes; chains from `memory_agent_001`
 
 ### Cleanup (CLEAN)
 
@@ -71,10 +71,10 @@ Replace all OpenAI model usage with Anthropic Claude (LLM) and Voyage AI (embedd
 | LLM-05 | Phase 9 | — |
 | LLM-06 | Phase 9 | — |
 | LLM-07 | Phase 9 | — |
-| EMBED-01 | Phase 10 | — |
-| EMBED-02 | Phase 10 | — |
-| EMBED-03 | Phase 10 | — |
-| EMBED-04 | Phase 10 | — |
-| EMBED-05 | Phase 10 | — |
+| EMBED-01 | Phase 10 | 10-01-PLAN.md |
+| EMBED-02 | Phase 10 | 10-01-PLAN.md |
+| EMBED-03 | Phase 10 | 10-02-PLAN.md |
+| EMBED-04 | Phase 10 | 10-01-PLAN.md |
+| EMBED-05 | Phase 10 | 10-02-PLAN.md |
 | CLEAN-03 | Phase 11 | — |
 | CLEAN-04 | Phase 11 | — |
