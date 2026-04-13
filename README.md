@@ -159,7 +159,7 @@ For detailed architecture information, see [Architecture Documentation](document
 - [**Database**](documentation/DATABASE.md) - PostgreSQL schema, models, and migrations
 - [**API Reference**](documentation/API_REFERENCE.md) - Complete API endpoint documentation
 - [**Authentication**](documentation/AUTHENTICATION.md) - Supabase Auth JWT authentication setup (v1.1+)
-- [**Deployment**](documentation/DEPLOYMENT.md) - Docker and production deployment guide
+- [**Deployment**](#production-deployment-hetzner) - Hetzner production deployment (see README above)
 
 ## Key Technologies
 
@@ -316,29 +316,193 @@ curl http://localhost:8080/_debug/db
 curl http://localhost:8080/_routes
 ```
 
-## Docker Deployment
+## Production Deployment (Hetzner)
 
-### Quick Start with Docker
+The backend runs on a **Hetzner Cloud** server with Docker. Caddy handles TLS termination and reverse-proxies to the FastAPI container.
 
-```bash
-# Stop any existing containers
-docker compose down
-
-# Optional: Clean up (recommended on small instances)
-docker system prune -af
-
-# Rebuild with no cache
-docker compose build --no-cache
-
-# Start services
-docker compose up -d
-
-# Check logs
-docker logs --tail=200 deen-backend
-docker logs --tail=200 deen-caddy
+```
+Internet → api.thedeenfoundation.com (Caddy :443) → FastAPI container (:8000)
 ```
 
-For complete deployment instructions, see [Deployment Documentation](documentation/DEPLOYMENT.md).
+### Server Details
+
+| Item | Value |
+|---|---|
+| Provider | Hetzner Cloud |
+| Server IP | `87.99.140.169` |
+| OS | Ubuntu 24.04 |
+| SSH user | `root` (key-based auth only) |
+| Domain | `api.thedeenfoundation.com` |
+| DNS | GoDaddy — A record pointing to server IP |
+
+### SSH into the Server
+
+```bash
+ssh -i ~/.ssh/deen-prod-keygen root@87.99.140.169
+```
+
+Or if you've added the SSH config entry:
+
+```bash
+ssh deen
+```
+
+<details>
+<summary>SSH config (~/.ssh/config)</summary>
+
+```
+Host deen
+    HostName 87.99.140.169
+    User root
+    IdentityFile ~/.ssh/deen-prod-keygen
+```
+</details>
+
+### Updating the Backend (Repeatable Steps)
+
+This is the standard process whenever you push new code and want to deploy it:
+
+```bash
+# 1. SSH into the server
+ssh deen
+
+# 2. Navigate to project
+cd ~/deen-backend
+
+# 3. Pull latest code
+git pull
+
+# 4. Rebuild and restart containers
+docker compose down
+docker compose build --no-cache
+docker compose up -d
+
+# 5. Run database migrations (if any new ones)
+docker exec -it deen-backend alembic upgrade head
+
+# 6. Verify deployment
+docker ps                                              # containers running?
+docker logs --tail=50 deen-backend                     # no startup errors?
+curl https://api.thedeenfoundation.com/health          # responding?
+```
+
+### Quick Reference Commands
+
+```bash
+# View logs
+docker logs -f deen-backend              # follow live logs
+docker logs --tail=200 deen-backend      # last 200 lines
+docker logs --tail=100 deen-caddy        # Caddy/TLS logs
+
+# Restart without rebuilding (e.g. .env change only)
+docker compose restart
+
+# Full clean rebuild (if disk is tight)
+docker compose down
+docker system prune -af
+docker compose build --no-cache
+docker compose up -d
+
+# Enter container for debugging
+docker exec -it deen-backend bash
+
+# Check resource usage
+docker stats
+
+# Check running containers
+docker ps
+```
+
+### First-Time Server Setup
+
+<details>
+<summary>Only needed when provisioning a brand new server</summary>
+
+#### 1. Create the Hetzner server
+
+In [Hetzner Cloud Console](https://console.hetzner.cloud):
+- **Location**: Ashburn (us-east) or nearest to your users
+- **Image**: Ubuntu 24.04
+- **Type**: Dedicated > CCX13 (2 vCPU, 8 GB RAM) or larger
+- **SSH key**: Add your public key (`~/.ssh/deen-prod-keygen.pub`)
+- **Firewall**: Allow TCP 22 (SSH), 80 (HTTP), 443 (HTTPS)
+- **Backups**: Enable
+
+#### 2. Initial server setup
+
+```bash
+# SSH in as root
+ssh -i ~/.ssh/deen-prod-keygen root@SERVER_IP
+
+# Update system
+apt update && apt upgrade -y
+reboot
+# Reconnect after ~30 seconds
+
+# Install Docker
+curl -fsSL https://get.docker.com | sh
+docker compose version   # verify
+
+# Install Git
+apt install -y git
+
+# Enable automatic security updates
+apt install -y unattended-upgrades
+dpkg-reconfigure -plow unattended-upgrades
+```
+
+#### 3. Clone and configure
+
+```bash
+cd ~
+git clone <repository-url> deen-backend
+cd deen-backend
+
+# Create .env with production values
+nano .env
+```
+
+#### 4. DNS setup (GoDaddy)
+
+Add an **A record** in GoDaddy DNS for `thedeenfoundation.com`:
+
+| Type | Name | Value | TTL |
+|---|---|---|---|
+| A | api | `SERVER_IP` | 600 |
+
+This creates `api.thedeenfoundation.com → your server`. Caddy auto-provisions the TLS certificate.
+
+#### 5. Build and start
+
+```bash
+docker compose build --no-cache
+docker compose up -d
+docker exec -it deen-backend alembic upgrade head
+```
+
+</details>
+
+### Rollback
+
+```bash
+# SSH into server
+ssh deen
+cd ~/deen-backend
+
+# Check current and recent commits
+git log --oneline -5
+
+# Revert to a previous commit
+git checkout <COMMIT_HASH>
+
+# Rebuild and restart
+docker compose down
+docker compose build --no-cache
+docker compose up -d
+
+# If a migration needs reverting
+docker exec -it deen-backend alembic downgrade -1
+```
 
 ## Testing
 
