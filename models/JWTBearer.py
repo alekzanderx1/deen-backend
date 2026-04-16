@@ -71,3 +71,28 @@ class JWTBearer(HTTPBearer):
                 raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="JWK invalid")
 
             return jwt_credentials
+
+
+class DevBypassBearer(HTTPBearer):
+    """
+    In ENV=development: skips JWKS verification and returns mock credentials.
+    In ENV=production: delegates entirely to JWTBearer (strict verification).
+    """
+
+    def __init__(self, jwks: JWKS, env: str = "development"):
+        super().__init__(auto_error=True)
+        self._env = env
+        self._strict = JWTBearer(jwks, auto_error=True)
+
+    async def __call__(self, request: Request) -> Optional[JWTAuthorizationCredentials]:
+        if self._env != "development":
+            return await self._strict(request)
+
+        # Development bypass: always return mock credentials, regardless of token
+        return JWTAuthorizationCredentials(
+            jwt_token="dev-bypass",
+            header={"alg": "HS256", "typ": "JWT"},
+            claims={"sub": "dev-user-001", "email": "dev@local.test"},
+            signature="dev",
+            message="dev",
+        )

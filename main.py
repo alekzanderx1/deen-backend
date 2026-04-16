@@ -1,12 +1,16 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from api import chat
 from api import reference
 from api import hikmah
 from api import account
+from api import onboarding
 from api import primers
 from models.JWTBearer import JWTBearer
 from core.auth import jwks
+from core.config import validate_supabase_config
 import os
 
 from db.session import engine, Base          # for optional table bootstrap
@@ -21,7 +25,12 @@ from api import memory_admin
 
 
 # RUN USING: uvicorn main:app --reload
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    validate_supabase_config()
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 auth = JWTBearer(jwks)
 
@@ -56,10 +65,8 @@ app.add_middleware(
 app.include_router(reference.ref_router)
 app.include_router(chat.chat_router)
 app.include_router(hikmah.hikmah_router)
-
-# app.include_router(reference.ref_router)
-# app.include_router(chat.chat_router)
-# app.include_router(hikmah.hikmah_router)
+app.include_router(account.router)                  # /account
+app.include_router(onboarding.router)               # /onboarding
 
 app.include_router(users_router.router)             # /users
 app.include_router(lessons_router.router)           # /lessons

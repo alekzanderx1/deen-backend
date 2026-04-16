@@ -1,16 +1,19 @@
 """
-Migration script to generate embeddings for existing notes and lesson content.
-Run this after the database migration to backfill embeddings.
+Backfill script: re-generate HuggingFace all-mpnet-base-v2 embeddings for all existing
+note_embeddings and lesson_chunk_embeddings rows after the Alembic embeddings_002 migration.
+
+Run after: alembic upgrade head
 
 Each lesson_content row (title + content_body) becomes a separate chunk embedding,
 preserving the natural structure of the lesson content.
 
 Usage:
-    python scripts/migrate_embeddings.py
-    python scripts/migrate_embeddings.py --batch-size 100
-    python scripts/migrate_embeddings.py --lessons-only
-    python scripts/migrate_embeddings.py --notes-only
-    python scripts/migrate_embeddings.py --user-id <user_id>
+    python scripts/reembed_pgvector.py
+    python scripts/reembed_pgvector.py --batch-size 100
+    python scripts/reembed_pgvector.py --lessons-only
+    python scripts/reembed_pgvector.py --notes-only
+    python scripts/reembed_pgvector.py --user-id <user_id>
+    python scripts/reembed_pgvector.py --stats-only
 """
 
 import argparse
@@ -243,7 +246,7 @@ def main():
     args = parser.parse_args()
 
     logger.info("=" * 60)
-    logger.info("Embedding Migration Script")
+    logger.info("Embedding Backfill Script — HuggingFace all-mpnet-base-v2 (768-dim)")
     logger.info("=" * 60)
     logger.info(f"Batch size: {args.batch_size}")
     logger.info(f"Started at: {datetime.utcnow().isoformat()}")

@@ -14,8 +14,8 @@ import uuid
 
 from ..session import Base
 
-# Embedding dimensions for OpenAI text-embedding-3-small
-EMBEDDING_DIMENSIONS = 1536
+# Embedding dimensions for HuggingFace all-mpnet-base-v2
+EMBEDDING_DIMENSIONS = 768
 
 # Chunking configuration
 CHUNK_SIZE = 256  # tokens

@@ -39,29 +39,19 @@ def mock_db():
 
 
 @pytest.fixture
-def mock_openai_client():
-    """Create a mock OpenAI client"""
-    with patch('services.embedding_service.OpenAI') as mock_openai:
-        mock_client = Mock()
-        mock_openai.return_value = mock_client
-
-        # Mock embedding response
-        mock_embedding_response = Mock()
-        mock_embedding_data = Mock()
-        mock_embedding_data.embedding = [0.1] * 1536  # 1536 dimensions
-        mock_embedding_response.data = [mock_embedding_data]
-        mock_client.embeddings.create.return_value = mock_embedding_response
-
-        yield mock_client
+def mock_embedder():
+    """Create a mock HuggingFace embedder (replaces old mock_openai_client)"""
+    mock = Mock()
+    mock.embed_query.return_value = [0.1] * 768      # 768-dim single
+    mock.embed_documents.return_value = [[0.1] * 768] # 768-dim batch default
+    return mock
 
 
 @pytest.fixture
-def embedding_service(mock_db, mock_openai_client):
-    """Create an EmbeddingService instance with mocks"""
-    with patch('services.embedding_service.OpenAI') as mock_openai:
-        mock_openai.return_value = mock_openai_client
+def embedding_service(mock_db, mock_embedder):
+    """Create an EmbeddingService instance with mocked HuggingFace embedder"""
+    with patch('services.embedding_service.getDenseEmbedder', return_value=mock_embedder):
         service = EmbeddingService(mock_db)
-        service.client = mock_openai_client
         return service
 
 
@@ -141,28 +131,25 @@ class TestContentHashing:
 class TestEmbeddingGeneration:
     """Test embedding generation functionality"""
 
-    def test_generate_embedding_single(self, embedding_service, mock_openai_client):
+    def test_generate_embedding_single(self, embedding_service, mock_embedder):
         """Test generating a single embedding"""
         text = "Test text for embedding"
 
         embedding = embedding_service.generate_embedding(text)
 
-        assert len(embedding) == 1536
-        mock_openai_client.embeddings.create.assert_called_once()
+        assert len(embedding) == 768
+        mock_embedder.embed_query.assert_called_once_with(text)
 
-    def test_generate_embeddings_batch(self, embedding_service, mock_openai_client):
+    def test_generate_embeddings_batch(self, embedding_service, mock_embedder):
         """Test generating embeddings in batch"""
         texts = ["Text one", "Text two", "Text three"]
 
-        # Mock batch response
-        mock_batch_response = Mock()
-        mock_batch_response.data = [Mock(embedding=[0.1] * 1536) for _ in texts]
-        mock_openai_client.embeddings.create.return_value = mock_batch_response
+        mock_embedder.embed_documents.return_value = [[0.1] * 768 for _ in texts]
 
         embeddings = embedding_service.generate_embeddings_batch(texts)
 
         assert len(embeddings) == 3
-        assert all(len(e) == 1536 for e in embeddings)
+        assert all(len(e) == 768 for e in embeddings)
 
     def test_generate_embeddings_batch_empty(self, embedding_service):
         """Test generating embeddings with empty list"""
@@ -175,7 +162,7 @@ class TestEmbeddingGeneration:
 class TestNoteEmbeddingStorage:
     """Test note embedding storage functionality"""
 
-    def test_store_note_embedding_new(self, embedding_service, mock_db, mock_openai_client):
+    def test_store_note_embedding_new(self, embedding_service, mock_db):
         """Test storing a new note embedding"""
         mock_db.query.return_value.filter.return_value.first.return_value = None
 
@@ -207,7 +194,7 @@ class TestNoteEmbeddingStorage:
         assert result == existing
         mock_db.add.assert_not_called()
 
-    def test_store_note_embedding_existing_changed(self, embedding_service, mock_db, mock_openai_client):
+    def test_store_note_embedding_existing_changed(self, embedding_service, mock_db):
         """Test storing when existing embedding with different content hash"""
         existing = Mock(spec=NoteEmbedding)
         existing.content_hash = "old_hash_value"
@@ -230,7 +217,7 @@ class TestLessonChunkEmbeddingStorage:
     """Test lesson chunk embedding storage from lesson_content rows"""
 
     def test_store_lesson_chunk_embeddings_new(
-        self, embedding_service, mock_db, mock_openai_client, sample_lesson_content
+        self, embedding_service, mock_db, mock_embedder, sample_lesson_content
     ):
         """Test storing new lesson chunk embeddings from lesson_content"""
         # Mock no existing chunks
@@ -238,10 +225,7 @@ class TestLessonChunkEmbeddingStorage:
         # Mock lesson content query
         mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = sample_lesson_content
 
-        # Mock batch embedding response for 2 content rows
-        mock_batch_response = Mock()
-        mock_batch_response.data = [Mock(embedding=[0.1] * 1536) for _ in sample_lesson_content]
-        mock_openai_client.embeddings.create.return_value = mock_batch_response
+        mock_embedder.embed_documents.return_value = [[0.1] * 768 for _ in sample_lesson_content]
 
         result = embedding_service.store_lesson_chunk_embeddings(lesson_id=100)
 
@@ -370,9 +354,9 @@ class TestSimilaritySearch:
         """Test similarity search with lesson chunks and results"""
         # Mock lesson chunks
         chunk1 = Mock(spec=LessonChunkEmbedding)
-        chunk1.embedding = [0.1] * 1536
+        chunk1.embedding = [0.1] * 768
         chunk2 = Mock(spec=LessonChunkEmbedding)
-        chunk2.embedding = [0.2] * 1536
+        chunk2.embedding = [0.2] * 768
 
         mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [chunk1, chunk2]
 
@@ -441,16 +425,13 @@ class TestBatchOperations:
         assert result == []
 
     def test_store_note_embeddings_batch_new_notes(
-        self, embedding_service, mock_db, mock_openai_client, sample_notes
+        self, embedding_service, mock_db, mock_embedder, sample_notes
     ):
         """Test batch storage with new notes"""
         # Mock no existing embeddings
         mock_db.query.return_value.filter.return_value.all.return_value = []
 
-        # Mock batch embedding generation
-        mock_batch_response = Mock()
-        mock_batch_response.data = [Mock(embedding=[0.1] * 1536) for _ in sample_notes]
-        mock_openai_client.embeddings.create.return_value = mock_batch_response
+        mock_embedder.embed_documents.return_value = [[0.1] * 768 for _ in sample_notes]
 
         result = embedding_service.store_note_embeddings_batch(
             user_id="user123",

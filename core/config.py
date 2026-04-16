@@ -4,8 +4,10 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+ENV = os.getenv("ENV", "development")
+
 # Retrieve API Keys
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 DEEN_DENSE_INDEX_NAME = os.getenv("DEEN_DENSE_INDEX_NAME")
 DEEN_SPARSE_INDEX_NAME = os.getenv("DEEN_SPARSE_INDEX_NAME")
@@ -22,10 +24,10 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 KEY_PREFIX = os.getenv("REDIS_KEY_PREFIX", "dev:chat")
 TTL_SECONDS = int(os.getenv("REDIS_TTL_SECONDS", "12000"))  # default 30d
 MAX_MESSAGES = int(os.getenv("REDIS_MAX_MESSAGES", "30"))
-COGNITO_REGION = os.getenv("COGNITO_REGION")
-COGNITO_POOL_ID = os.getenv("COGNITO_POOL_ID")
-LARGE_LLM = os.getenv("LARGE_LLM")
-SMALL_LLM = os.getenv("SMALL_LLM")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+LARGE_LLM = os.getenv("LARGE_LLM", "claude-sonnet-4-6")
+SMALL_LLM = os.getenv("SMALL_LLM", "claude-haiku-4-5-20251001")
 
 # Database Configuration
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -38,9 +40,20 @@ DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 
-# Check if keys are loaded (optional)
-if not OPENAI_API_KEY or not PINECONE_API_KEY:
-    raise ValueError("Missing API keys! Ensure they are set in the .env file.")
+# Startup guard: fail fast if any required API key is absent
+if not ANTHROPIC_API_KEY or not PINECONE_API_KEY:
+    raise ValueError("Missing API keys! Ensure ANTHROPIC_API_KEY and PINECONE_API_KEY are set in the .env file.")
+
+def validate_supabase_config() -> None:
+    """Call from app startup to fail-fast if Supabase vars are absent.
+
+    Intentionally deferred (not inline at module level) so that test imports
+    of core.config succeed without SUPABASE_URL set. Fires at server startup
+    via main.py lifespan, providing the same fail-fast guarantee as the inline
+    ANTHROPIC_API_KEY/PINECONE_API_KEY guards without breaking the test suite.
+    """
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        raise ValueError("Missing Supabase config! Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.")
 
 # Check if keys are loaded (optional)
 if not DEEN_DENSE_INDEX_NAME or not DEEN_SPARSE_INDEX_NAME:
@@ -72,8 +85,8 @@ FINAL_DATABASE_URL = build_database_url()
 FINAL_ASYNC_DATABASE_URL = build_async_database_url()
 
 # Embedding Configuration (for personalized primers)
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
-EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "1536"))
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-mpnet-base-v2")
+EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "768"))
 
 # Similarity thresholds for note filtering and signal quality
 # Notes with max similarity to lesson content >= NOTE_FILTER_THRESHOLD are included

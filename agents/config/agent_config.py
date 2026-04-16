@@ -3,7 +3,6 @@ Configuration classes for the LangGraph agentic pipeline.
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional
 from core.config import DENSE_RESULT_WEIGHT, SPARSE_RESULT_WEIGHT, LARGE_LLM
 
 
@@ -67,19 +66,19 @@ class ModelConfig(BaseModel):
     """Configuration for LLM models."""
     
     agent_model: str = Field(
-        default=LARGE_LLM or "gpt-4o",
+        default=LARGE_LLM or "claude-sonnet-4-6",
         description="Model to use for the agent (tool calling)"
     )
     
     temperature: float = Field(
         default=0.7,
         ge=0.0,
-        le=2.0,
+        le=1.0,
         description="Temperature for response generation"
     )
     
-    max_tokens: Optional[int] = Field(
-        default=None,
+    max_tokens: int = Field(
+        default=4096,
         ge=1,
         description="Maximum tokens for response generation"
     )
@@ -87,9 +86,9 @@ class ModelConfig(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "agent_model": LARGE_LLM or "gpt-4o",
+                "agent_model": LARGE_LLM or "claude-sonnet-4-6",
                 "temperature": 0.7,
-                "max_tokens": 2000
+                "max_tokens": 4096
             }
         }
 
@@ -143,7 +142,7 @@ class AgentConfig(BaseModel):
                     "quran_doc_count": 3
                 },
                 "model": {
-                    "agent_model": LARGE_LLM or "gpt-4o",
+                    "agent_model": LARGE_LLM or "claude-sonnet-4-6",
                     "temperature": 0.7
                 },
                 "max_iterations": 5,

@@ -23,7 +23,7 @@ graph TB
     Backend --> PostgreSQL[(PostgreSQL RDS)]
     Backend --> Redis[(Redis)]
     Backend --> Pinecone[(Pinecone Vector DB)]
-    Backend --> OpenAI[OpenAI API]
+    Backend --> Anthropic[Anthropic API]
     Backend --> Cognito[AWS Cognito]
 ```
 
@@ -35,7 +35,7 @@ graph TB
 - **Cache**: Redis (ElastiCache or self-hosted)
 - **Vector DB**: Pinecone (SaaS)
 - **Authentication**: AWS Cognito
-- **LLM**: OpenAI API
+- **LLM**: Anthropic Claude API
 
 ## Docker Setup
 
@@ -163,10 +163,10 @@ Create `.env` file with production values:
 # Environment
 ENV=production
 
-# OpenAI Configuration
-OPENAI_API_KEY=your_production_key
-LARGE_LLM=gpt-4o
-SMALL_LLM=gpt-4o-mini
+# Anthropic Configuration
+ANTHROPIC_API_KEY=your_production_key
+LARGE_LLM=claude-sonnet-4-6
+SMALL_LLM=claude-haiku-4-5-20251001
 
 # Pinecone Configuration
 PINECONE_API_KEY=your_production_key
