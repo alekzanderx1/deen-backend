@@ -92,12 +92,26 @@ cp .env.example .env
 # Fill in SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, DATABASE_URL, ASYNC_DATABASE_URL
 ```
 
-Use the **direct connection** (port `5432`), not the transaction pooler (port `6543` is incompatible with asyncpg):
+#### Choosing the right Supabase connection string
+
+Supabase exposes three ways to connect to Postgres. Pick one based on your environment:
+
+| Mode | Host | Port | IPv4? | Notes |
+|---|---|---|---|---|
+| Direct | `db.<ref>.supabase.co` | `5432` | No (IPv6 only in most regions) | Avoid on Hetzner / Docker |
+| **Session Pooler** | `aws-0-<region>.pooler.supabase.com` | `5432` | **Yes** | Recommended for Hetzner / Docker |
+| Transaction Pooler | `aws-0-<region>.pooler.supabase.com` | `6543` | Yes | Incompatible with asyncpg / Alembic |
+
+**Hetzner servers and Docker do not have IPv6 enabled by default.** If you use the direct `db.<ref>.supabase.co` host, connections will time out or fail with a "Network is unreachable" error. Use the **Session Pooler** (port `5432` on the pooler host) instead — it is IPv4-compatible and behaves identically to a direct connection for SQLAlchemy and asyncpg.
+
+The Session Pooler URL looks like this (copy it from **Supabase Dashboard → Project Settings → Database → Connection string → Session pooler**):
 
 ```
 DATABASE_URL=postgresql://postgres.xxxx:password@aws-0-us-east-1.pooler.supabase.com:5432/postgres
 ASYNC_DATABASE_URL=postgresql+asyncpg://postgres.xxxx:password@aws-0-us-east-1.pooler.supabase.com:5432/postgres
 ```
+
+> **Do not use port `6543`** (Transaction Pooler). It does not support prepared statements, which asyncpg and Alembic require.
 
 ### 3. Run database migrations
 
@@ -212,7 +226,7 @@ Copy `.env.example` to `.env` and fill in the real values. All variables are des
 
 Provide either `DATABASE_URL` / `ASYNC_DATABASE_URL` directly, or provide all `DB_*` components and the app will build the URL.
 
-Use the **direct connection** (port 5432), not the transaction pooler (port 6543 is incompatible with asyncpg).
+On Hetzner or Docker (IPv4-only), use the **Session Pooler** URL (port `5432` on `pooler.supabase.com`). Do **not** use port `6543` (Transaction Pooler) — it is incompatible with asyncpg and Alembic. See [Choosing the right Supabase connection string](#choosing-the-right-supabase-connection-string) for details.
 
 | Variable             | Required | Description                                                     |
 | -------------------- | -------- | --------------------------------------------------------------- |
@@ -648,6 +662,12 @@ When contributing to this project:
 - Verify `.env` file has correct database credentials
 - Ensure PostgreSQL is running
 - Check database exists: `psql -l`
+
+**"Network is unreachable" / connection timeout on Hetzner or Docker**
+
+Supabase's direct database host (`db.<ref>.supabase.co`) resolves to an IPv6 address. Hetzner Cloud servers and Docker environments do not have IPv6 enabled by default, so connections fail silently.
+
+Switch to the **Session Pooler** connection string (port `5432` on `pooler.supabase.com`) — see [Choosing the right Supabase connection string](#choosing-the-right-supabase-connection-string) above. Do **not** use port `6543` (Transaction Pooler); it breaks Alembic migrations and asyncpg.
 
 **Redis Connection Errors**
 
