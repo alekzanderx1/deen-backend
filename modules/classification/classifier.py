@@ -1,9 +1,6 @@
-from openai import OpenAI
 from modules.context import context
 from core import chat_models
 from core import prompt_templates
-
-from core.config import OPENAI_API_KEY
 
 def classify_fiqh_query(query: str, session_id: str = None) -> bool:
     """

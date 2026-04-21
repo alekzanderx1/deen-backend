@@ -1,238 +1,348 @@
-# Technology Stack — Fiqh Agentic RAG (FAIR-RAG Pipeline)
+# Stack Research: v1.2 Claude + Voyage AI Migration
 
-**Project:** Deen Backend — Fiqh Q&A Milestone
-**Researched:** 2026-03-23
-**Scope:** New libraries/components required. Does not re-document the existing stack (see `.planning/codebase/STACK.md`).
-
----
-
-## What This File Covers
-
-The existing stack (FastAPI 0.115.8, LangGraph 0.2.64, Pinecone 7.3.0, Redis 6.4.0, PostgreSQL, OpenAI) is already in place. This document covers **only the incremental stack needed for the fiqh pipeline** — i.e., the libraries and patterns that are new, upgraded, or configured differently for FAIR-RAG.
+**Project:** Deen Backend v1.2 — Claude + Voyage AI Migration
+**Researched:** 2026-04-09
+**Scope:** Replace OpenAI LLM + embeddings with Anthropic Claude (LLM) + Voyage AI (embeddings)
 
 ---
 
-## Incremental Stack — New Libraries Required
+## Packages to Add
 
-### PDF Parsing
+### 1. `langchain-anthropic==0.3.22`
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `pymupdf4llm` | `0.0.17` | Extract structured Markdown from "Islamic Laws" PDF | Converts Sistani's PDF into clean Markdown with preserved heading hierarchy and paragraph boundaries — critical for chapter/section metadata extraction during chunking. PyMuPDF is the fastest PDF renderer in Python (C-based), and `pymupdf4llm` adds LLM-optimized output. Produces better structure than `pdfplumber` (which is row/table-oriented) or `pypdf` (which loses formatting). |
+**Why:** Provides `ChatAnthropic`, the LangChain-native wrapper for Claude models. This is the drop-in replacement for `langchain-openai`'s `ChatOpenAI` within the existing LangChain/LangGraph stack.
 
-**Why not `pdfplumber`:** Optimized for tabular data extraction; produces noisy output for running prose text like legal rulings.
+**Compatibility with existing stack:** `langchain-anthropic 0.3.22` requires `langchain-core>=0.3.31,<0.4.0`. The installed `langchain-core==0.3.74` satisfies this range. No LangChain version upgrades required.
 
-**Why not `pypdf`:** Extracts raw text with no layout awareness; paragraph boundaries are lost, which breaks the chunking strategy.
+**Key capabilities confirmed:**
+- `init_chat_model()` works with Anthropic. Pass `model_provider="anthropic"` or prefix the model string with `"anthropic:"`. The `anthropic_api_key` parameter replaces `openai_api_key`.
+- `.bind_tools()` is supported. `ChatAnthropic.bind_tools()` accepts the same LangChain tool list format used in `ChatAgent._create_llm_with_tools()`. Tool calling uses Anthropic's `tool_use` content block protocol internally; LangChain abstracts this — the agent graph code is unchanged.
+- `.stream()` and `.astream()` are supported. The existing `chain.stream()` call in `pipeline_langgraph.py` and `agent.astream()` in the LangGraph graph work without modification.
 
-**Why not `docling`:** IBM's Docling is comprehensive but adds heavy ML dependencies (vision models for PDF layout detection) that are overkill for a clean, single-column English PDF like "Islamic Laws." PyMuPDF handles this PDF class with zero ML overhead.
+**Dependency pulled in:** `anthropic>=0.52.0,<1.0.0` (see below).
 
-**Confidence:** MEDIUM. PyMuPDF and pymupdf4llm are well-established as of August 2025. Version 0.0.17 was current at knowledge cutoff — verify latest on PyPI before pinning.
-
----
-
-### Chunking
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `langchain-text-splitters` | `0.3.9` (already installed) | `RecursiveCharacterTextSplitter` for paragraph-boundary-aware chunking | Already in requirements. Splits on `\n\n` first (paragraph), then `\n` (line), then space — exactly matching the FARSIQA chunking strategy. Target: 300–400 tokens (~1,400–1,600 characters with `chunk_size=1500`, `chunk_overlap=150`). |
-
-**Chunk size rationale from FARSIQA research:** The paper used 378 tokens based on their embedding model architecture. With `all-mpnet-base-v2` (512 token max) and `text-embedding-3-small` (8191 token max), staying at 300–400 tokens preserves full semantic context per chunk without hitting context limits.
-
-**No new library needed.** `langchain-text-splitters` is already pinned and its `RecursiveCharacterTextSplitter` covers this use case completely.
+**Source:** [langchain-anthropic PyPI](https://pypi.org/project/langchain-anthropic/), [LangChain ChatAnthropic reference](https://python.langchain.com/api_reference/anthropic/chat_models/langchain_anthropic.chat_models.ChatAnthropic.html)
 
 ---
 
-### Embedding for Fiqh Index
+### 2. `anthropic==0.87.0`
 
-The existing pipeline uses `sentence-transformers/all-mpnet-base-v2` (via `langchain-huggingface==0.1.2`) for dense embeddings and `TfidfVectorizer` (via `scikit-learn`) for sparse embeddings. **Both can be reused for the fiqh index without modification.**
+**Why:** The official Anthropic Python SDK. `langchain-anthropic` declares `anthropic>=0.52.0,<1.0.0` as a dependency, so it will be pulled in transitively — but pin it explicitly in `requirements.txt` to control the version used in production and Docker builds.
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `sentence-transformers/all-mpnet-base-v2` | loaded via `sentence-transformers==3.4.1` (already installed) | Dense embeddings for fiqh chunks | The existing dense model is already loaded at startup. Reusing it avoids cold-start overhead of a second model. `all-mpnet-base-v2` scores well on semantic similarity benchmarks (BEIR) across domain-general legal/religious text. English-only corpus means no multilingual model is needed. |
-| `TfidfVectorizer` (scikit-learn) | `scikit-learn==1.6.1` (already installed) | Sparse embeddings for fiqh chunks | The existing sparse mechanism works for BM25-style keyword matching. Fiqh-specific Arabic terms (`wudu`, `najasah`, `tayammum`) will appear as high-IDF tokens automatically. However, see note below on TF-IDF vs BM25. |
+`0.87.0` is the latest stable release (April 8, 2026). It is within `langchain-anthropic 0.3.22`'s declared range.
 
-**Important caveat on sparse embeddings:** The existing TF-IDF approach works but requires `fit_transform` on a fixed corpus (the vectorizer must be fitted first). For a static ingestion pipeline (single book, one-time ingest), this is acceptable. At query time, `transform` must be called with the same fitted vectorizer — which means the fitted vectorizer must be persisted (pickled) after ingest and loaded at query time. **This is the same pattern needed for the hadith index; verify the existing pipeline handles vectorizer persistence before ingest.**
+**Note:** The direct `from anthropic import Anthropic` import is not needed by this codebase — all LLM calls go through LangChain's abstraction layer. The SDK is a transitive dependency only. Pin it to prevent unexpected upgrades.
 
-**Alternative considered — Pinecone's native BM25:** Pinecone offers a hosted `BM25Encoder` (via `pinecone-text`) that eliminates vectorizer persistence concerns. However, the existing codebase uses Pinecone sparse indexes with TF-IDF vectors already. Changing to `BM25Encoder` would require migrating existing indexes or maintaining two different sparse strategies in one codebase. **Defer this optimization** — TF-IDF is sufficient for the bounded fiqh corpus.
-
-**No new embedding library needed.**
+**Source:** [anthropic PyPI](https://pypi.org/project/anthropic/)
 
 ---
 
-### Hybrid Retrieval with RRF
+### 3. `voyageai==0.3.7`
 
-The existing `reranker.py` implements a **weighted score merge** (not RRF). For the fiqh pipeline, the FAIR-RAG and FARSIQA papers use **Reciprocal Rank Fusion (RRF)** with `k=60`. RRF is parameterless and rank-based, making it more robust than weighted score fusion for cross-modal merging.
+**Why:** The official Voyage AI Python SDK. Used to replace the `openai.OpenAI` client in `EmbeddingService` for generating dense embeddings. There is no LangChain wrapper required — the `voyageai` SDK is used directly, just as `openai.OpenAI` was used directly.
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| Custom RRF implementation | N/A (pure Python, ~20 lines) | Merge dense + sparse results by rank for fiqh retrieval | RRF is a standard formula: `score(d) = Σ 1/(k + rank_i(d))` with `k=60`. No library is needed — `langchain`'s `EnsembleRetriever` wraps RRF but adds unnecessary abstraction layers over the direct Pinecone calls. A standalone function is cleaner, testable in isolation, and consistent with the project's existing module pattern. |
+`0.3.7` is the latest stable release (December 2025 / early 2026).
 
-**Why not `langchain.retrievers.EnsembleRetriever`:** It wraps two `BaseRetriever` instances and applies RRF internally, but it requires adapting both dense and sparse Pinecone calls into LangChain retriever interfaces. The existing retriever code calls Pinecone directly; a custom RRF function avoids that refactor. The math is 20 lines — write it directly.
+**Client initialization:**
+```python
+import voyageai
+vo = voyageai.Client(api_key=VOYAGE_API_KEY)  # sync
+# or
+vo = voyageai.AsyncClient(api_key=VOYAGE_API_KEY)  # async
+```
 
-**Why not the existing weighted merge:** Weighted score merge is sensitive to score normalization and score distribution differences between dense cosine similarity scores and sparse BM25 scores. RRF is rank-based and eliminates this problem.
+**Embed method — sync:**
+```python
+result = vo.embed(
+    texts,                      # List[str]
+    model="voyage-4",           # model name
+    input_type="document",      # "document" | "query" | None
+    output_dimension=1024,      # optional; 1024 is the default for voyage-4
+)
+embeddings = result.embeddings  # List[List[float]]
+```
 
----
+**Embed method — async:**
+```python
+result = await vo.aembed(
+    texts,
+    model="voyage-4",
+    input_type="document",
+)
+embeddings = result.embeddings
+```
 
-### LangGraph Sub-Graph (FAIR-RAG Loop)
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `langgraph==0.2.64` (already installed) | existing | FAIR-RAG iterative loop as a LangGraph sub-graph | The existing `ChatAgent` is built on LangGraph's `StateGraph`. LangGraph supports composable sub-graphs — the FAIR-RAG loop (decompose → retrieve → filter → assess → refine → repeat) maps cleanly to a `StateGraph` with a conditional loop back edge. The main agent routes fiqh queries to this sub-graph at the `fiqh_classification` node, replacing the existing early-exit with a sub-graph invocation. |
-
-**Sub-graph integration pattern:** The main graph's `fiqh_classification` node currently exits early with a canned response. The replacement: on `is_fiqh=True`, invoke the fiqh sub-graph as a compiled graph call (LangGraph supports this via `graph.invoke()` returning state). The sub-graph manages its own iteration counter (max 3), SEA verdicts, and accumulated evidence before returning a structured result to the main graph's `generate_response` node.
-
-**No new library needed.** LangGraph 0.2.64 supports sub-graphs. Verify that `StateGraph.compile()` with nested graph invocations is stable in this version — it was in active development as of late 2024.
-
-**Confidence:** MEDIUM. Sub-graph composition in LangGraph was stabilized in 0.2.x but the exact API surface (`.invoke()` vs `.stream()` for nested graphs) should be verified against LangGraph 0.2.64 release notes before implementation.
-
----
-
-### Dynamic LLM Routing
-
-No new library. This is a configuration pattern using existing `langchain-openai` and OpenAI models.
-
-| Task | Model | Rationale |
-|------|-------|-----------|
-| Query validation/routing | `gpt-4o-mini` (`SMALL_LLM`) | Simple classification — 3-way category (valid/out-of-scope/unethical). Cheap. |
-| Query decomposition | `gpt-4o-mini` (`SMALL_LLM`) | Pattern-based decomposition into sub-queries. Small model handles this well per FARSIQA ablation. |
-| Structured Evidence Assessment (SEA) | `gpt-4o-mini` (`SMALL_LLM`) | Checklist-based gap analysis with a structured output format. Small model with structured JSON output is sufficient. |
-| Evidence filtering | `gpt-4.1` (`LARGE_LLM`) | Subtle relevance judgments between fiqh topics require stronger reasoning to avoid over-filtering. |
-| Query refinement | `gpt-4.1` (`LARGE_LLM`) | Precision task — bad refinement queries waste iterations. Large model's instruction-following is critical here. |
-| Faithful answer generation | `gpt-4.1` (`LARGE_LLM`) | Highest-stakes step. Evidence-only grounding with citations. Large model's lower hallucination rate is essential for religious legal content. |
-
-**Cost rationale from FARSIQA Table 6:** Dynamic allocation is 13% cheaper than static large-model usage while achieving 97% negative rejection vs 94%. The incremental cost of using the large model for filtering/refinement/generation is justified by the gain in faithfulness and refusal accuracy.
-
-**env vars:** Reuse existing `LARGE_LLM=gpt-4.1-2025-04-14` and `SMALL_LLM=gpt-4o-mini-2024-07-18`. No new env vars needed for model routing.
+**Source:** [voyageai PyPI](https://pypi.org/project/voyageai/), [Voyage AI embeddings docs](https://docs.voyageai.com/docs/embeddings), [voyageai-python GitHub](https://github.com/voyage-ai/voyageai-python)
 
 ---
 
-### Pinecone Index Configuration (Fiqh-Specific)
+## Packages to Remove
 
-No new SDK needed. Two new Pinecone indexes must be created (separate from existing hadith/Quran indexes):
+### 1. `langchain-openai==0.3.25` — REMOVE
 
-| Index | Type | Dimensions | Metric | Namespace |
-|-------|------|-----------|--------|-----------|
-| `FIQH_DENSE_INDEX_NAME` | Dense | 768 (all-mpnet-base-v2 output) | cosine | `ns1` |
-| `FIQH_SPARSE_INDEX_NAME` | Sparse | N/A (TF-IDF vocabulary size) | dotproduct | `ns1` |
+**Why:** All LLM calls will use `langchain-anthropic`. `langchain-openai` provides `ChatOpenAI` and `OpenAIEmbeddings`. Neither is used after migration. Removing it eliminates the transitive `openai` SDK dependency and prevents any accidental fallback to OpenAI models.
 
-**Chunk metadata schema per Pinecone record:**
+**Risk if kept:** Dead code in `requirements.txt`; `openai` SDK still installed; bloat. No functional risk since nothing will call it, but keeping it muddies the intent.
+
+---
+
+### 2. `openai==1.91.0` — REMOVE
+
+**Why:** The `openai` SDK is used in 3 places via `from openai import OpenAI`:
+- `services/embedding_service.py` — `OpenAI(api_key=OPENAI_API_KEY)` for generating embeddings
+- `modules/generation/stream_generator.py` — `OpenAI(api_key=OPENAI_API_KEY)` (legacy pipeline, kept for `POST /chat/` non-agentic path)
+- `modules/classification/classifier.py` — `from openai import OpenAI` import (unused in actual code — `chat_models.get_classifier_model()` is used instead; dead import)
+
+After migration, `embedding_service.py` uses `voyageai.Client` instead. `stream_generator.py` and `classifier.py` dead imports are cleaned up. With no remaining `openai` usage, remove the package.
+
+**Dependency chain:** Removing `openai` also removes `tiktoken==0.9.0` if it is only depended on by `openai`. Check whether `tiktoken` is used elsewhere before removing it.
+
+---
+
+### 3. `tiktoken==0.9.0` — REMOVE (conditional)
+
+**Why:** `tiktoken` is an OpenAI tokenizer library. It is listed in `requirements.txt` but is not referenced in any application code (`grep` shows no direct `import tiktoken` in the codebase). It appears to be a transitive dependency pulled in by `langchain-openai` or `openai`. Once those are removed, `tiktoken` can be removed too.
+
+**Confirm before removing:** Run `grep -r "import tiktoken"` in the codebase to verify there are no direct uses.
+
+---
+
+## Compatibility Notes
+
+### LangChain version: no upgrade needed
+
+The existing `langchain==0.3.27` + `langchain-core==0.3.74` stack is fully compatible with `langchain-anthropic==0.3.22`. Both packages track the same `0.3.x` release series. No LangChain version bump required.
+
+**Warning about LangChain 1.0:** LangChain 1.0 was released in November 2025 (currently at ~1.2.x). The 1.x ecosystem uses `langchain-anthropic 1.x` (latest 1.3.4), which requires `langchain-core 1.x`. Do NOT upgrade to `langchain-anthropic 1.x` — it would force a full LangChain stack upgrade and is out of scope for this milestone.
+
+### `init_chat_model` provider switching
+
+The current `core/chat_models.py` calls `init_chat_model(model=LARGE_LLM, openai_api_key=OPENAI_API_KEY)`. After migration:
 
 ```python
-{
-    "chunk_id": "sistani-laws-ch03-p047",   # stable ID for citations
-    "text": "...",                            # decompressed chunk text
-    "source_book": "Islamic Laws 4th Ed",
-    "chapter": "Chapter 3: Najasaat",
-    "section": "Types of Najis Things",
-    "page_number": 47,                        # PDF page number
-    "token_count": 312
-}
+# Before
+from langchain.chat_models import init_chat_model
+from core.config import OPENAI_API_KEY, LARGE_LLM
+
+chat_model = init_chat_model(
+    model=LARGE_LLM,
+    openai_api_key=OPENAI_API_KEY
+)
+
+# After
+from langchain.chat_models import init_chat_model
+from core.config import CLAUDE_API_KEY, LARGE_LLM
+
+chat_model = init_chat_model(
+    model=LARGE_LLM,           # e.g. "claude-sonnet-4-6"
+    model_provider="anthropic",
+    anthropic_api_key=CLAUDE_API_KEY
+)
 ```
 
-**New env vars needed:**
+The `model_provider="anthropic"` parameter is required when the model string does not include the `"anthropic:"` prefix. Alternatively, set `LARGE_LLM="anthropic:claude-sonnet-4-6"` in the `.env` and the provider is inferred automatically.
+
+### `.bind_tools()` in `ChatAgent`
+
+`agents/core/chat_agent.py` calls `init_chat_model(...).bind_tools(self.tools)`. `ChatAnthropic.bind_tools()` accepts the same `@tool`-decorated LangChain tool list format. The tool-use protocol differs internally (Anthropic uses `tool_use` content blocks vs OpenAI's `function_calling`), but LangChain normalizes this — `ToolNode` and the LangGraph graph are unaffected. No changes to `agents/tools/` or `agents/core/chat_agent.py` beyond the `init_chat_model` call are required.
+
+**Known issue to watch:** A GitHub issue (#34406) reported empty `AIMessage` when using `astream()` with Anthropic tool calling in certain edge cases. This is in a narrow code path (streaming + tool invocation in the same turn). Monitor for this; the fix is to use `.invoke()` in those specific paths if streaming tool-call chunks are empty.
+
+### Voyage AI model and embedding dimensions
+
+**voyage-4** default output dimensions: **1024**. This is a breaking change from `text-embedding-3-small` which uses 1536 dimensions.
+
+This affects two SQLAlchemy models in `db/models/embeddings.py`:
+```python
+# Before
+EMBEDDING_DIMENSIONS = 1536
+
+# After
+EMBEDDING_DIMENSIONS = 1024
 ```
-FIQH_DENSE_INDEX_NAME
-FIQH_SPARSE_INDEX_NAME
+
+Both `NoteEmbedding.embedding` (`Vector(1536)`) and `LessonChunkEmbedding.embedding` (`Vector(1536)`) pgvector columns must be resized to `Vector(1024)`. This requires an Alembic migration (ALTER COLUMN with `USING` cast). All existing embeddings in `note_embeddings` and `lesson_chunk_embeddings` tables will be incompatible and must be regenerated after migration.
+
+**voyage-4 dimension options:** 256, 512, 1024 (default), 2048. Use 1024 (the default) — it provides the best balance between storage and retrieval quality without requiring `output_dimension` to be specified explicitly.
+
+**voyage-4 context length:** 320K tokens (vs 8,191 for `text-embedding-3-small`). This means the existing chunking logic in `EmbeddingService` is more than adequate; no chunk size changes are needed.
+
+### `input_type` parameter
+
+When generating embeddings for stored documents (lesson chunks, notes): use `input_type="document"`.
+When generating embeddings for query lookup: use `input_type="query"`.
+
+The current `EmbeddingService.generate_embedding()` does not distinguish between document and query embeddings — it uses a single method for all purposes. After migration, the query path in similarity search should use `input_type="query"` for best retrieval performance. This is an optimization, not a correctness requirement.
+
+### `OPENAI_API_KEY` guard in `core/config.py`
+
+Line 44 of `core/config.py`:
+```python
+if not OPENAI_API_KEY or not PINECONE_API_KEY:
+    raise ValueError("Missing API keys! Ensure they are set in the .env file.")
+```
+
+This guard must be updated to check `CLAUDE_API_KEY` and `VOYAGE_API_KEY` instead. Otherwise the server will fail to start without `OPENAI_API_KEY` even after migration.
+
+### Pinecone dense vectors (no change needed)
+
+The Pinecone dense indexes (deen-fiqh-dense, deen-dense, quran-dense) use embeddings generated by `sentence-transformers/all-mpnet-base-v2` (768 dims) via `langchain-huggingface`, NOT by OpenAI `text-embedding-3-small`. The `embedder.py` in `modules/embedding/` uses `HuggingFaceEmbeddings` for Pinecone retrieval. This path is unaffected by the Voyage AI migration.
+
+**Only the pgvector tables (`note_embeddings`, `lesson_chunk_embeddings`) use OpenAI embeddings.** These are the only tables requiring the embedding model swap and column resize.
+
+---
+
+## SDK Usage Examples
+
+### LLM Initialization (replaces `core/chat_models.py`)
+
+```python
+from langchain.chat_models import init_chat_model
+from core.config import CLAUDE_API_KEY, LARGE_LLM, SMALL_LLM
+
+def get_generator_model():
+    return init_chat_model(
+        model=LARGE_LLM,           # "claude-sonnet-4-6"
+        model_provider="anthropic",
+        anthropic_api_key=CLAUDE_API_KEY,
+    )
+
+def get_enhancer_model():
+    return init_chat_model(
+        model=SMALL_LLM,           # "claude-haiku-4-5-20251001"
+        model_provider="anthropic",
+        anthropic_api_key=CLAUDE_API_KEY,
+    )
+
+def get_translator_model():
+    base = init_chat_model(
+        model=LARGE_LLM,
+        model_provider="anthropic",
+        anthropic_api_key=CLAUDE_API_KEY,
+    )
+    return base.bind(temperature=0)
+```
+
+### ChatAgent LLM with tools (replaces `agents/core/chat_agent.py` `_create_llm_with_tools`)
+
+```python
+from langchain.chat_models import init_chat_model
+from core.config import CLAUDE_API_KEY
+
+llm = init_chat_model(
+    model=self.config.model.agent_model,  # "claude-sonnet-4-6"
+    model_provider="anthropic",
+    anthropic_api_key=CLAUDE_API_KEY,
+    temperature=self.config.model.temperature,
+    max_tokens=self.config.model.max_tokens,
+)
+return llm.bind_tools(self.tools)
+```
+
+### Embedding generation (replaces `services/embedding_service.py`)
+
+```python
+import voyageai
+from core.config import VOYAGE_API_KEY, EMBEDDING_MODEL, EMBEDDING_DIMENSIONS
+
+class EmbeddingService:
+    def __init__(self, db: Session):
+        self.db = db
+        self.client = voyageai.Client(api_key=VOYAGE_API_KEY)
+
+    def generate_embedding(self, text: str) -> List[float]:
+        result = self.client.embed(
+            [text],
+            model=EMBEDDING_MODEL,        # "voyage-4"
+            input_type="document",
+        )
+        return result.embeddings[0]
+
+    def generate_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
+        if not texts:
+            return []
+        result = self.client.embed(
+            texts,
+            model=EMBEDDING_MODEL,
+            input_type="document",
+        )
+        return result.embeddings
+```
+
+### Environment variable additions to `core/config.py`
+
+```python
+CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
+VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "voyage-4")       # was "text-embedding-3-small"
+EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "1024"))  # was 1536
+
+if not CLAUDE_API_KEY or not VOYAGE_API_KEY or not PINECONE_API_KEY:
+    raise ValueError("Missing API keys! Set CLAUDE_API_KEY, VOYAGE_API_KEY, PINECONE_API_KEY.")
 ```
 
 ---
 
-### Citation and Reference Formatting
+## New `.env` Variables Required
 
-No new library. The inline citation pattern `[n]` with a trailing references list is implemented via prompt engineering in the generation step. The `chunk_id` metadata field in each Pinecone record serves as the stable citation anchor.
+| Variable | Example Value | Replaces |
+|----------|---------------|---------|
+| `CLAUDE_API_KEY` | `sk-ant-...` | `OPENAI_API_KEY` |
+| `VOYAGE_API_KEY` | `pa-...` | (was embedded in OpenAI SDK usage) |
+| `LARGE_LLM` | `claude-sonnet-4-6` | `gpt-4.1-2025-04-14` |
+| `SMALL_LLM` | `claude-haiku-4-5-20251001` | `gpt-4o-mini-2024-07-18` |
+| `EMBEDDING_MODEL` | `voyage-4` | `text-embedding-3-small` |
+| `EMBEDDING_DIMENSIONS` | `1024` | `1536` |
 
----
-
-### Ingestion Pipeline (One-Time Script)
-
-The data ingestion (PDF → chunks → embeddings → Pinecone upload) is a one-time offline script, not part of the live API. Required components:
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `pymupdf4llm` | `0.0.17` | PDF → structured Markdown | See PDF Parsing section above |
-| `langchain-text-splitters` | `0.3.9` (already installed) | Markdown-aware chunking | `MarkdownHeaderTextSplitter` to split on `#` headings first, then `RecursiveCharacterTextSplitter` for token-length control |
-| `tiktoken` | `0.9.0` (already installed) | Token counting to enforce 300–400 token budget | Already installed |
-| `tqdm` | `4.67.1` (already installed) | Progress bars for batch embedding/upload | Already installed |
-
-**Ingestion sequence:**
-1. `pymupdf4llm.to_markdown()` → Markdown string with heading hierarchy
-2. `MarkdownHeaderTextSplitter` on `#`, `##`, `###` → sections with chapter/section metadata
-3. `RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=150)` → final chunks at ~300–400 tokens
-4. For each chunk: generate dense embedding (all-mpnet-base-v2) + sparse embedding (TF-IDF, fitted on all chunks first)
-5. Upload to Pinecone (batched, 100 records/batch)
-6. Persist fitted TF-IDF vectorizer to disk (pickle) for query-time use
+**Remove from `.env`:** `OPENAI_API_KEY`
 
 ---
 
-## Summary: What's New vs What's Reused
+## Files Requiring Changes
 
-| Component | New? | Library | Notes |
-|-----------|------|---------|-------|
-| PDF parsing | NEW | `pymupdf4llm==0.0.17` | Only new pip dependency |
-| Chunking | Reuse | `langchain-text-splitters==0.3.9` | Already installed |
-| Dense embedding | Reuse | `all-mpnet-base-v2` via `sentence-transformers==3.4.1` | Same model, new index |
-| Sparse embedding | Reuse | `TfidfVectorizer` via `scikit-learn==1.6.1` | Vectorizer must be persisted |
-| Hybrid RRF | New pattern | Pure Python (~20 lines) | Replace weighted merge for fiqh only |
-| FAIR-RAG loop | New graph | `langgraph==0.2.64` | Sub-graph composition |
-| Dynamic LLM routing | New pattern | `langchain-openai==0.3.25` | Config change, no new lib |
-| Pinecone indexes | New indexes | `pinecone==7.3.0` | 2 new indexes, existing SDK |
-| Citation formatting | New prompt | N/A | Prompt engineering only |
-
-**Net new pip dependency: 1** (`pymupdf4llm`)
-
----
-
-## Installation
-
-```bash
-# Only one new package
-pip install pymupdf4llm==0.0.17
-```
-
-Add to `requirements.txt`:
-```
-pymupdf4llm==0.0.17
-```
+| File | Change Required |
+|------|----------------|
+| `requirements.txt` | Add `langchain-anthropic==0.3.22`, `anthropic==0.87.0`, `voyageai==0.3.7`; remove `langchain-openai==0.3.25`, `openai==1.91.0`, `tiktoken==0.9.0` |
+| `core/config.py` | Replace `OPENAI_API_KEY` with `CLAUDE_API_KEY` + `VOYAGE_API_KEY`; update startup guard; update `EMBEDDING_MODEL` default to `"voyage-4"` and `EMBEDDING_DIMENSIONS` default to `1024` |
+| `core/chat_models.py` | Replace `openai_api_key=OPENAI_API_KEY` with `model_provider="anthropic", anthropic_api_key=CLAUDE_API_KEY` in all 4 model factory functions |
+| `agents/core/chat_agent.py` | Replace `openai_api_key=OPENAI_API_KEY` with `model_provider="anthropic", anthropic_api_key=CLAUDE_API_KEY` in `_create_llm_with_tools()` |
+| `services/embedding_service.py` | Replace `from openai import OpenAI` + `OpenAI(api_key=...)` with `import voyageai` + `voyageai.Client(api_key=VOYAGE_API_KEY)` |
+| `modules/classification/classifier.py` | Remove dead `from openai import OpenAI` and `from core.config import OPENAI_API_KEY` imports |
+| `modules/generation/stream_generator.py` | Remove `from openai import OpenAI` + `OpenAI(api_key=OPENAI_API_KEY)` globals (legacy pipeline; assess whether this module still needs updating) |
+| `modules/generation/generator.py` | Remove `from core.config import OPENAI_API_KEY` dead import |
+| `modules/enhancement/enhancer.py` | Remove `from core.config import OPENAI_API_KEY` dead import |
+| `db/models/embeddings.py` | Change `EMBEDDING_DIMENSIONS = 1536` to `EMBEDDING_DIMENSIONS = 1024` |
+| `alembic/versions/` | New migration: resize `note_embeddings.embedding` and `lesson_chunk_embeddings.embedding` from `vector(1536)` to `vector(1024)` |
 
 ---
 
-## Alternatives Considered
+## What Does NOT Change
 
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| PDF parsing | `pymupdf4llm` | `docling` | Adds vision ML models (heavy); overkill for single-column clean PDF |
-| PDF parsing | `pymupdf4llm` | `pdfplumber` | Table-optimized; loses paragraph boundaries in prose text |
-| PDF parsing | `pymupdf4llm` | `pypdf` | No layout awareness; paragraph structure lost |
-| Sparse retrieval | TF-IDF (existing) | Pinecone BM25Encoder | Would require migrating existing sparse indexes; not worth inconsistency |
-| RRF fusion | Custom Python | `EnsembleRetriever` | Forces refactor of Pinecone calls into LangChain retriever interface; 20-line formula doesn't need abstraction |
-| Embedding model | `all-mpnet-base-v2` (existing) | `text-embedding-3-small` (OpenAI) | OpenAI embeddings add per-token cost for every ingestion and query; existing local model is free at inference time |
-| Embedding model | `all-mpnet-base-v2` (existing) | `intfloat/multilingual-e5-large` | English-only corpus; multilingual overhead is unnecessary |
-| FAIR-RAG loop | LangGraph sub-graph | Separate FastAPI endpoint | Breaks the single agentic graph model; harder to maintain state across the pipeline |
-
----
-
-## Confidence Assessment
-
-| Area | Confidence | Notes |
-|------|------------|-------|
-| PDF parsing library choice | MEDIUM | `pymupdf4llm` is well-established but version should be verified on PyPI at implementation time |
-| Chunking strategy (300–400 tokens) | HIGH | Directly from FARSIQA paper's empirical results; validated against the same book type |
-| Reusing existing embedding model | HIGH | `all-mpnet-base-v2` is domain-general and handles English religious text; no research gap |
-| RRF over weighted merge | HIGH | Standard algorithm from IR literature; FAIR-RAG and FARSIQA both validate it for this pipeline type |
-| LangGraph sub-graph composition | MEDIUM | Sub-graphs were stabilized in 0.2.x but implementation details need verification against the exact version in use (0.2.64) |
-| Dynamic LLM allocation | HIGH | Directly from FARSIQA Table 6 empirical results; cost/quality tradeoffs are well-characterized |
-| TF-IDF vectorizer persistence requirement | HIGH | This is a known constraint of TF-IDF in batch ingestion; must be addressed in the ingestion design |
+| Component | Reason |
+|-----------|--------|
+| `langchain-huggingface==0.1.2` | Pinecone dense embedding uses `HuggingFaceEmbeddings` (all-mpnet-base-v2, 768 dims) — unaffected |
+| `langchain-pinecone==0.2.8` | Pinecone vector store integration unchanged |
+| `langchain==0.3.27` | No version change needed; compatible with `langchain-anthropic 0.3.x` |
+| `langchain-core==0.3.74` | Within the `>=0.3.31,<0.4.0` range required by `langchain-anthropic 0.3.22` |
+| `langgraph==0.2.64` | LangGraph graph structure, nodes, tools, routing — unchanged |
+| `sentence-transformers==3.4.1` | Used for Pinecone sparse/dense embeddings — unaffected |
+| `torch==2.6.0` | Required by sentence-transformers — unaffected |
+| `pgvector==0.3.6` | SQLAlchemy pgvector extension — unchanged, only column dimension changes |
+| Redis, Pinecone, PostgreSQL, Alembic | Infrastructure unchanged |
+| All API endpoints and SSE protocol | Zero behavioral changes from the frontend's perspective |
 
 ---
 
 ## Sources
 
-- FAIR_RAG_Fiqh_Implementation_Guide.md — internal synthesis of FAIR-RAG and FARSIQA papers
-- `.planning/codebase/STACK.md` — existing stack audit (2026-03-22)
-- `requirements.txt` — pinned versions of all installed packages
-- `modules/embedding/embedder.py` — confirmed `all-mpnet-base-v2` and TF-IDF usage
-- `modules/reranking/reranker.py` — confirmed weighted score merge (not RRF) in existing pipeline
-- `agents/core/chat_agent.py` — confirmed LangGraph 0.2.64 StateGraph pattern and fiqh early-exit node
-- PyMuPDF documentation: https://pymupdf.readthedocs.io/en/latest/ (HIGH confidence for library capabilities; version pinning needs current PyPI check)
-- FARSIQA paper (Section 4, Table 6) — dynamic LLM allocation cost/quality data
-- RRF algorithm: Cormack et al. 2009 — standard IR result, no version concerns
+- [langchain-anthropic PyPI](https://pypi.org/project/langchain-anthropic/) — version 0.3.22 exists; dependency range `langchain-core>=0.3.31,<0.4.0` (MEDIUM confidence — search result excerpt, not direct page read)
+- [LangChain ChatAnthropic reference](https://python.langchain.com/api_reference/anthropic/chat_models/langchain_anthropic.chat_models.ChatAnthropic.html) — `bind_tools()` documented; streaming via Runnable interface (HIGH confidence — official docs)
+- [LangChain init_chat_model reference](https://reference.langchain.com/python/langchain/chat_models/base/init_chat_model) — `model_provider="anthropic"` parameter (HIGH confidence — official docs)
+- [anthropic PyPI](https://pypi.org/project/anthropic/) — latest version 0.87.0, April 2026 (MEDIUM confidence — search result)
+- [voyageai PyPI](https://pypi.org/project/voyageai/) — version 0.3.7 (MEDIUM confidence — search result)
+- [Voyage AI embeddings docs](https://docs.voyageai.com/docs/embeddings) — `vo.embed(texts, model, input_type)` method signature; `result.embeddings` accessor (HIGH confidence — official docs)
+- [Voyage AI blog: voyage-4 family](https://blog.voyageai.com/2026/01/15/voyage-4/) — voyage-4 default 1024 dims, 320K token context (HIGH confidence — official blog)
+- [Voyage AI flexible dimensions](https://docs.voyageai.com/docs/flexible-dimensions-and-quantization) — supported dimension values: 256, 512, 1024, 2048 (HIGH confidence — official docs)
+- [voyageai-python GitHub](https://github.com/voyage-ai/voyageai-python) — `AsyncClient.aembed()` method available (MEDIUM confidence — GitHub repo)
+- [langchain-ai/langchain #34406](https://github.com/langchain-ai/langchain/issues/34406) — empty AIMessage with astream + Anthropic tool calling edge case (MEDIUM confidence — GitHub issue)
+- Codebase read: `services/embedding_service.py`, `core/chat_models.py`, `agents/core/chat_agent.py`, `db/models/embeddings.py`, `core/config.py`, `modules/generation/generator.py`, `modules/classification/classifier.py` — confirmed all OpenAI import sites and embedding dimension usage (HIGH confidence — direct source read)

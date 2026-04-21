@@ -1,7 +1,7 @@
 """
 Embedding service for generating, storing, and retrieving embeddings.
 
-Uses OpenAI text-embedding-3-small (1536 dimensions) for generating embeddings
+Uses HuggingFace all-mpnet-base-v2 (768 dimensions) for generating embeddings
 and pgvector for storage and similarity search.
 
 Lesson embeddings are stored per lesson_content row (each row is a natural chunk
@@ -13,14 +13,11 @@ from datetime import datetime, timezone
 import hashlib
 import logging
 
-from openai import OpenAI
+from modules.embedding.embedder import getDenseEmbedder
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from core.config import (
-    OPENAI_API_KEY,
-    EMBEDDING_MODEL,
-    EMBEDDING_DIMENSIONS,
     NOTE_FILTER_THRESHOLD,
 )
 from db.models.embeddings import NoteEmbedding, LessonChunkEmbedding
@@ -34,7 +31,7 @@ class EmbeddingService:
     Service for managing embeddings for notes and lesson chunks.
 
     Responsibilities:
-    - Generate embeddings using OpenAI API
+    - Generate embeddings using HuggingFace all-mpnet-base-v2 via getDenseEmbedder
     - Store embeddings for each lesson_content row (natural chunks)
     - Store single embeddings for user notes
     - Find similar notes by comparing against all lesson content embeddings
@@ -43,35 +40,25 @@ class EmbeddingService:
 
     def __init__(self, db: Session):
         self.db = db
-        self.client = OpenAI(api_key=OPENAI_API_KEY)
+        self.embedder = getDenseEmbedder()
 
     # ================== EMBEDDING GENERATION ==================
 
     def generate_embedding(self, text: str) -> List[float]:
-        """Generate embedding for a single text using OpenAI API."""
+        """Generate embedding for a single text using HuggingFace all-mpnet-base-v2."""
         try:
-            response = self.client.embeddings.create(
-                model=EMBEDDING_MODEL,
-                input=text,
-                dimensions=EMBEDDING_DIMENSIONS
-            )
-            return response.data[0].embedding
+            return self.embedder.embed_query(text)
         except Exception as e:
             logger.error(f"Failed to generate embedding: {e}")
             raise
 
     def generate_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
-        """Generate embeddings for multiple texts in a single API call."""
+        """Generate embeddings for multiple texts in a single call."""
         if not texts:
             return []
 
         try:
-            response = self.client.embeddings.create(
-                model=EMBEDDING_MODEL,
-                input=texts,
-                dimensions=EMBEDDING_DIMENSIONS
-            )
-            return [item.embedding for item in response.data]
+            return self.embedder.embed_documents(texts)
         except Exception as e:
             logger.error(f"Failed to generate batch embeddings: {e}")
             raise

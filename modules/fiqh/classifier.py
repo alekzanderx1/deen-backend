@@ -5,8 +5,23 @@ Classifies user queries into one of 6 categories to route them to the
 correct retrieval strategy before any retrieval runs.
 """
 
-from core import chat_models
+from typing import Literal
+
+from pydantic import BaseModel
 from langchain.prompts import ChatPromptTemplate
+from core import chat_models
+
+
+class FiqhCategory(BaseModel):
+    """Pydantic model for structured fiqh classification output."""
+    category: Literal[
+        "VALID_OBVIOUS",
+        "VALID_SMALL",
+        "VALID_LARGE",
+        "VALID_REASONER",
+        "OUT_OF_SCOPE_FIQH",
+        "UNETHICAL",
+    ]
 
 
 VALID_CATEGORIES = {
@@ -50,18 +65,19 @@ _prompt = ChatPromptTemplate.from_messages([
 
 def classify_fiqh_query(query: str) -> str:
     """
-    Classifies a fiqh query into one of 6 categories using gpt-4o-mini.
-    Never raises — returns OUT_OF_SCOPE_FIQH on any error or unexpected output.
+    Classifies a fiqh query into one of 6 categories.
+    Never raises — returns OUT_OF_SCOPE_FIQH on any error.
+
+    Uses with_structured_output to reliably extract the category
+    regardless of Claude preamble text in the response.
 
     Returns one of: VALID_OBVIOUS, VALID_SMALL, VALID_LARGE, VALID_REASONER,
                     OUT_OF_SCOPE_FIQH, UNETHICAL
     """
     try:
         model = chat_models.get_classifier_model()
-        response = model.invoke(_prompt.format_messages(query=query))
-        category = response.content.strip().upper()
-        if category not in VALID_CATEGORIES:
-            return "OUT_OF_SCOPE_FIQH"
-        return category
+        structured_model = model.with_structured_output(FiqhCategory)
+        result = structured_model.invoke(_prompt.format_messages(query=query))
+        return result.category
     except Exception:
         return "OUT_OF_SCOPE_FIQH"

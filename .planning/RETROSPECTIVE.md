@@ -51,6 +51,98 @@
 
 ---
 
+## Milestone: v1.1 — Supabase Migration
+
+**Shipped:** 2026-04-07
+**Phases:** 3 | **Plans:** 6 | **Commits:** ~30 (2026-04-06 → 2026-04-07)
+
+### What Was Built
+
+- **Database migration:** Supabase Postgres provisioned; genesis Alembic migration created to support fresh-DB provisioning; all 13 tables + pgvector HNSW index verified; app connects via SQLAlchemy with zero code changes
+- **Auth migration:** JWKS fetch URL updated from Cognito to `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`; Cognito env vars removed; account deletion replaced with httpx Supabase Admin API call; all routes protected with strict auth + ENV=development bypass
+- **Cleanup:** boto3 fully removed from requirements.txt and api/account.py; `.env.example` created with 28 vars grouped by service; README `## Environment Variables` section added with v1.0→v1.1 migration callout
+
+### What Worked
+
+- **Clear phase boundaries:** Keeping auth changes in Phase 6 and boto3 removal in Phase 7 prevented scope creep and made each phase independently verifiable
+- **Genesis migration pattern:** Creating `0000_initial_schema.py` as a separate foundational migration (rather than hacking existing migrations) kept the Alembic chain clean and idempotent — `alembic upgrade head` on any fresh DB now just works
+- **Research catching subtle issues:** Phase 7 researcher identified the botocore import line that CONTEXT.md missed — both lines got removed cleanly
+- **Plan checker catching gaps:** Checker caught 4 missing env vars in .env.example template before execution — saved a re-run
+
+### What Was Inefficient
+
+- **Requirements checkboxes not updated during execution:** DB-01, DB-02, DB-03, AUTH-01, AUTH-02 remained unchecked at milestone close despite the code being complete; checkbox maintenance needs to happen at plan completion, not retroactively
+- **Phase 5 was purely manual (infra provisioning):** The GSD execution flow doesn't map cleanly to "go click in a dashboard" tasks — Phase 5 plans were more of a checklist than executable code tasks
+
+### Patterns Established
+
+- **Genesis migration for legacy codebases:** When adopting Alembic on a codebase with pre-existing tables, always create a `0000_initial_schema.py` genesis migration before running against any fresh database
+- **Direct port 5432 over pooler:** asyncpg + Supabase transaction pooler (6543) are incompatible — always use direct connection for both sync and async SQLAlchemy engines
+- **.env.example as the deployment contract:** A well-structured `.env.example` grouped by service (OpenAI, Pinecone, Supabase, Redis, App) eliminates all "what env vars do I need?" onboarding friction
+
+### Key Lessons
+
+1. **Alembic chain must be validated on a fresh DB before any migration milestone ships** — testing only on existing databases hides genesis-migration gaps
+2. **Requirement checkboxes are a tracking artifact, not just a gate** — update them at plan completion so they reflect reality at archive time
+3. **Auth middleware migrations are less risky than they look** — changing a JWKS URL is a one-line diff with no schema or protocol impact; the testing surface is the JWKS fetch at startup
+
+### Cost Observations
+
+- Model mix: Sonnet 4.6 (all phases)
+- Sessions: ~2 sessions over 2 days
+- Notable: Phase 5 (infra provisioning) generated minimal commits — most of the work was manual Supabase dashboard interaction; GSD planning overhead was low relative to v1.0
+
+---
+
+## Milestone: v1.2 — Claude Migration
+
+**Shipped:** 2026-04-10
+**Phases:** 5 | **Plans:** 9 | **Commits:** 71 (2026-03-27 → 2026-04-10)
+
+### What Was Built
+
+- **Config + Dependencies (Phase 8):** ANTHROPIC_API_KEY wired into startup guard; langchain-anthropic + anthropic added; openai + langchain-openai removed; LLM and embedding defaults updated
+- **LLM Swap (Phase 9):** ChatAnthropic replaces init_chat_model/OpenAI in all 4 factory functions; Claude-specific fixes applied: preamble-safe fiqh classifier via `with_structured_output`, AIMessage filter in `_agent_node`, ModelConfig temperature constraint ≤1.0
+- **Embedding Migration (Phase 10):** HuggingFace `all-mpnet-base-v2` (768-dim, free, no API key) replaces text-embedding-3-small (1536-dim); Alembic migration drops + recreates pgvector tables with Vector(768); backfill script created
+- **Dead Code Cleanup (Phase 11):** All OpenAI import sites, OPENAI_API_KEY shim, and voyageai dependency excised; 197 tests pass with zero OpenAI references in application code
+- **Docs Cleanup (Phase 12):** All user-facing docs, comments, and docstrings updated; README/DEPLOYMENT/CHATBOT reflect Claude + HuggingFace; stale comment strings in pipeline.py and docstrings in decomposer.py + README_LANGGRAPH fixed
+
+### What Worked
+
+- **Phased provider swap:** Tackling config (Phase 8), LLM (Phase 9), embedding (Phase 10), dead code (Phase 11) in sequence prevented contamination — each phase had a clean, verifiable scope
+- **Milestone audit before Phase 12:** Running `/gsd:audit-milestone` before the final phase surfaced all remaining tech debt items; Phase 12 then closed them in a single targeted plan
+- **`with_structured_output` for preamble-safe parsing:** Claude returns preamble text before JSON; using Pydantic structured output via LangChain bypassed all fragile string parsing and was simpler than string manipulation
+- **HuggingFace pivot discovery:** The research phase for Phase 10 identified that `all-mpnet-base-v2` was already installed — switching to it from Voyage AI saved an API key dependency and ongoing cost with zero retrieval quality trade-off at the index sizes used
+- **Verification gap closed inline:** Phase 12 verifier found 1 gap (README_LANGGRAPH footer) after initial execution; fixed inline and re-verified without a full gap-closure cycle — single-line fixes don't need a plan
+
+### What Was Inefficient
+
+- **Voyage AI planned, then dropped:** Phase 8 wired `VOYAGE_API_KEY`; Phase 10 removed it in favour of HuggingFace. The pivot was correct but created two superseded requirements (CONF-02, CONF-04) with misleading descriptions. Better: decide on the final embedding provider before Phase 8 rather than updating it in Phase 10.
+- **Phase 9 VERIFICATION.md body/frontmatter discrepancy:** The verifier updated frontmatter to `status: passed` but left body text saying `gaps_found` — this surfaced as tech debt in the milestone audit and required Phase 12 to reconcile it. Verifier should update both frontmatter and body in one pass.
+- **SUMMARY.md `one_liner` field extraction gaps:** Phase 8 and 10 summaries lacked clean `one_liner` frontmatter, producing "One-liner:" placeholders in MILESTONES.md. Same pattern seen in v1.0 — still not fixed in the executor.
+
+### Patterns Established
+
+- **Provider swap order:** Config vars → LLM wiring → Embedding migration → Dead code → Docs. Each step is independently verifiable and doesn't require the next to be done first.
+- **`with_structured_output` for any enum-valued LLM call:** Use it whenever a node expects a fixed-vocabulary output from Claude. It eliminates preamble parsing, JSON parsing, and validation in one change.
+- **AIMessage filter before LLM invocation:** Claude errors on consecutive tool-call messages without an intermediate assistant turn. Filter `state["messages"]` before passing to `llm.invoke()` in any LangGraph agent node.
+- **Milestone audit before cleanup phase:** Run `/gsd:audit-milestone` after the last functional phase (before the cleanup phase) to capture all accumulated tech debt. The cleanup phase then has a concrete, complete list rather than relying on memory.
+
+### Key Lessons
+
+1. **Decide on all external providers before Phase 1 of a migration** — mid-milestone pivots (Voyage AI → HuggingFace) are correct but leave superseded requirements and stale plan context
+2. **VERIFICATION.md body and frontmatter must be reconciled in the same commit** — if the verifier updates frontmatter without updating the body, the discrepancy becomes tech debt that has to be cleaned up later
+3. **Single-line gap fixes don't need a gap-closure plan** — verify, fix inline, re-verify. The workflow overhead of plan→execute→verify for one line of markdown is wasteful.
+4. **Claude's temperature constraint (≤1.0) is different from OpenAI's (≤2.0)** — LangChain's ModelConfig validator set `le=2.0` for OpenAI; this must be updated to `le=1.0` in any OpenAI→Claude migration
+
+### Cost Observations
+
+- Model mix: Sonnet 4.6 (all executor and verifier agents)
+- Sessions: ~3 sessions, 71 commits over 14 days
+- Notable: Inline gap closure (Phase 12 verifier found 1 gap; fixed in main context without spawning another executor) saved ~1 agent spawn; verification cycle was verifier → inline fix → re-verify
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -58,14 +150,21 @@
 | Milestone | Phases | Plans | Key Change |
 |-----------|--------|-------|------------|
 | v1.0 | 4 | 12 | First milestone; established FAIR-RAG module isolation + sub-graph patterns |
+| v1.1 | 3 | 6 | Infrastructure migration; established genesis-migration + direct-connection patterns |
+| v1.2 | 5 | 9 | Provider migration; established provider-swap ordering + `with_structured_output` + AIMessage filter patterns |
 
 ### Cumulative Quality
 
 | Milestone | Tests Added | Modules | Zero-Dep Additions |
 |-----------|-------------|---------|-------------------|
 | v1.0 | ~55 mock-based unit tests | 8 fiqh modules | modules/fiqh/ (fully isolated from agents layer) |
+| v1.1 | 0 new tests (infra migration) | 0 new modules | core/auth.py, api/account.py, .env.example |
+| v1.2 | ~15 updated tests (HuggingFace mocks) | 0 new modules | langchain-anthropic (added), openai/langchain-openai/voyageai (removed) |
 
 ### Top Lessons (Verified Across Milestones)
 
 1. Build and test modules in isolation before wiring into the graph — Phase 3 isolation caught interface bugs before Phase 4 integration
 2. Pre-canned workarounds for SSE/event propagation accrue UX debt — invest in proper event propagation at design time
+3. Always validate Alembic chain on a fresh database before any migration milestone — the genesis-migration gap in v1.1 was only discovered during Phase 5 execution
+4. Decide on all external providers before Phase 1 of a migration — mid-milestone pivots are correct but create superseded requirements and stale documentation
+5. Run `/gsd:audit-milestone` before the final cleanup phase — surfaces all accumulated tech debt so the cleanup phase has a complete, authoritative list

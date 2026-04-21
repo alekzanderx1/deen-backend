@@ -1,5 +1,35 @@
 # Milestones
 
+## v1.2 Claude Migration (Shipped: 2026-04-10)
+
+**Phases completed:** 5 phases, 9 plans, 20 tasks
+
+**Key accomplishments:**
+
+- One-liner:
+- ChatAnthropic replaces init_chat_model/OpenAI in all four factory functions, OPENAI_API_KEY shim added for legacy import compat, ModelConfig updated with Claude API constraints (temperature<=1.0, max_tokens=4096)
+- ChatAnthropic wired end-to-end in ChatAgent and hikmah script; fiqh classifier made preamble-safe via with_structured_output(FiqhCategory); D-08 AIMessage filter added to prevent Claude tool-call sequence crashes
+- One-liner:
+- One-liner:
+- Dead `openai` imports, `OPENAI_API_KEY` references, and `voyageai` dependency fully excised from application code — zero OpenAI import sites remain
+- One-liner:
+- Removed all 10 stale OpenAI/GPT references from user-facing docs, in-code comments, docstrings, and planning artifacts — README, DEPLOYMENT, CHATBOT, pipeline.py, README_LANGGRAPH, decomposer.py, and 09-VERIFICATION.md now accurately reflect the Claude + HuggingFace stack
+
+---
+
+## v1.1 Supabase Migration (Shipped: 2026-04-07)
+
+**Phases completed:** 3 phases, 6 plans, 6 tasks
+
+**Key accomplishments:**
+
+- Supabase env vars (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) replace Cognito constants in core/config.py with startup ValueError guard
+- JWKS fetch URL in core/auth.py changed from AWS Cognito to Supabase Auth endpoint; Cognito references fully removed
+- httpx DELETE to Supabase Admin API replaces boto3 AdminDeleteUser in account deletion; GET /account/me cleaned of Cognito username field
+- boto3 removed from requirements.txt and api/account.py; .env.example and README.md Environment Variables section added for operator onboarding
+
+---
+
 ## v1.0 Fiqh Agentic RAG MVP (Shipped: 2026-03-25)
 
 **Phases completed:** 4 phases, 12 plans, 17 tasks

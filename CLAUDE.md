@@ -168,7 +168,6 @@ An enhancement to the Deen Islamic education platform's chatbot agent that enabl
 - `httpx==0.28.1` — async HTTP client
 - `httpx-sse==0.4.1` — SSE client support
 - `requests==2.32.3` — sync HTTP (used for JWKS endpoint fetch at startup)
-- `boto3==1.35.96` — AWS SDK (present in requirements; used for any AWS service calls)
 - `aiohttp==3.12.13` — async HTTP (used by LangChain internals)
 - `orjson==3.10.18` — fast JSON
 - `ormsgpack==1.10.0` — MessagePack serialization

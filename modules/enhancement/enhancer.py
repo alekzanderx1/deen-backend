@@ -1,4 +1,3 @@
-from core.config import OPENAI_API_KEY
 from core import chat_models
 from core import prompt_templates
 from typing import Optional

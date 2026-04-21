@@ -15,17 +15,25 @@ from agents.core.chat_agent import ChatAgent
 from core import utils
 
 
-# Human-readable status messages for each agent node
+# Human-readable status messages for each agent node.
+#
+# NOTE on `"tools": None`:
+#   Per-tool status events are emitted on the `agent` node event (where the
+#   AIMessage.tool_calls are first visible, BEFORE the `tools` node runs).
+#   We intentionally skip a redundant generic emission on the `tools` node
+#   event via `if node_msg:` in the streaming loop.
 NODE_STATUS_MESSAGES = {
-    "fiqh_classification": "Checking query classification...",
+    "fiqh_classification": "Fiqh query detected...",
     "agent": "Agent thinking...",
-    "tools": "Looking for information...",
-    "generate_response": "Generating response...",
-    "check_early_exit": "Processing...",
+    "tools": None,  # intentional: per-tool messages on 'agent' event cover this window
+    "generate_response": "Preparing answer...",
+    "check_early_exit": "Finalizing...",
     # Fiqh FAIR-RAG pipeline nodes
-    "fiqh_subgraph": "Processing fiqh query...",
-    "generate_fiqh_response": "Generating fiqh answer...",
-    # Fiqh sub-graph stage status (emitted explicitly after fiqh_subgraph event)
+    "fiqh_subgraph": "Processing fiqh query (this may take 10-15 seconds)...",
+    "generate_fiqh_response": "Preparing fiqh answer...",
+    # Fiqh sub-graph stage status (fallback-only if fiqh_status_events is empty,
+    # e.g. error path). Normal runs surface real per-iteration messages from
+    # node_state["fiqh_status_events"] (populated by the sub-graph).
     "fiqh_decompose": "Decomposing fiqh query...",
     "fiqh_retrieve": "Retrieving fiqh documents...",
     "fiqh_filter": "Filtering evidence...",
@@ -36,11 +44,11 @@ NODE_STATUS_MESSAGES = {
 # Human-readable status messages for each tool call
 TOOL_STATUS_MESSAGES = {
     "check_if_non_islamic_tool": "Checking if query is within scope...",
-    "translate_to_english_tool": "Translating query...",
-    "enhance_query_tool": "Enhancing query for better results...",
-    "retrieve_shia_documents_tool": "Retrieving Shia documents...",
-    "retrieve_sunni_documents_tool": "Retrieving Sunni documents...",
-    "retrieve_quran_tafsir_tool": "Retrieving Quran & Tafsir...",
+    "translate_to_english_tool": "Translating your question...",
+    "enhance_query_tool": "Enhancing your question...",
+    "retrieve_shia_documents_tool": "Searching Shia sources...",
+    "retrieve_sunni_documents_tool": "Searching Sunni sources...",
+    "retrieve_quran_tafsir_tool": "Searching Quran and Tafsir...",
 }
 
 
@@ -49,7 +57,15 @@ VALID_FIQH_CATEGORIES = {"VALID_OBVIOUS", "VALID_SMALL", "VALID_LARGE", "VALID_R
 
 
 def sse_event(event_type: str, data: dict) -> str:
-    """Format a Server-Sent Event string."""
+    """Format a Server-Sent Event string.
+
+    Note on extensibility: `status` events are advisory and new `step` values
+    may be added over time (e.g., `starting`, `fiqh_decompose`, etc.). Clients
+    SHOULD ignore unknown `step` values rather than treat them as errors.
+    The non-status event contract (response_chunk, response_end,
+    hadith_references, quran_references, fiqh_references, error, done) is
+    stable and its payload shapes are preserved.
+    """
     return f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
 
 
@@ -83,6 +99,17 @@ async def chat_pipeline_streaming_agentic(
         try:
             final_state = None
             emitted_tool_call_ids = set()
+            fiqh_trail_emitted = False
+
+            # Pre-flight: emit an immediate status event so the frontend shows
+            # feedback during the synchronous classify_fiqh_query() LLM call
+            # inside _fiqh_classification_node (which otherwise produces a
+            # multi-second silent gap between request start and the first
+            # node-arrival event).
+            yield sse_event(
+                "status",
+                {"step": "starting", "message": "Checking query classification..."},
+            )
 
             async for event in agent.astream(
                 user_query=user_query,
@@ -95,29 +122,71 @@ async def chat_pipeline_streaming_agentic(
                     print(f"[AGENTIC PIPELINE] Node: {node_name}")
                     final_state = node_state
 
-                    # Emit a status event for each node
+                    # Emit the node-arrival status event (may be None for 'tools'
+                    # — per-tool messages on the 'agent' event cover that window).
                     node_msg = NODE_STATUS_MESSAGES.get(node_name)
+                    # `fiqh_classification` runs on every query; only announce
+                    # "Fiqh query detected..." when the classifier actually
+                    # routed to the fiqh path. Non-fiqh outcomes fall through
+                    # to the next node's status (e.g. "Agent thinking...").
+                    if node_name == "fiqh_classification":
+                        is_fiqh = (
+                            node_state.get("is_fiqh")
+                            if isinstance(node_state, dict)
+                            else False
+                        )
+                        if not is_fiqh:
+                            node_msg = None
                     if node_msg:
                         yield sse_event("status", {"step": node_name, "message": node_msg})
 
-                    # Emit status events for any tool calls the agent made
-                    messages = node_state.get("messages", []) if isinstance(node_state, dict) else []
-                    for msg in messages:
-                        if hasattr(msg, "tool_calls") and msg.tool_calls:
-                            for index, tc in enumerate(msg.tool_calls):
-                                tool_name = tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", None)
-                                tool_call_id = None
-                                if isinstance(tc, dict):
-                                    tool_call_id = tc.get("id")
-                                else:
-                                    tool_call_id = getattr(tc, "id", None)
-                                if not tool_call_id:
-                                    tool_call_id = f"{node_name}:{index}:{tool_name}"
+                    # Per-tool status events: emit only on the 'agent' node event,
+                    # where the AIMessage with tool_calls is first surfaced (BEFORE
+                    # the 'tools' node runs). Scanning on the 'tools' event is
+                    # redundant and causes whiplash in the status stream.
+                    if node_name == "agent":
+                        messages = node_state.get("messages", []) if isinstance(node_state, dict) else []
+                        for msg in messages:
+                            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                                for index, tc in enumerate(msg.tool_calls):
+                                    tool_name = tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", None)
+                                    tool_call_id = None
+                                    if isinstance(tc, dict):
+                                        tool_call_id = tc.get("id")
+                                    else:
+                                        tool_call_id = getattr(tc, "id", None)
+                                    if not tool_call_id:
+                                        tool_call_id = f"{node_name}:{index}:{tool_name}"
 
-                                if tool_name and tool_call_id not in emitted_tool_call_ids:
-                                    emitted_tool_call_ids.add(tool_call_id)
-                                    tool_msg = TOOL_STATUS_MESSAGES.get(tool_name, f"Running {tool_name}...")
-                                    yield sse_event("status", {"step": tool_name, "message": tool_msg})
+                                    if tool_name and tool_call_id not in emitted_tool_call_ids:
+                                        emitted_tool_call_ids.add(tool_call_id)
+                                        tool_msg = TOOL_STATUS_MESSAGES.get(
+                                            tool_name, f"Running {tool_name}..."
+                                        )
+                                        yield sse_event(
+                                            "status",
+                                            {"step": tool_name, "message": tool_msg},
+                                        )
+
+                    # Fiqh sub-graph: the node-arrival status (keep-alive message
+                    # "Processing fiqh query (this may take 10-15 seconds)...") was
+                    # already emitted above via NODE_STATUS_MESSAGES. Now replay
+                    # the batch of per-iteration status events the sub-graph
+                    # accumulated while it ran (surfaced via Task 1).
+                    if node_name == "fiqh_subgraph" and isinstance(node_state, dict):
+                        fiqh_status_events = node_state.get("fiqh_status_events") or []
+                        if fiqh_status_events:
+                            fiqh_trail_emitted = True
+                            for ev in fiqh_status_events:
+                                if not isinstance(ev, dict):
+                                    continue
+                                step = ev.get("step")
+                                message = ev.get("message")
+                                if step and message:
+                                    yield sse_event(
+                                        "status",
+                                        {"step": step, "message": message},
+                                    )
 
             if final_state is None:
                 yield sse_event("error", {"message": "No response generated."})
@@ -154,18 +223,22 @@ async def chat_pipeline_streaming_agentic(
                 from core import chat_models
                 from core.utils import format_fiqh_references_as_json
 
-                # Emit per-stage status events for the fiqh pipeline stages
-                # (sub-graph runs as a black box; we emit pre-canned stage messages)
-                fiqh_stages = [
-                    ("fiqh_decompose", "Decomposing fiqh query..."),
-                    ("fiqh_retrieve", "Retrieving fiqh documents..."),
-                    ("fiqh_filter", "Filtering evidence..."),
-                    ("fiqh_assess", "Assessing evidence sufficiency..."),
-                ]
-                for stage_step, stage_msg in fiqh_stages:
-                    yield sse_event("status", {"step": stage_step, "message": stage_msg})
+                # Fallback-only: if the retrospective fiqh trail was NOT emitted
+                # (e.g. sub-graph raised before any node ran and returned an
+                # empty fiqh_status_events list), emit the pre-canned stage
+                # messages as a best-effort progress breadcrumb. Normal runs
+                # emit the real per-iteration events during the node loop.
+                if not fiqh_trail_emitted:
+                    fiqh_stages = [
+                        ("fiqh_decompose", "Decomposing fiqh query..."),
+                        ("fiqh_retrieve", "Retrieving fiqh documents..."),
+                        ("fiqh_filter", "Filtering evidence..."),
+                        ("fiqh_assess", "Assessing evidence sufficiency..."),
+                    ]
+                    for stage_step, stage_msg in fiqh_stages:
+                        yield sse_event("status", {"step": stage_step, "message": stage_msg})
 
-                yield sse_event("status", {"step": "generate_fiqh_response", "message": "Generating fiqh answer..."})
+                yield sse_event("status", {"step": "generate_fiqh_response", "message": "Preparing fiqh answer..."})
 
                 fiqh_docs = final_state.get("fiqh_filtered_docs", [])
                 sea_result = final_state.get("fiqh_sea_result")
@@ -244,7 +317,7 @@ async def chat_pipeline_streaming_agentic(
                         from core import chat_models, prompt_templates
                         from core.memory import make_history
 
-                        yield sse_event("status", {"step": "generate_response", "message": "Generating response..."})
+                        yield sse_event("status", {"step": "generate_response", "message": "Preparing answer..."})
 
                         references = utils.compact_format_references(all_docs)
                         chat_model = chat_models.get_generator_model()
