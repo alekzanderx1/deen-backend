@@ -333,16 +333,17 @@ Generate a comprehensive, accurate response that directly addresses the user's q
             return {
                 "fiqh_filtered_docs": fiqh_filtered_docs,
                 "fiqh_sea_result": fiqh_sea_result,
-                # Store status_events in errors as metadata for pipeline_langgraph.py
-                # to read — using a special sentinel key in early_exit_message is too fragile.
-                # Instead store in a dedicated field: we'll pass via fiqh_sea_result metadata.
-                # The status_events are re-read by pipeline_langgraph.py from the node event dict.
+                # Surface status_events via the node delta so
+                # core.pipeline_langgraph.py can yield them as in-order SSE status
+                # events after the blocking sub-graph invoke returns.
+                "fiqh_status_events": list(status_events),
             }
         except Exception as exc:
             print(f"[FIQH SUBGRAPH NODE] Error: {exc}")
             return {
                 "fiqh_filtered_docs": [],
                 "fiqh_sea_result": None,
+                "fiqh_status_events": [],
                 "errors": state.get("errors", []) + [f"Fiqh sub-graph error: {str(exc)}"],
             }
 

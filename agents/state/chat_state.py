@@ -128,6 +128,11 @@ class ChatState(TypedDict):
     """SEAResult from final sub-graph iteration. None if fiqh path not taken.
     Typed as Any to avoid circular import; actual type is modules.fiqh.sea.SEAResult."""
 
+    fiqh_status_events: List[Dict[str, str]]
+    """Status events accumulated inside the fiqh sub-graph, surfaced up so the
+    pipeline can yield them as SSE status events in the order they occurred.
+    Each event: {"step": str, "message": str}. Empty list if fiqh path not taken."""
+
 
 def create_initial_state(
     user_query: str,
@@ -189,4 +194,5 @@ def create_initial_state(
         iterations=0,
         fiqh_filtered_docs=[],
         fiqh_sea_result=None,
+        fiqh_status_events=[],
     )
