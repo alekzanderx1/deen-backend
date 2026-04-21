@@ -4,8 +4,8 @@ milestone: v1.2
 milestone_name: Claude Migration
 status: complete
 stopped_at: v1.2 milestone complete
-last_updated: "2026-04-10"
-last_activity: 2026-04-10
+last_updated: "2026-04-21"
+last_activity: 2026-04-21
 progress:
   total_phases: 5
   completed_phases: 5
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-10 after v1.2 milestone)
 
 Phase: v1.2 complete
 Status: Milestone shipped — ready for next milestone planning
-Last activity: 2026-04-10
+Last activity: 2026-04-21 - Completed quick task 260420-t2v: Improve SSE status granularity in /stream/agentic endpoint
 
 Progress: [██████████] 100%  (5/5 phases, 9/9 plans complete)
 
@@ -54,6 +54,12 @@ None.
 ### Blockers/Concerns
 
 - Live Claude API smoke test (POST /chat/stream/agentic with real ANTHROPIC_API_KEY) not yet run — runtime environment confirmation only, not a code gap
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Status | Directory |
+|---|-------------|------|--------|--------|-----------|
+| 260420-t2v | Improve SSE status granularity in /stream/agentic endpoint | 2026-04-21 | 54c8418 | Verified | [260420-t2v-improve-sse-status-granularity-in-stream](./quick/260420-t2v-improve-sse-status-granularity-in-stream/) |
 
 ## Session Continuity
 
