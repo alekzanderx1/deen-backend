@@ -34,7 +34,6 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain.chat_models import init_chat_model
 from langgraph.graph import StateGraph, END
 
 from modules.retrieval.retriever import retrieve_shia_documents, retrieve_quran_documents
@@ -257,21 +256,23 @@ def init_llm(model_choice: str):
     import os
 
     if model_choice == "default":
-        from core.config import OPENAI_API_KEY, LARGE_LLM
+        from core.config import LARGE_LLM, ANTHROPIC_API_KEY
+        from langchain_anthropic import ChatAnthropic
         if not LARGE_LLM:
             raise ValueError("LARGE_LLM is not set in .env")
-        print(f"[{timestamp()}] Using model: {LARGE_LLM} (OpenAI)")
-        _llm = init_chat_model(model=LARGE_LLM, openai_api_key=OPENAI_API_KEY)
+        print(f"[{timestamp()}] Using model: {LARGE_LLM} (Anthropic)")
+        _llm = ChatAnthropic(model=LARGE_LLM, api_key=ANTHROPIC_API_KEY, max_tokens=4096)
     else:
-        anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-        if not anthropic_key:
+        from core.config import ANTHROPIC_API_KEY
+        from langchain_anthropic import ChatAnthropic
+        if not ANTHROPIC_API_KEY:
             raise ValueError(
                 "ANTHROPIC_API_KEY is not set in .env\n"
                 "Add it: ANTHROPIC_API_KEY=sk-ant-..."
             )
         model_id = "claude-sonnet-4-6" if model_choice == "sonnet" else "claude-opus-4-6"
         print(f"[{timestamp()}] Using model: {model_id} (Anthropic)")
-        _llm = init_chat_model(model=model_id, anthropic_api_key=anthropic_key)
+        _llm = ChatAnthropic(model=model_id, api_key=ANTHROPIC_API_KEY, max_tokens=4096)
 
 
 # ---------------------------------------------------------------------------
@@ -831,7 +832,7 @@ def get_interactive_config() -> dict:
 
     # Model selection
     print("\nModel selection:")
-    print("  1) Default  -- LARGE_LLM from .env (OpenAI)")
+    print("  1) Default  -- LARGE_LLM from .env (Anthropic)")
     print("  2) Sonnet   -- claude-sonnet-4-6 (requires ANTHROPIC_API_KEY)")
     print("  3) Opus     -- claude-opus-4-6   (requires ANTHROPIC_API_KEY)")
     model_input = input("Choose model (1/2/3, default 1): ").strip()

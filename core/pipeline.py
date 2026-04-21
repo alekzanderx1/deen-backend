@@ -30,7 +30,7 @@ def chat_pipeline(user_query: str, session_id: str):
     # Step 4: Retrieve relevant documents from Pinecone
     relevant_docs = retriever.retrieve_documents(enhanced_query,REFERENCE_FETCH_COUNT)
 
-    # Step 5: Generate AI response using OpenAI
+    # Step 5: Generate AI response using LLM
     ai_response = generator.generate_response(enhanced_query, relevant_docs)
 
     return ai_response
@@ -71,7 +71,7 @@ def chat_pipeline_streaming(user_query: str, session_id: str, target_language: s
 
     all_relevant_docs = relevant_shia_docs + relevant_sunni_docs
 
-    # Step 5: Stream the AI response from OpenAI
+    # Step 5: Stream the AI response from the LLM
     response_generator = stream_generator.generate_response_stream(user_query, all_relevant_docs, session_id, target_language=tl)
 
     #Step 6: Stream the formatted references in JSON format
@@ -107,7 +107,7 @@ def hikmah_elaboration_pipeline_streaming(selected_text: str, context_text: str,
 
     all_relevant_docs = relevant_shia_docs
 
-    # Step 2: Stream the AI response from OpenAI
+    # Step 2: Stream the AI response from the LLM
     response_generator = stream_generator.generate_elaboration_response_stream(
         selected_text, context_text, hikmah_tree_name, lesson_name, 
         lesson_summary, all_relevant_docs, user_id=user_id

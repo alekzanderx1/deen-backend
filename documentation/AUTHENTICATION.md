@@ -285,14 +285,12 @@ async def delete_my_account(
     # 3. Clear Redis sessions
     sessions_cleared = clear_user_redis_sessions(user_id)
     
-    # 4. Delete from AWS Cognito
-    cognito_client = boto3.client('cognito-idp', region_name=COGNITO_REGION)
-    cognito_username = credentials.claims.get("cognito:username")
-    
-    cognito_client.admin_delete_user(
-        UserPoolId=COGNITO_POOL_ID,
-        Username=cognito_username
+    # 4. Delete from Supabase Auth via Admin API (v1.1+)
+    response = httpx.delete(
+        f"{SUPABASE_URL}/auth/v1/admin/users/{user_id}",
+        headers={"Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}"},
     )
+    # 404 treated as success — user already removed
     
     return None  # 204 No Content
 ```
@@ -301,27 +299,12 @@ async def delete_my_account(
 
 1. **Database**: User progress, memory profiles, events, consolidations
 2. **Redis**: All session data for user
-3. **Cognito**: User account completely removed
+3. **Supabase Auth**: User account completely removed via Admin API
 
-### IAM Permissions Required
+### Service Role Key Required
 
-For account deletion, the EC2 instance (or service) needs IAM permissions:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "cognito-idp:AdminDeleteUser",
-        "cognito-idp:AdminGetUser"
-      ],
-      "Resource": "arn:aws:cognito-idp:REGION:ACCOUNT_ID:userpool/POOL_ID"
-    }
-  ]
-}
-```
+For account deletion, `SUPABASE_SERVICE_ROLE_KEY` must be set in `.env`. This key is available in:
+Supabase Dashboard → Project Settings → API → `service_role`
 
 ## Frontend Integration
 

@@ -30,8 +30,8 @@ The Deen chatbot provides intelligent, source-backed responses to questions abou
 
 ### Tech Stack
 
-- **LLM**: OpenAI GPT-4 (configurable)
-- **Embeddings**: OpenAI text-embedding-3-small
+- **LLM**: Anthropic Claude (configurable)
+- **Embeddings**: HuggingFace all-mpnet-base-v2 (768-dim)
 - **Vector DB**: Pinecone (dense + sparse indices)
 - **Memory**: Redis with TTL
 - **Framework**: LangChain
@@ -118,7 +118,7 @@ Classification filters queries to ensure:
 ```python
 def classify_non_islamic_query(query: str, session_id: str = None) -> bool:
     """Returns True if query is NOT about Islam"""
-    # Uses GPT-4o-mini for classification
+    # Uses Claude Haiku for classification
     # Considers recent chat context if session_id provided
     # Returns True for rejection, False to continue
 ```
@@ -139,7 +139,7 @@ def classify_non_islamic_query(query: str, session_id: str = None) -> bool:
 ```python
 def classify_fiqh_query(query: str, session_id: str = None) -> bool:
     """Returns True if query requires religious legal ruling"""
-    # Uses GPT-4o-mini for classification
+    # Uses Claude Haiku for classification
     # Defers fiqh questions to qualified scholars
 ```
 
@@ -234,7 +234,7 @@ Location: `core/prompt_templates.py` (`enhancer_prompt_template`)
 The system uses **two types of embeddings** for better results:
 
 1. **Dense Embeddings** (Semantic)
-   - OpenAI text-embedding-3-small
+   - HuggingFace all-mpnet-base-v2
    - Captures meaning and concepts
    - Good for "What is justice in Islam?"
 
@@ -475,7 +475,7 @@ graph LR
 ```python
 def translate_to_english(text: str, source_language: str) -> str:
     """Translate input to English for processing"""
-    # Uses OpenAI for translation
+    # Uses Claude for translation
     pass
 ```
 
@@ -496,7 +496,7 @@ response = generate_response_stream(
 
 ### Supported Languages
 
-The system can handle any language supported by OpenAI's models, including:
+The system can handle any language supported by Claude's models, including:
 - Arabic
 - Urdu
 - Farsi/Persian
@@ -637,8 +637,8 @@ response = requests.delete(delete_url, headers=headers)
 
 ```bash
 # LLM Models
-LARGE_LLM=gpt-4o              # For generation
-SMALL_LLM=gpt-4o-mini         # For classification/enhancement
+LARGE_LLM=claude-sonnet-4-6              # For generation
+SMALL_LLM=claude-haiku-4-5-20251001      # For classification/enhancement
 
 # Retrieval Configuration
 REFERENCE_FETCH_COUNT=10       # Max docs per retrieval
@@ -658,16 +658,16 @@ REDIS_MAX_MESSAGES=30          # Max messages per session
 
 ```python
 def get_generator_model():
-    """GPT-4 for response generation"""
-    return ChatOpenAI(model=LARGE_LLM, temperature=0.7, streaming=True)
+    """Claude Sonnet for response generation"""
+    return ChatAnthropic(model=LARGE_LLM, temperature=0.7, max_tokens=4096)
 
 def get_classifier_model():
-    """GPT-4o-mini for classification (faster, cheaper)"""
-    return ChatOpenAI(model=SMALL_LLM, temperature=0)
+    """Claude Haiku for classification (faster, cheaper)"""
+    return ChatAnthropic(model=SMALL_LLM, temperature=0, max_tokens=4096)
 
 def get_enhancer_model():
-    """GPT-4o-mini for query enhancement"""
-    return ChatOpenAI(model=SMALL_LLM, temperature=0.3)
+    """Claude Haiku for query enhancement"""
+    return ChatAnthropic(model=SMALL_LLM, temperature=0.3, max_tokens=4096)
 ```
 
 ## Performance Considerations
@@ -683,8 +683,8 @@ Typical response times:
 
 ### Cost Optimization
 
-- **GPT-4o-mini** for classification/enhancement (cheaper)
-- **GPT-4** only for final generation (better quality)
+- **Claude Haiku** for classification/enhancement (faster, cheaper)
+- **Claude Sonnet** only for final generation (better quality)
 - **Retrieval first** (cheapest operation)
 - **Context trimming** (reduces tokens)
 
@@ -730,12 +730,12 @@ except Exception as e:
 ### No Response / Timeout
 
 **Possible Causes**:
-- OpenAI API rate limit
+- Anthropic API rate limit
 - Redis connection failure
 - Pinecone timeout
 
 **Solutions**:
-- Check OpenAI API status
+- Check Anthropic API status
 - Verify Redis is running: `redis-cli ping`
 - Check Pinecone dashboard
 

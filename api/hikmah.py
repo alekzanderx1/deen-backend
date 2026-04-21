@@ -5,7 +5,9 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, s
 from sqlalchemy.orm import Session
 
 from core import pipeline
+from core.auth import auth
 from core.logging_config import setup_logging
+from models.JWTBearer import JWTAuthorizationCredentials
 from db.session import get_db
 from models.schemas import (
     ElaborationRequest,
@@ -33,7 +35,10 @@ hikmah_router = APIRouter(
 
 
 @hikmah_router.post("/elaborate/stream")
-async def chat_pipeline_stream_ep(request: ElaborationRequest):
+async def chat_pipeline_stream_ep(
+    request: ElaborationRequest,
+    credentials: JWTAuthorizationCredentials = Depends(auth),
+):
     """
     Streaming endpoint to get explanation on selected text in a hikam tree lesson.
     Expects:
@@ -84,6 +89,7 @@ async def chat_pipeline_stream_ep(request: ElaborationRequest):
 )
 async def get_page_quiz_questions(
     lesson_content_id: int,
+    credentials: JWTAuthorizationCredentials = Depends(auth),
     db: Session = Depends(get_db),
 ):
     """Get all active multiple-choice quiz questions associated with a lesson page."""
@@ -109,6 +115,7 @@ async def submit_page_quiz_answer(
     lesson_content_id: int,
     request: SubmitLessonPageQuizAnswerRequest,
     background_tasks: BackgroundTasks,
+    credentials: JWTAuthorizationCredentials = Depends(auth),
 ):
     """
     Fire-and-forget quiz answer submission endpoint.
@@ -134,6 +141,7 @@ async def submit_page_quiz_answer(
 async def create_page_quiz_question(
     lesson_content_id: int,
     request: QuizQuestionCreateRequest,
+    credentials: JWTAuthorizationCredentials = Depends(auth),
     db: Session = Depends(get_db),
 ):
     """Create one quiz question (with choices) for a lesson page."""
@@ -159,6 +167,7 @@ async def create_page_quiz_question(
 async def list_page_quiz_questions_admin(
     lesson_content_id: int,
     include_inactive: bool = Query(False),
+    credentials: JWTAuthorizationCredentials = Depends(auth),
     db: Session = Depends(get_db),
 ):
     """List quiz questions for authoring (optionally including inactive questions)."""
@@ -186,6 +195,7 @@ async def list_page_quiz_questions_admin(
 async def get_page_quiz_question(
     lesson_content_id: int,
     question_id: int,
+    credentials: JWTAuthorizationCredentials = Depends(auth),
     db: Session = Depends(get_db),
 ):
     """Get one quiz question for authoring."""
@@ -217,6 +227,7 @@ async def replace_page_quiz_question(
     lesson_content_id: int,
     question_id: int,
     request: QuizQuestionPutRequest,
+    credentials: JWTAuthorizationCredentials = Depends(auth),
     db: Session = Depends(get_db),
 ):
     """Replace question metadata and choices."""
@@ -250,6 +261,7 @@ async def patch_page_quiz_question(
     lesson_content_id: int,
     question_id: int,
     request: QuizQuestionPatchRequest,
+    credentials: JWTAuthorizationCredentials = Depends(auth),
     db: Session = Depends(get_db),
 ):
     """Patch question metadata only."""
@@ -284,6 +296,7 @@ async def patch_page_quiz_question(
 async def delete_page_quiz_question(
     lesson_content_id: int,
     question_id: int,
+    credentials: JWTAuthorizationCredentials = Depends(auth),
     db: Session = Depends(get_db),
 ):
     """Hard delete a quiz question and cascaded children."""

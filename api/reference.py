@@ -1,6 +1,8 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from models.schemas import ReferenceRequest
 from core import pipeline
+from core.auth import auth
+from models.JWTBearer import JWTAuthorizationCredentials
 
 ref_router = APIRouter(
     prefix='/references',
@@ -13,9 +15,10 @@ ref_router = APIRouter(
 # Example json body input:: {"user_query": "What does Islam say about justice?"}
 @ref_router.post("/")
 async def references_pipeline(
-    request: ReferenceRequest, 
+    request: ReferenceRequest,
+    credentials: JWTAuthorizationCredentials = Depends(auth),
     sect: str = Query("both", enum=["sunni", "shia", "both"]),
-    limit: int = Query(10, ge=1, le=50, description="Number of references to fetch (1-50)")
+    limit: int = Query(10, ge=1, le=50, description="Number of references to fetch (1-50)"),
 ):
     user_query = request.user_query.strip()
 

@@ -8,8 +8,8 @@ Shia hadith, Sunni hadith, and Quran/Tafsir evidence per query.
 import json
 from typing import Any, Dict, List, Literal
 
-from langchain.chat_models import init_chat_model
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_anthropic import ChatAnthropic
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import ToolNode
@@ -29,7 +29,7 @@ from agents.tools import (
     translate_to_english_tool,
 )
 from core import utils
-from core.config import OPENAI_API_KEY
+from core.config import ANTHROPIC_API_KEY
 
 
 class ChatAgent:
@@ -53,9 +53,9 @@ class ChatAgent:
         self.compiled_graph = self.graph.compile(checkpointer=self.checkpointer)
 
     def _create_llm_with_tools(self):
-        llm = init_chat_model(
+        llm = ChatAnthropic(
             model=self.config.model.agent_model,
-            openai_api_key=OPENAI_API_KEY,
+            api_key=ANTHROPIC_API_KEY,
             temperature=self.config.model.temperature,
             max_tokens=self.config.model.max_tokens,
         )
@@ -145,6 +145,18 @@ class ChatAgent:
             return state
 
         messages = list(state["messages"])
+
+        # D-08: filter spurious empty AIMessages emitted by Claude in tool-calling sequences.
+        # AIMessage(content="", tool_calls=[...]) is valid (Claude tool-call request) — preserved.
+        # AIMessage(content="", tool_calls=None/[]) with no tool_calls is spurious — filtered out.
+        messages = [
+            msg for msg in messages
+            if not (
+                isinstance(msg, AIMessage)
+                and msg.content == ""
+                and not getattr(msg, "tool_calls", None)
+            )
+        ]
 
         if state["iterations"] == 1:
             messages.insert(0, SystemMessage(content=AGENT_SYSTEM_PROMPT))
@@ -321,16 +333,17 @@ Generate a comprehensive, accurate response that directly addresses the user's q
             return {
                 "fiqh_filtered_docs": fiqh_filtered_docs,
                 "fiqh_sea_result": fiqh_sea_result,
-                # Store status_events in errors as metadata for pipeline_langgraph.py
-                # to read — using a special sentinel key in early_exit_message is too fragile.
-                # Instead store in a dedicated field: we'll pass via fiqh_sea_result metadata.
-                # The status_events are re-read by pipeline_langgraph.py from the node event dict.
+                # Surface status_events via the node delta so
+                # core.pipeline_langgraph.py can yield them as in-order SSE status
+                # events after the blocking sub-graph invoke returns.
+                "fiqh_status_events": list(status_events),
             }
         except Exception as exc:
             print(f"[FIQH SUBGRAPH NODE] Error: {exc}")
             return {
                 "fiqh_filtered_docs": [],
                 "fiqh_sea_result": None,
+                "fiqh_status_events": [],
                 "errors": state.get("errors", []) + [f"Fiqh sub-graph error: {str(exc)}"],
             }
 
