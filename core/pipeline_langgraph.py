@@ -125,6 +125,18 @@ async def chat_pipeline_streaming_agentic(
                     # Emit the node-arrival status event (may be None for 'tools'
                     # — per-tool messages on the 'agent' event cover that window).
                     node_msg = NODE_STATUS_MESSAGES.get(node_name)
+                    # `fiqh_classification` runs on every query; only announce
+                    # "Fiqh query detected..." when the classifier actually
+                    # routed to the fiqh path. Non-fiqh outcomes fall through
+                    # to the next node's status (e.g. "Agent thinking...").
+                    if node_name == "fiqh_classification":
+                        is_fiqh = (
+                            node_state.get("is_fiqh")
+                            if isinstance(node_state, dict)
+                            else False
+                        )
+                        if not is_fiqh:
+                            node_msg = None
                     if node_msg:
                         yield sse_event("status", {"step": node_name, "message": node_msg})
 
