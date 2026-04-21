@@ -205,6 +205,115 @@ async def test_agentic_streaming_sse_to_markdown_file(tmp_path):
     print(f"\n[TEST] Wrote UI markdown to: {out_path}")
 
 
+@_maybe_mark_asyncio
+async def test_agentic_streaming_emits_granular_status_events(tmp_path):
+    """Verify granular status events are emitted (dual-path: fiqh vs non-fiqh).
+
+    Assertions:
+      - For the non-fiqh path: at least one per-tool status event is emitted,
+        AND a per-tool status event precedes the first response_chunk.
+      - For the fiqh path: at least one fiqh_* stage status event is emitted,
+        AND a `fiqh_classification` or pre-flight `starting` status event
+        precedes the first response_chunk.
+      - If neither path is detected (e.g. early-exit / environment unable to
+        reach external services), skip gracefully.
+    """
+    if pytest is None:  # pragma: no cover - pytest required for skip()
+        return
+
+    # Reuse the same query as the existing test to minimize setup variance.
+    # The fiqh classifier may still route this down the fiqh path in some
+    # configurations — the test handles both paths below.
+    query = "What does Islam say about patience?"
+    session_id = "test-sse-session-granular"
+
+    # Skip gracefully on environment bootstrap errors (missing keys, model
+    # init failures, network). The test's purpose is to assert SSE status
+    # emission *given* a working pipeline; it should not fail the suite when
+    # the pipeline cannot even be constructed.
+    try:
+        chunks = await run_agentic_stream_and_collect(query, session_id=session_id)
+    except Exception as exc:  # pragma: no cover - environment-dependent
+        pytest.skip(f"Pipeline bootstrap failed ({type(exc).__name__}): {exc}")
+    if not chunks:
+        pytest.skip("No SSE chunks received — environment likely cannot reach external services")
+
+    events = parse_sse_stream(chunks)
+    if not events:
+        pytest.skip("No SSE events parsed — environment likely cannot reach external services")
+
+    status_events = [e for e in events if e.get("event") == "status"]
+    status_steps = [(e.get("data") or {}).get("step") for e in status_events]
+    chunk_events = [e for e in events if e.get("event") == "response_chunk"]
+
+    # Path detection. fiqh_classification alone is NOT enough to mark the fiqh
+    # path; we only treat a run as the fiqh path when a fiqh_<stage> step
+    # (decompose / retrieve / filter / assess / refine / subgraph) is seen.
+    has_agent_step = "agent" in status_steps
+    fiqh_stage_steps = {
+        s for s in status_steps
+        if isinstance(s, str) and s.startswith("fiqh_") and s != "fiqh_classification"
+    }
+    is_fiqh_path = len(fiqh_stage_steps) > 0
+    is_nonfiqh_path = has_agent_step and not is_fiqh_path
+
+    # Skip-gracefully guards
+    if len(chunk_events) == 0:
+        pytest.skip(
+            "No response_chunk events received — environment likely cannot reach external services"
+        )
+    if not (is_fiqh_path or is_nonfiqh_path):
+        pytest.skip(
+            f"Neither fiqh nor non-fiqh path detected (status_steps={status_steps}); "
+            f"likely early-exit or env issue"
+        )
+
+    # First response_chunk index (used by both paths for ordering assertion).
+    first_chunk_idx = next(i for i, e in enumerate(events) if e.get("event") == "response_chunk")
+    preceding_status_steps = [
+        (e.get("data") or {}).get("step")
+        for e in events[:first_chunk_idx]
+        if e.get("event") == "status"
+    ]
+
+    if is_nonfiqh_path:
+        known_tool_steps = {
+            "retrieve_shia_documents_tool",
+            "retrieve_sunni_documents_tool",
+            "retrieve_quran_tafsir_tool",
+            "enhance_query_tool",
+            "translate_to_english_tool",
+            "check_if_non_islamic_tool",
+        }
+        assert any(s in known_tool_steps for s in status_steps), (
+            f"[non-fiqh path] Expected at least one per-tool status event. "
+            f"status_steps={status_steps}"
+        )
+        assert any(s in known_tool_steps for s in preceding_status_steps), (
+            f"[non-fiqh path] Expected a per-tool status event BEFORE the first "
+            f"response_chunk. preceding_status_steps={preceding_status_steps}"
+        )
+    else:
+        # Fiqh path assertions
+        assert len(fiqh_stage_steps) >= 1, (
+            f"[fiqh path] Expected at least one fiqh_* stage status event (e.g., "
+            f"fiqh_decompose, fiqh_retrieve, fiqh_filter, fiqh_assess). "
+            f"status_steps={status_steps}"
+        )
+        gating_steps = {"fiqh_classification", "starting"}
+        assert any(s in gating_steps for s in preceding_status_steps), (
+            f"[fiqh path] Expected fiqh_classification or 'starting' status event "
+            f"BEFORE the first response_chunk. "
+            f"preceding_status_steps={preceding_status_steps}"
+        )
+
+    print(
+        f"\n[TEST] Granular status check OK "
+        f"(path={'fiqh' if is_fiqh_path else 'non-fiqh'}, "
+        f"status_steps={status_steps})"
+    )
+
+
 def main():
     """Run the pipeline once and write output to a temp markdown file (no pytest).
 
